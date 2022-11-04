@@ -13,6 +13,13 @@ def compute_scib_metrics(
     """Compute integration metrics."""
     config = load_config(config_in)
     adata = sc.read_h5ad(adata_in)
+    batch_key = config.get("batch_key", None)
+    sample_key = config.get("sample_key", None)
+    labels_key = config.get("labels_key", None)
+    latent_key = config.get("latent_key", None)
+
+    X_latent = adata.obsm[latent_key]
+    labels = 
 
 
 if __name__ == "__main__":

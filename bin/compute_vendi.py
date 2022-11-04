@@ -11,7 +11,6 @@ def compute_vendi(
 ) -> None:
     """Compute integration metrics."""
     config = load_config(config_in)
-
     adata = sc.read_h5ad(adata_in)
 
 
