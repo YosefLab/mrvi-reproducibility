@@ -1,12 +1,14 @@
 {
     "name": "example",
     "description": "Example dataset",
-    "batch_key": "batch",
-    "sample_key": "sample",
+    "batch_key": "cell_source",
+    "sample_key": "donor",
     "hvg_kwargs": {
         "n_top_genes": 2000,
         "subset": true,
         "flavor": "seurat_v3"
     },
-    "train_kwargs": null
+    "train_kwargs": {
+        "max_epochs": 1
+    }
 }

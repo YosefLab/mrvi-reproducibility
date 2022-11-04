@@ -8,3 +8,5 @@ dependencies:
     - anndata>=0.8.0
     - scanpy>=1.9.0
     - scikit-misc
+    - pip:
+        - click
