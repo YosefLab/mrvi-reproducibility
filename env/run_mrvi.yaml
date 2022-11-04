@@ -1,0 +1,11 @@
+name: run-mrvi
+channels:
+    - conda-forge
+    - bioconda
+    - pytorch
+    - defaults
+dependencies:
+    - python=3.10
+    - mrvi>=0.1.0
+    - anndata>=0.8.0
+    - scanpy>=1.9.0

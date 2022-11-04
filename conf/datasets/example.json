@@ -1,0 +1,12 @@
+{
+    "name": "example",
+    "description": "Example dataset",
+    "batch_key": "batch",
+    "sample_key": "sample",
+    "hvg_kwargs": {
+        "n_top_genes": 2000,
+        "subset": true,
+        "flavor": "seurat_v3"
+    },
+    "train_kwargs": null
+}

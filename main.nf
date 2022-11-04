@@ -1,12 +1,9 @@
 #!/usr/bin/env nextflow
 
-// Using DSL-2
-nextflow.enable.dsl=2
-
-def helloWorld() {
-  println "hello world"
-}
+include { simple_pipeline } from params.simple_pipeline_workflow
 
 workflow {
-  helloWorld()
+    if (params.workflow == "simple_pipeline") {
+        simple_pipeline()
+    }
 }

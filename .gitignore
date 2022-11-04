@@ -25,3 +25,5 @@ __pycache__/
 
 # Nextflow
 .nextflow*
+work/
+*/.cache/

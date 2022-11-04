@@ -2,8 +2,8 @@ import argparse
 import json
 import pathlib
 
+import mrvi
 import scanpy as sc
-from anndata import AnnData
 
 
 def load_config(config_path: str) -> dict:
@@ -13,41 +13,39 @@ def load_config(config_path: str) -> dict:
     return config
 
 
-def _hvg(adata: AnnData, **kwargs) -> None:
-    sc.pp.highly_variable_genes(adata, **kwargs)
-
-
-def preprocess_data(
+def get_latent_mrvi(
     *,
     adata_in: str,
+    model_in: str,
     config_in: str,
     adata_out: str,
-):
-    """
-    Preprocess an input AnnData object and saves it to a new file.
-
-    Performs the following steps:
-    1. Highly variable genes selection
-    """
+) -> None:
+    """Get latent space from MrVI model."""
     config = load_config(config_in)
-    hvg_kwargs = config.get("hvg_kwargs", {})
-    adata = sc.read(adata_in)
-    
-    _hvg(adata, **hvg_kwargs)
-    
+    adata = sc.read_h5ad(adata_in)
+    model = mrvi.MrVI.load(model_in)
+    latent_key = config.get("latent_key", "X_mrvi_u")
+
+    adata[latent_key] = model.get_latent_representation(adata, give_z=False)
+
     path = pathlib.Path(adata_out)
     path.parent.mkdir(parents=True, exist_ok=True)
     adata.write(filename=adata_out)
 
-
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Preprocess dataset.")
+    parser = argparse.ArgumentParser(description="Get latent space from a MrVI model")
 
     parser.add_argument(
         "--adata_in",
         dest="adata_in",
         type=str,
-        help="Input raw AnnData path",
+        help="Input preprocessed AnnData attached to MrVI path",
+    )
+    parser.add_argument(
+        "--model_in",
+        dest="model_in",
+        type=str,
+        help="Input trained MrVI model path",
     )
     parser.add_argument(
         "--config_in",
@@ -59,12 +57,12 @@ if __name__ == "__main__":
         "--adata_out",
         dest="adata_out",
         type=str,
-        help="Output preprocessed AnnData path",
+        help="Output AnnData with latent space path",
     )
-    
     args = parser.parse_args()
-    preprocess_data(
+    get_latent_mrvi(
         adata_in=args.adata_in,
+        model_in=args.model_in,
         config_in=args.config_in,
         adata_out=args.adata_out,
     )
