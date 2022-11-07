@@ -2,6 +2,8 @@ name: compute-metrics
 channels:
     - conda-forge
     - bioconda
+    - pytorch
+    - nvidia
     - defaults
 dependencies:
     - python=3.10
@@ -9,7 +11,11 @@ dependencies:
     - scanpy>=1.9.0
     - numpy
     - pandas
+    - jax
+    - jaxlib
+    - cuda-nvcc
     - pip
     - pip:
-        - scib-metrics>=0.0.7
         - click
+        - scib-metrics>=0.0.7
+        
