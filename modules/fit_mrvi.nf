@@ -1,12 +1,9 @@
 process fit_mrvi {
     conda "${params.env.run_mrvi}"
+    publishDir "${params.publish}"
 
     input:
     path adata_in
-
-    output:
-    path adata_out
-    path model_out
 
     script:
     adata_name = adata_in.getBaseName()
@@ -20,4 +17,8 @@ process fit_mrvi {
         --adata_out ${adata_out} \\
         --model_out ${model_out}
     """
+
+    output:
+    path adata_out
+    path model_out
 }

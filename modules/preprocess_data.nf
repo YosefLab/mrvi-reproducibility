@@ -1,5 +1,6 @@
 process preprocess_data {
     conda "${params.env.preprocess_data}"
+    publishDir "${params.publish}"
 
     input:
     path adata_in

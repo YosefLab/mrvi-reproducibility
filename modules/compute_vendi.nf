@@ -1,5 +1,6 @@
 process compute_vendi {
     conda "${params.env.compute_metrics}"
+    publishDir "${params.publish}"
 
     input:
     path adata_in
@@ -15,4 +16,6 @@ process compute_vendi {
         --table_out ${table_out}
     """
     
+    output:
+    path table_out
 }

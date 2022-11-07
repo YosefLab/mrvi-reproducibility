@@ -27,3 +27,4 @@ __pycache__/
 .nextflow*
 work/
 */.cache/
+results/

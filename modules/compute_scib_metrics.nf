@@ -1,5 +1,6 @@
 process compute_scib_metrics {
     conda "${params.env.compute_metrics}"
+    publishDir "${params.publish}"
 
     input:
     path adata_in
@@ -14,4 +15,7 @@ process compute_scib_metrics {
         --config_in ${config_in} \\
         --table_out ${table_out}
     """
+
+    output:
+    path table_out
 }
