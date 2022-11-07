@@ -19,6 +19,8 @@ provided in the `conf/datasets/` directory as JSON files, which can only be acce
 by Python scripts in `bin/`.
 
 To start a new run with `simple_pipeline`, the following is required:
-- Add a `.h5ad` file to `data/raw`
-- Add a dataset configuration file to `conf/datasets`, following the example
+- Add a `.h5ad` file to `data/`
+- Add a dataset configuration file to `conf/datasets/`, following the example
 in `example.json`. The config file must have the same name as the `.h5ad` file.
+
+Intermediate and final outputs will be placed in `results/simple_pipeline/`.
