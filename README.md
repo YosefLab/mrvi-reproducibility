@@ -17,3 +17,8 @@ specified in the configuration can be accessed within any of the subworkflows or
 In addition to the Nextflow configuration file, dataset-level configurations can be 
 provided in the `conf/datasets/` directory as JSON files, which can only be accessed
 by Python scripts in `bin/`.
+
+To start a new run with `simple_pipeline`, the following is required:
+- Add a `.h5ad` file to `data/raw`
+- Add a dataset configuration file to `conf/datasets`, following the example
+in `example.json`. The config file must have the same name as the `.h5ad` file.
