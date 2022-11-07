@@ -8,7 +8,7 @@ process compute_vendi {
     script:
     adata_name = adata_in.getBaseName()
     config_in = "${params.conf.dataset}/${adata_name}.json"
-    table_out = "${params.output.compute_metrics}/vendi/${adata_name}.csv"
+    table_out = "${params.output.compute_metrics_vendi}/${adata_name}.csv"
     """
     python3 ${params.script.compute_vendi} \\
         --adata_in ${adata_in} \\

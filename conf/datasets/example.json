@@ -1,6 +1,4 @@
 {
-    "name": "example",
-    "description": "Example dataset",
     "batch_key": "cell_source",
     "labels_key": "cell_type",
     "sample_key": "donor",
