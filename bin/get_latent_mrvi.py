@@ -29,7 +29,7 @@ def get_latent_mrvi(
     """
     config = load_config(config_in)
     adata = sc.read_h5ad(adata_in)
-    model = mrvi.MrVI.load(model_in)
+    model = mrvi.MrVI.load(model_in, adata=adata)
     latent_key = config.get("latent_key", None)
 
     adata.obsm[latent_key] = model.get_latent_representation(adata, give_z=False)

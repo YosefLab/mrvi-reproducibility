@@ -6,7 +6,7 @@ process compute_scib_metrics {
 
     script:
     adata_name = adata_in.getBaseName()
-    config_in = "${params.conf/dataset}/${adata_name}.json"
+    config_in = "${params.conf.dataset}/${adata_name}.json"
     table_out = "${params.output.compute_metrics}/scib/${adata_name}.csv"
     """
     python3 ${params.script.compute_scib_metrics} \\

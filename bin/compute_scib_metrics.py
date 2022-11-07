@@ -1,7 +1,14 @@
+import numpy as np
+import pandas as pd
 import scanpy as sc
 import scib_metrics as metrics
+from anndata import AnnData
 
 from utils import load_config, make_parents, wrap_kwargs
+
+
+def categorical_obs(adata: AnnData, key: str) -> np.ndarray:
+    return np.array(adata.obs[key].astype("category").cat.codes).ravel()
 
 
 def compute_scib_metrics(
@@ -30,7 +37,14 @@ def compute_scib_metrics(
     latent_key = config.get("latent_key", None)
 
     X_latent = adata.obsm[latent_key]
-    labels = 
+    labels = categorical_obs(adata, labels_key)
+    batch = categorical_obs(adata, batch_key)
+
+    metrics = {"example_metric": [0.0]}
+    df = pd.DataFrame.from_dict(metrics, orient="index", columns=["value"])
+
+    make_parents(table_out)
+    df.to_csv(table_out)
 
 
 if __name__ == "__main__":

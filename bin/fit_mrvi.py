@@ -21,7 +21,7 @@ def fit_mrvi(
     config_in
         Path to the dataset configuration file.
     adata_out
-        Path to write the setup AnnData object.
+        Path to write the latent AnnData object.
     model_out
         Path to write the trained MrVI model.
     """
@@ -37,8 +37,8 @@ def fit_mrvi(
     model = mrvi.MrVI(adata)
     model.train(**train_kwargs)
 
-    make_parents([adata_out, model_out])
-    model.save(model_out, save_anndata=False)
+    make_parents([model_out, adata_out])
+    model.save(dir_path=model_out, overwrite=True, save_anndata=False)
     adata.write(filename=adata_out)
     return model
 
