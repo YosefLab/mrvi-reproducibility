@@ -10,8 +10,21 @@ def fit_mrvi(
     config_in: str,
     adata_out: str,
     model_out: str,
-):
-    """Train a MrVI model."""
+) -> None:
+    """
+    Train a MrVI model.
+    
+    Parameters
+    ----------
+    adata_in
+        Path to the preprocessed AnnData object.
+    config_in
+        Path to the dataset configuration file.
+    adata_out
+        Path to write the setup AnnData object.
+    model_out
+        Path to write the trained MrVI model.
+    """
     config = load_config(config_in)
     batch_key = config.get("batch_key", None)
     sample_key = config.get("sample_key", None)
@@ -27,6 +40,7 @@ def fit_mrvi(
     make_parents([adata_out, model_out])
     model.save(model_out, save_anndata=False)
     adata.write(filename=adata_out)
+    return model
 
 
 if __name__ == "__main__":

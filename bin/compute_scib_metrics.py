@@ -10,7 +10,18 @@ def compute_scib_metrics(
     config_in: str,
     table_out: str,
 ) -> None:
-    """Compute integration metrics."""
+    """
+    Compute integration metrics.
+    
+    Parameters
+    ----------
+    adata_in
+        Path to input AnnData object with integrated data.
+    config_in
+        Path to the dataset configuration file.
+    table_out
+        Path to write output CSV table with integration metrics.
+    """
     config = load_config(config_in)
     adata = sc.read_h5ad(adata_in)
     batch_key = config.get("batch_key", None)

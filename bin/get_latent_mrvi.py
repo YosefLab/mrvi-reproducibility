@@ -11,7 +11,22 @@ def get_latent_mrvi(
     config_in: str,
     adata_out: str,
 ) -> None:
-    """Get latent space from MrVI model."""
+    """
+    Get latent space from a trained MrVI instance.
+
+    Saves it as a `.obsm` field in a new AnnData object.
+    
+    Parameters
+    ----------
+    adata_in
+        Path to the setup AnnData object.
+    model_in
+        Path to the trained MrVI model.
+    config_in
+        Path to the dataset configuration file.
+    adata_out
+        Path to write the latent AnnData object.
+    """
     config = load_config(config_in)
     adata = sc.read_h5ad(adata_in)
     model = mrvi.MrVI.load(model_in)
@@ -21,6 +36,7 @@ def get_latent_mrvi(
 
     make_parents(adata_out)
     adata.write(filename=adata_out)
+    return adata
 
 if __name__ == "__main__":
     wrap_kwargs(get_latent_mrvi)()

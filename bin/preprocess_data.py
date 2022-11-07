@@ -28,11 +28,11 @@ def preprocess_data(
     Parameters
     ----------
     adata_in
-        Input AnnData path
+        Path to the input AnnData object.
     config_in
-        Input dataset configuration path
+        Path to the dataset configuration file.
     adata_out
-        Output preprocessed AnnData path
+        Path to write the preprocessed AnnData object.
     """
     config = load_config(config_in)
     adata = sc.read(adata_in)
@@ -42,6 +42,7 @@ def preprocess_data(
     
     make_parents(adata_out)
     adata.write(filename=adata_out)
+    return adata
 
 
 if __name__ == "__main__":
