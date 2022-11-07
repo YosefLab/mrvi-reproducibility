@@ -10,7 +10,7 @@ def fit_mrvi(
     config_in: str,
     adata_out: str,
     model_out: str,
-) -> None:
+) -> mrvi.MrVI:
     """
     Train a MrVI model.
     

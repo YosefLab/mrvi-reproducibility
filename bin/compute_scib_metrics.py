@@ -16,7 +16,7 @@ def compute_scib_metrics(
     adata_in: str,
     config_in: str,
     table_out: str,
-) -> None:
+) -> pd.DataFrame:
     """
     Compute integration metrics.
     
@@ -45,6 +45,7 @@ def compute_scib_metrics(
 
     make_parents(table_out)
     df.to_csv(table_out)
+    return df
 
 
 if __name__ == "__main__":

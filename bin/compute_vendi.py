@@ -1,3 +1,4 @@
+import pandas as pd
 import scanpy as sc
 
 from utils import load_config, make_parents, wrap_kwargs
@@ -8,7 +9,7 @@ def compute_vendi(
     adata_in: str,
     config_in: str,
     table_out: str,
-) -> None:
+) -> pd.DataFrame:
     """
     Compute Vendi score.
 
@@ -23,6 +24,13 @@ def compute_vendi(
     """
     config = load_config(config_in)
     adata = sc.read_h5ad(adata_in)
+
+    metrics = {"example_metric": [0.0]}
+    df = pd.DataFrame.from_dict(metrics, orient="index", columns=["value"])
+
+    make_parents(table_out)
+    df.to_csv(table_out)
+    return df
 
 
 if __name__ == "__main__":

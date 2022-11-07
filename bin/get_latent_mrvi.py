@@ -1,5 +1,6 @@
 import mrvi
 import scanpy as sc
+from anndata import AnnData
 
 from utils import load_config, make_parents, wrap_kwargs
 
@@ -10,7 +11,7 @@ def get_latent_mrvi(
     model_in: str,
     config_in: str,
     adata_out: str,
-) -> None:
+) -> AnnData:
     """
     Get latent space from a trained MrVI instance.
 

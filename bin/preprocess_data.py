@@ -15,7 +15,7 @@ def preprocess_data(
     adata_in: str,
     config_in: str,
     adata_out: str,
-):
+) -> AnnData:
     """
     Preprocess an input AnnData object and saves it to a new file.
 
