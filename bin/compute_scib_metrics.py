@@ -11,6 +11,7 @@ def categorical_obs(adata: AnnData, key: str) -> np.ndarray:
     return np.array(adata.obs[key].astype("category").cat.codes).ravel()
 
 
+@wrap_kwargs
 def compute_scib_metrics(
     *,
     adata_in: str,
@@ -48,5 +49,5 @@ def compute_scib_metrics(
     return df
 
 
-if __name__ == "__main__":
-    wrap_kwargs(compute_scib_metrics)()
+if __name__ == "__main__": 
+    compute_scib_metrics()

@@ -5,6 +5,7 @@ from anndata import AnnData
 from utils import load_config, make_parents, wrap_kwargs
 
 
+@wrap_kwargs
 def get_latent_mrvi(
     *,
     adata_in: str,
@@ -40,4 +41,4 @@ def get_latent_mrvi(
     return adata
 
 if __name__ == "__main__":
-    wrap_kwargs(get_latent_mrvi)()
+    get_latent_mrvi()

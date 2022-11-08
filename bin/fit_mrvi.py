@@ -4,6 +4,7 @@ import scanpy as sc
 from utils import load_config, make_parents, wrap_kwargs
 
 
+@wrap_kwargs
 def fit_mrvi(
     *,
     adata_in: str,
@@ -44,4 +45,4 @@ def fit_mrvi(
 
 
 if __name__ == "__main__":
-    wrap_kwargs(fit_mrvi)()
+    fit_mrvi()

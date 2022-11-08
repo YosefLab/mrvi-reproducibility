@@ -4,6 +4,7 @@ import scanpy as sc
 from utils import load_config, make_parents, wrap_kwargs
 
 
+@wrap_kwargs
 def compute_vendi(
     *,
     adata_in: str,
@@ -34,4 +35,4 @@ def compute_vendi(
 
 
 if __name__ == "__main__":
-    wrap_kwargs(compute_vendi)()
+    compute_vendi()

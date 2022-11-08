@@ -10,6 +10,7 @@ def _hvg(adata: AnnData, **kwargs) -> None:
     sc.pp.highly_variable_genes(adata, **kwargs)
 
 
+@wrap_kwargs
 def preprocess_data(
     *,
     adata_in: str,
@@ -36,9 +37,10 @@ def preprocess_data(
     """
     config = load_config(config_in)
     adata = sc.read(adata_in)
-    hvg_kwargs = config.get("hvg_kwargs", {})
+    hvg_kwargs = config.get("hvg_kwargs", None)
     
-    _hvg(adata, **hvg_kwargs)
+    if hvg_kwargs is not None:
+        _hvg(adata, **hvg_kwargs)
     
     make_parents(adata_out)
     adata.write(filename=adata_out)
@@ -46,4 +48,4 @@ def preprocess_data(
 
 
 if __name__ == "__main__":
-    wrap_kwargs(preprocess_data)()
+    preprocess_data()
