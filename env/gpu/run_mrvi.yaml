@@ -1,0 +1,22 @@
+name: run-mrvi
+channels:
+    - conda-forge
+    - bioconda
+    - pytorch
+    - nvidia
+    - defaults
+dependencies:
+    - python=3.10
+    - anndata>=0.8.0
+    - scanpy>=1.9.0
+    - pytorch
+    - torchvision
+    - torchaudio
+    - cudatoolkit=11.6
+    - jax
+    - jaxlib
+    - cuda-nvcc
+    - pip
+    - pip:
+          - click
+          - mrvi>=0.1.0

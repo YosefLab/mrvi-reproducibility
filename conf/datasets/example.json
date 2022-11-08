@@ -1,0 +1,13 @@
+{
+    "batch_key": "cell_source",
+    "labels_key": "cell_type",
+    "sample_key": "donor",
+    "latent_key": "X_mrvi_u",
+    "hvg_kwargs": {
+        "n_top_genes": 2000,
+        "flavor": "seurat_v3"
+    },
+    "train_kwargs": {
+        "max_epochs": 1
+    }
+}

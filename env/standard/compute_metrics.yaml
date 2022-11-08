@@ -1,0 +1,19 @@
+name: compute-metrics
+channels:
+    - conda-forge
+    - bioconda
+    - pytorch
+    - nvidia
+    - defaults
+dependencies:
+    - python=3.10
+    - anndata>=0.8.0
+    - scanpy>=1.9.0
+    - numpy
+    - pandas
+    - jax
+    - jaxlib
+    - pip
+    - pip:
+          - click
+          - scib-metrics>=0.0.7
