@@ -1,6 +1,6 @@
 {
-    "batch_key": "cell_source",
-    "labels_key": "cell_type",
+    "batch_key": "batch",
+    "labels_key": "celltype",
     "sample_key": "donor",
     "latent_key": "X_mrvi_u",
     "hvg_kwargs": {

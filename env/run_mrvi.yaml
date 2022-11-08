@@ -18,5 +18,5 @@ dependencies:
     - cuda-nvcc
     - pip
     - pip:
-        - click
-        - mrvi>=0.1.0
+          - click
+          - mrvi>=0.1.0
