@@ -1,7 +1,4 @@
 process fit_mrvi {
-    conda "${params.env.run_mrvi}"
-    publishDir "${params.publish}"
-
     input:
     path adata_in
 

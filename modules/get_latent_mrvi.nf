@@ -1,7 +1,4 @@
 process get_latent_mrvi {
-    conda "${params.env.run_mrvi}"
-    publishDir "${params.publish}"
-
     input:
     path adata_in
     path model_in
