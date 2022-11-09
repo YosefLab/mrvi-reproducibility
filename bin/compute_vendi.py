@@ -1,5 +1,6 @@
 import pandas as pd
 import scanpy as sc
+from vendi_score import vendi
 
 from utils import load_config, make_parents, wrap_kwargs
 
@@ -26,8 +27,16 @@ def compute_vendi(
     config = load_config(config_in)
     adata = sc.read_h5ad(adata_in)
 
-    metrics = {"example_metric": [0.0]}
-    df = pd.DataFrame.from_dict(metrics, orient="index", columns=["value"])
+    local_sample_dists_key = adata.uns["local_sample_dists_key"]
+    local_sample_dists = adata.obsm[local_sample_dists_key]
+    local_sample_similarities = 1 / (1 + local_sample_dists)
+
+    vendi_scores = []
+    for i in range(local_sample_similarities.shape[0]):
+        vendi_scores.append(vendi.score_K(local_sample_similarities[i]))
+
+    vendi_dict = {"obs_id": adata.obs.index, "vendi_score": vendi_scores}
+    df = pd.DataFrame.from_dict(vendi_dict)
 
     make_parents(table_out)
     df.to_csv(table_out)
