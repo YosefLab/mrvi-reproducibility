@@ -82,16 +82,16 @@ def compute_scib_metrics(
                 "silhouette_batch_score",
                 silhouette_batch_score,
             ],
-            f"{latent_key}_nmi_kmeans_label_score": [
-                latent_key,
-                "nmi_kmeans_label_score",
-                nmi_kmeans_label_score,
-            ],
-            f"{latent_key}_ari_kmeans_label_score": [
-                latent_key,
-                "ari_kmeans_label_score",
-                ari_kmeans_label_score,
-            ],
+            # f"{latent_key}_nmi_kmeans_label_score": [
+            #     latent_key,
+            #     "nmi_kmeans_label_score",
+            #     nmi_kmeans_label_score,
+            # ],
+            # f"{latent_key}_ari_kmeans_label_score": [
+            #     latent_key,
+            #     "ari_kmeans_label_score",
+            #     ari_kmeans_label_score,
+            # ],
             # f"{latent_key}_nmi_leiden_label_score": [
             #     latent_key,
             #     "nmi_leiden_label_score",
