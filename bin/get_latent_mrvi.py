@@ -37,7 +37,7 @@ def get_latent_mrvi(
     z_latent_key = "X_mrvi_z"
     adata.obsm[u_latent_key] = model.get_latent_representation(adata, give_z=False)
     adata.obsm[z_latent_key] = model.get_latent_representation(adata, give_z=True)
-    adata.uns["latent_keys"] = (u_latent_key, z_latent_key)
+    adata.uns["latent_keys"] = [u_latent_key, z_latent_key]
 
     local_sample_rep_key = "mrvi_local_sample_rep"
     adata.obsm[local_sample_rep_key] = model.get_local_sample_representation(adata)

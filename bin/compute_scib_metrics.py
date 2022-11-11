@@ -35,9 +35,9 @@ def compute_scib_metrics(
     batch_key = config.get("batch_key", None)
     sample_key = config.get("sample_key", None)
     labels_key = config.get("labels_key", None)
-    latent_keys = adata.obsm["latent_keys"]
+    latent_keys = adata.uns["latent_keys"]
 
-    metrics = {}
+    all_metrics = {}
     for latent_key in latent_keys:
         X_latent = adata.obsm[latent_key]
         labels = categorical_obs(adata, labels_key)
@@ -51,18 +51,15 @@ def compute_scib_metrics(
         silhouette_sample_score = metrics.silhouette_label(
             X_latent, sample, rescale=True
         )
-        silhouette_batch_score = metrics.silhouette_batch(X_latent, batch, rescale=True)
-        (
-            nmi_kmeans_label_score,
-            ari_kmeans_label_score,
-        ) = metrics.nmi_ari_cluster_labels_kmeans(X_latent, labels)
-        (
-            nmi_leiden_label_score,
-            ari_leiden_label_score,
-        ) = metrics.nmi_ari_cluster_labels_leiden(X_latent, labels)
-        pcr_label_score = metrics.principal_component_regression(
-            X_latent, labels, categorical=True
-        )
+        silhouette_batch_score = metrics.silhouette_batch(X_latent, labels, batch, rescale=True)
+        # (
+        #     nmi_kmeans_label_score,
+        #     ari_kmeans_label_score,
+        # ) = metrics.nmi_ari_cluster_labels_kmeans(X_latent, labels)
+        # (
+        #     nmi_leiden_label_score,
+        #     ari_leiden_label_score,
+        # ) = metrics.nmi_ari_cluster_labels_leiden(X_latent, labels)
 
         latent_metrics = {
             f"{latent_key}_isolated_label_score": [
@@ -95,26 +92,21 @@ def compute_scib_metrics(
                 "ari_kmeans_label_score",
                 ari_kmeans_label_score,
             ],
-            f"{latent_key}_nmi_leiden_label_score": [
-                latent_key,
-                "nmi_leiden_label_score",
-                nmi_leiden_label_score,
-            ],
-            f"{latent_key}_ari_leiden_label_score": [
-                latent_key,
-                "ari_leiden_label_score",
-                ari_leiden_label_score,
-            ],
-            f"{latent_key}_pcr_label_score": [
-                latent_key,
-                "pcr_label_score",
-                pcr_label_score,
-            ],
+            # f"{latent_key}_nmi_leiden_label_score": [
+            #     latent_key,
+            #     "nmi_leiden_label_score",
+            #     nmi_leiden_label_score,
+            # ],
+            # f"{latent_key}_ari_leiden_label_score": [
+            #     latent_key,
+            #     "ari_leiden_label_score",
+            #     ari_leiden_label_score,
+            # ],
         }
-        metrics.update(latent_metrics)
+        all_metrics.update(latent_metrics)
 
     df = pd.DataFrame.from_dict(
-        metrics, orient="index", columns=["latent_key", "metric_name", "metric_value"]
+        all_metrics, orient="index", columns=["latent_key", "metric_name", "metric_value"]
     )
     make_parents(table_out)
     df.to_csv(table_out)
