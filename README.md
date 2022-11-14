@@ -35,3 +35,16 @@ To start a new run with `simple_pipeline`, the following is required:
 in `example.json`. The config file must have the same name as the `.h5ad` file.
 
 Intermediate and final outputs will be placed in `results/simple_pipeline/`.
+
+## AWS
+In order to pull data from AWS, you must have the AWS CLI installed and configured. 
+Additionally, create a file called `aws_creds.config` in the `conf/` directory with the
+following entries. This file is ignored by git.
+```
+aws {
+    accessKey = ""
+    secretKey = ""
+    region = ""
+}
+```
+Right now, `aws_pipeline.nf` is configured to just pull `s3://largedonor/cancer.h5ad`.
