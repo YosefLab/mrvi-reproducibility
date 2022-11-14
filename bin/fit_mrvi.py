@@ -9,7 +9,6 @@ def fit_mrvi(
     *,
     adata_in: str,
     config_in: str,
-    adata_out: str,
     model_out: str,
 ) -> mrvi.MrVI:
     """
@@ -38,9 +37,8 @@ def fit_mrvi(
     model = mrvi.MrVI(adata)
     model.train(**train_kwargs)
 
-    make_parents([model_out, adata_out])
+    make_parents(model_out)
     model.save(dir_path=model_out, overwrite=True, save_anndata=False)
-    adata.write(filename=adata_out)
     return model
 
 

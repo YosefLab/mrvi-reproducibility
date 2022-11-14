@@ -4,10 +4,11 @@ from anndata import AnnData
 from utils import load_config, make_parents, wrap_kwargs
 
 
-def _hvg(adata: AnnData, **kwargs) -> None:
+def _hvg(adata: AnnData, **kwargs) -> AnnData:
     """Select highly-variable genes in-place."""
     kwargs.update({"subset": True})
     sc.pp.highly_variable_genes(adata, **kwargs)
+    return adata
 
 
 @wrap_kwargs
@@ -40,7 +41,7 @@ def preprocess_data(
     hvg_kwargs = config.get("hvg_kwargs", None)
     
     if hvg_kwargs is not None:
-        _hvg(adata, **hvg_kwargs)
+        adata = _hvg(adata, **hvg_kwargs)
     
     make_parents(adata_out)
     adata.write(filename=adata_out)
