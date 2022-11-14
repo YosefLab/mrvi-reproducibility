@@ -28,13 +28,14 @@ def fit_mrvi(
     config = load_config(config_in)
     batch_key = config.get("batch_key", None)
     sample_key = config.get("sample_key", None)
+    model_kwargs = config.get("model_kwargs", {})
     train_kwargs = config.get("train_kwargs", {})
     adata = sc.read(adata_in)
 
     mrvi.MrVI.setup_anndata(
         adata, categorical_nuisance_keys=[batch_key], sample_key=sample_key,
     )
-    model = mrvi.MrVI(adata)
+    model = mrvi.MrVI(adata, **model_kwargs)
     model.train(**train_kwargs)
 
     make_parents(model_out)
