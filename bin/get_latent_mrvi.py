@@ -53,7 +53,7 @@ def get_latent_mrvi(
 
     make_parents(adata_out)
     _adata.write(filename=adata_out)
-    return adata
+    return _adata
 
 
 if __name__ == "__main__":
