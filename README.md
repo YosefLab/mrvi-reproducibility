@@ -47,4 +47,10 @@ aws {
     region = ""
 }
 ```
-Right now, `aws_pipeline.nf` is configured to just pull `s3://largedonor/cancer.h5ad`.
+The datasets being pulled from AWS can be configured by modifying the list specified 
+as `params.input.preprocess_data` in `conf/aws_pipeline.config`. Then, the respective
+workflow can be run in the same way:
+```
+nextflow main.nf --workflow aws_pipeline --profile standard
+```
+This will just run the processing steps locally, however.

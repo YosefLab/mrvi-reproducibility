@@ -5,6 +5,6 @@ include { compute_metrics } from params.subworkflow.compute_metrics
 
 workflow aws_pipeline {
     main:
-    raw_data = Channel.fromPath(params.input.preprocess_data)
+    raw_data = Channel.fromList(params.input.preprocess_data)
     preprocess_data(raw_data) | run_mrvi | compute_metrics
 }
