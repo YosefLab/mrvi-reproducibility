@@ -1,9 +1,8 @@
 #!/usr/bin/env nextflow
 
-include { simple_pipeline } from params.simple_pipeline_workflow
+include { run_main } from "${params.workflows.root}/${params.workflow}.nf"
 
 workflow {
-    if (params.workflow == "simple_pipeline") {
-        simple_pipeline()
-    }
+    main:
+    run_main()
 }

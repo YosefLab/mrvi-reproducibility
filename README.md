@@ -1,5 +1,12 @@
 # scvi-v2-reproducibility
 
+## Adding new workflows
+
+## Adding new subworkflows
+
+## Adding new modules and scripts
+
+
 Nextflow workflows (found in `workflows/`) are wrappers over subworkflows and modules 
 (found in `modules/` and `subworkflows/` respectively) that run end-to-end. The 
 subworkflows and modules are designed to be reusable and can be run independently of the 
