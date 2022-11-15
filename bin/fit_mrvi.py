@@ -9,7 +9,6 @@ def fit_mrvi(
     *,
     adata_in: str,
     config_in: str,
-    adata_out: str,
     model_out: str,
 ) -> mrvi.MrVI:
     """
@@ -29,18 +28,18 @@ def fit_mrvi(
     config = load_config(config_in)
     batch_key = config.get("batch_key", None)
     sample_key = config.get("sample_key", None)
+    model_kwargs = config.get("model_kwargs", {})
     train_kwargs = config.get("train_kwargs", {})
     adata = sc.read(adata_in)
 
     mrvi.MrVI.setup_anndata(
         adata, categorical_nuisance_keys=[batch_key], sample_key=sample_key,
     )
-    model = mrvi.MrVI(adata)
+    model = mrvi.MrVI(adata, **model_kwargs)
     model.train(**train_kwargs)
 
-    make_parents([model_out, adata_out])
+    make_parents(model_out)
     model.save(dir_path=model_out, overwrite=True, save_anndata=False)
-    adata.write(filename=adata_out)
     return model
 
 
