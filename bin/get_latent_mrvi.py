@@ -16,7 +16,8 @@ def get_latent_mrvi(
     """
     Get latent space from a trained MrVI instance.
 
-    Saves it as a `.obsm` field in a new AnnData object.
+    Create a new AnnData object with latent spaces as `obsm` layers and
+    keys stored in `uns`. Only copies over `obs` from the input AnnData.
 
     Parameters
     ----------
@@ -33,25 +34,26 @@ def get_latent_mrvi(
     adata = sc.read_h5ad(adata_in)
     model = mrvi.MrVI.load(model_in, adata=adata)
 
+    _adata = AnnData(obs=adata.obs)
     u_latent_key = "X_mrvi_u"
     z_latent_key = "X_mrvi_z"
-    adata.obsm[u_latent_key] = model.get_latent_representation(adata, give_z=False)
-    adata.obsm[z_latent_key] = model.get_latent_representation(adata, give_z=True)
-    adata.uns["latent_keys"] = [u_latent_key, z_latent_key]
+    _adata.obsm[u_latent_key] = model.get_latent_representation(adata, give_z=False)
+    _adata.obsm[z_latent_key] = model.get_latent_representation(adata, give_z=True)
+    _adata.uns["latent_keys"] = [u_latent_key, z_latent_key]
 
     local_sample_rep_key = "mrvi_local_sample_rep"
-    adata.obsm[local_sample_rep_key] = model.get_local_sample_representation(adata)
-    adata.uns["local_sample_rep_key"] = local_sample_rep_key
+    _adata.obsm[local_sample_rep_key] = model.get_local_sample_representation(adata)
+    _adata.uns["local_sample_rep_key"] = local_sample_rep_key
 
     local_sample_dists_key = "mrvi_local_sample_dists"
-    adata.obsm[local_sample_dists_key] = model.get_local_sample_representation(
+    _adata.obsm[local_sample_dists_key] = model.get_local_sample_representation(
         adata, return_distances=True
     )
-    adata.uns["local_sample_dists_key"] = local_sample_dists_key
+    _adata.uns["local_sample_dists_key"] = local_sample_dists_key
 
     make_parents(adata_out)
-    adata.write(filename=adata_out)
-    return adata
+    _adata.write(filename=adata_out)
+    return _adata
 
 
 if __name__ == "__main__":
