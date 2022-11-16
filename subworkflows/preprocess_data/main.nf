@@ -1,12 +1,12 @@
-include { preprocess_data as preprocess } from params.module.preprocess_data
+include { preprocess } from params.modules.preprocess
 
 
 workflow preprocess_data {
     take:
-    input
+    inputs
 
     main:
-    preprocess(input)
+    preprocess(inputs)
 
     emit:
     preprocess.out

@@ -12,7 +12,7 @@ def _hvg(adata: AnnData, **kwargs) -> AnnData:
 
 
 @wrap_kwargs
-def preprocess_data(
+def preprocess(
     *,
     adata_in: str,
     config_in: str,
@@ -49,4 +49,4 @@ def preprocess_data(
 
 
 if __name__ == "__main__":
-    preprocess_data()
+    preprocess()
