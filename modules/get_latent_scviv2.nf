@@ -1,4 +1,4 @@
-process get_latent_mrvi {
+process get_latent_scviv2 {
     input:
     path adata_in
     path model_in
@@ -6,9 +6,9 @@ process get_latent_mrvi {
     script:
     adata_name = adata_in.getSimpleName()
     config_in = "${params.conf.datasets}/${adata_name}.json"
-    adata_out = "${params.outputs.data}/${adata_name}.mrvi.h5ad"
+    adata_out = "${params.outputs.data}/${adata_name}.scviv2.h5ad"
     """
-    python3 ${params.bin.get_latent_mrvi} \\
+    python3 ${params.bin.get_latent_scviv2} \\
         --adata_in ${adata_in} \\
         --model_in ${model_in} \\
         --config_in ${config_in} \\

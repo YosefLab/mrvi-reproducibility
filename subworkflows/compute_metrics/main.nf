@@ -1,12 +1,16 @@
-include { compute_scib_metrics} from params.module.compute_scib_metrics
-include { compute_vendi } from params.module.compute_vendi
+include { scib } from params.modules.scib
+include { vendi } from params.modules.vendi
 
 
 workflow compute_metrics {
     take:
-    input
+    inputs
 
     main:
-    compute_scib_metrics(input)
-    compute_vendi(input)
+    scib(inputs)
+    vendi(inputs)
+
+    emit:
+    scib.out
+    vendi.out
 }
