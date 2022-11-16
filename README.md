@@ -29,7 +29,7 @@ aws {
 }
 ```
 You can specify the individual AnnDatas being processed by modifying `params.inputs` in
-`conf/aw_pipeline_.config`.
+`conf/aws_pipeline_.config`.
 
 ## Adding new workflows
 Workflows are intended to connect subworkflows into an end-to-end pipeline. In order to 
