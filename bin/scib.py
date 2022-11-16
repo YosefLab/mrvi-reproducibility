@@ -12,7 +12,7 @@ def categorical_obs(adata: AnnData, key: str) -> np.ndarray:
 
 
 @wrap_kwargs
-def compute_scib_metrics(
+def compute_scib(
     *,
     adata_in: str,
     config_in: str,
@@ -115,4 +115,4 @@ def compute_scib_metrics(
 
 
 if __name__ == "__main__":
-    compute_scib_metrics()
+    compute_scib()

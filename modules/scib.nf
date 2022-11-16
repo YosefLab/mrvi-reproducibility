@@ -1,20 +1,19 @@
-process get_latent_mrvi {
+process scib {
     input:
     path adata_in
-    path model_in
 
     script:
     adata_name = adata_in.getSimpleName()
+    adata_model_name = adata_in.getBaseName()
     config_in = "${params.conf.datasets}/${adata_name}.json"
-    adata_out = "${params.outputs.data}/${adata_name}.mrvi.h5ad"
+    table_out = "${params.outputs.metrics}/${adata_model_name}.scib.csv"
     """
-    python3 ${params.bin.get_latent_mrvi} \\
+    python3 ${params.bin.scib} \\
         --adata_in ${adata_in} \\
-        --model_in ${model_in} \\
         --config_in ${config_in} \\
-        --adata_out ${adata_out}
+        --table_out ${table_out}
     """
 
     output:
-    path adata_out
+    path table_out
 }

@@ -1,63 +1,147 @@
 # scvi-v2-reproducibility
 
+## Running existing workflows
+Existing workflows can be discovered under `workflows/`. These can be run as follows from
+the root of the repository:
+```
+nextflow main.nf --workflow workflow_name --profile profile_name
+```
+Setting both ``--workflow`` and ``--profile`` is required. Available profiles include 
+`standard` (run without GPU) and `gpu` (run with GPU). 
+
+By default, intermediate and final outputs are placed in `results/`. This can be changed
+by modifying the `publishDir` directive in the configuration.
+
+### Simple pipeline
+Currently, this pipeline just scans `data/` in the root directory for any `.h5ad` files
+and runs each subworkflow sequentially. It expects a configuration JSON file to be 
+present in `conf/datasets/` with the same name as the `.h5ad` file.
+
+### AWS pipeline
+This pipeline pulls data from `s3://largedonor` and runs each subworkflow locally. In
+order to run this pipeline, create the file `conf/aws_credentials.config` (ignored by
+git) with the following entries:
+```
+aws {
+    accessKey = "access_key"
+    secretKey = "secret_key"
+    region = "us-west-1"
+}
+```
+You can specify the individual AnnDatas being processed by modifying `params.inputs` in
+`conf/aw_pipeline_.config`.
+
 ## Adding new workflows
+Workflows are intended to connect subworkflows into an end-to-end pipeline. In order to 
+add a new workflow, follow these steps:
+
+1. Add a `workflow_name.nf` file to `workflows/` with the following template:
+```
+include { subworkflow } from "${params.subworkflows.subworkflow_name}"
+
+workflow run_main {
+    main:
+    inputs = Channel.fromPath(params.inputs)
+    // subworkflows here
+}
+```
+
+2. Create the associated `workflow_name.config` file in `conf/` with the following 
+template:
+```
+params {
+    inputs = //path or list of paths to inputs
+}
+```
 
 ## Adding new subworkflows
+Subworkflows are intended to be reusable pieces across different workflows. To add a new 
+subworkflow, follow these steps:
+
+1. Add a `main.nf` file to `subworkflows/subworkflow_name/` with the following template:
+```
+include { module } from "${params.modules.module_name}"
+
+workflow subworkflow_name {
+    take:
+    inputs
+
+    main:
+    module(inputs)
+
+    emit:
+    module.out
+}
+```
+2. Add a reference to the new subworkflow under `nextflow.config` to be able to import
+it as `params.subworkflows.subworkflow_name
+```
+params {
+    subworkflow_name = "${params.subworkflows.root}/subworkflow_name/main.nf"
+}
+```
 
 ## Adding new modules and scripts
 
+Modules are Nextflow wrappers over Python scripts that pass in appropriate arguments.
+They can be found under `modules/` and `bin/`, respecively. To add a new module, follow
+these steps:
 
-Nextflow workflows (found in `workflows/`) are wrappers over subworkflows and modules 
-(found in `modules/` and `subworkflows/` respectively) that run end-to-end. The 
-subworkflows and modules are designed to be reusable and can be run independently of the 
-workflows. To run a workflow, the primary entry point is through `main.nf` in the 
-project root:
-
+1. Add a `module_name.nf` file to `modules/` with the following template:
 ```
-nextflow main.nf --workflow workflow_name
-```
+process module_name {
+    input:
+    path input_path
 
-A configuration file can be provided to the workflow by placing a `.config` file in 
-`conf/` with the same name as the workflow. Parameters specified in this file can be 
-accessed within any of the subworkflows or modules.
+    script:
+    output_path = "output_path_here"
+    """
+    python3 ${params.bin.module_name} \\
+        --input_path ${input_path} \\
+        --output_path ${output_path}
+    """
 
-In addition to the Nextflow configuration file, dataset-level configurations can be 
-provided in the `conf/datasets/` directory as JSON files, which can only be accessed
-by Python scripts in `bin/`.
-
-Compute profiles that specify the kind of hardware to use can be found in
-`nextflow.config`. These profiles can be used by passing in the `-profile` flag when 
-running a workflow, e.g.:
-
-```
-nextflow main.nf --workflow workflow_name --profile standard
-```
-
-which will not use any GPU resources in addition to installing non-GPU supported 
-dependencies.
-
-To start a new run with `simple_pipeline`, the following is required:
-- Add a `.h5ad` file to `data/`
-- Add a dataset configuration file to `conf/datasets/`, following the example
-in `example.json`. The config file must have the same name as the `.h5ad` file.
-
-Intermediate and final outputs will be placed in `results/simple_pipeline/`.
-
-## AWS
-In order to pull data from AWS, you must have the AWS CLI installed and configured. 
-Additionally, create a file called `aws_creds.config` in the `conf/` directory with the
-following entries. This file is ignored by git.
-```
-aws {
-    accessKey = ""
-    secretKey = ""
-    region = ""
+    output:
+    path output_path
 }
 ```
-The datasets being pulled from AWS can be configured by modifying the list specified 
-as `params.input.preprocess_data` in `conf/aws_pipeline.config`. Then, the respective
-workflow can be run in the same way:
+
+2. Add the corresponding Python script to `bin/` with the following template:
 ```
-nextflow main.nf --workflow aws_pipeline --profile standard
+from utils import wrap_kwargs
+
+@wrap_kwargs
+def module_name(input_path, output_path):
+    pass
+
+if __name__ == "__main__":
+    module_name()
 ```
-This will just run the processing steps locally, however.
+
+3. Add references to the new module and script under `nextflow.config` to be able to
+import them as `params.modules.module_name` and `params.bin.module_name`, respectively.
+```
+params {
+    modules {
+        module_name = "${params.modules.root}/module_name.nf"
+    }
+    bin {
+        module_name = "${params.bin.root}/module_name.py"
+    }
+}
+```
+
+4. Specify the conda environment for the new module in `nextflow.config`:
+```
+params {
+    env {
+        module_name = "${params.env.root}/module_name.yaml"
+    }
+}
+
+process {
+    withName: module_name {
+        conda = "${params.env.module_name}"
+    }
+}
+```

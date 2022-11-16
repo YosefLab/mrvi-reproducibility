@@ -28,4 +28,4 @@ __pycache__/
 work/
 */.cache/
 results/
-conf/aws_creds.config
+conf/aws_credentials.config

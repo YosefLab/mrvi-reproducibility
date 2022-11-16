@@ -20,4 +20,4 @@ dependencies:
     - pip:
           - click
           - mrvi>=0.1.0
-          - git+https://github.com/YosefLab/scvi-v2.git@main
+          - git+ssh://git@github.com/YosefLab/scvi-v2.git
