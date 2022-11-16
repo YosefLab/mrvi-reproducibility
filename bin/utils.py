@@ -6,11 +6,9 @@ from typing import Callable, List, Union
 import click
 
 
-def make_parents(path: Union[str, List[str]]) -> None:
+def make_parents(*paths) -> None:
     """Make parent directories of a file path if they do not exist."""
-    if isinstance(path, str):
-        path = [path]
-    for p in path:
+    for p in paths:
         pathlib.Path(p).parent.mkdir(parents=True, exist_ok=True)
 
 

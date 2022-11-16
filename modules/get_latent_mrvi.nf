@@ -6,7 +6,7 @@ process get_latent_mrvi {
     script:
     adata_name = adata_in.getBaseName()
     config_in = "${params.conf.dataset}/${adata_name}.json"
-    adata_out = "${params.output.run_mrvi_latent_data}/${adata_name}.h5ad"
+    adata_out = "${params.output.run_mrvi_data}/${adata_name}.h5ad"
     """
     python3 ${params.script.get_latent_mrvi} \\
         --adata_in ${adata_in} \\
