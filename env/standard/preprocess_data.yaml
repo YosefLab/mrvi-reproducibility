@@ -7,6 +7,9 @@ dependencies:
     - python=3.10
     - anndata>=0.8.0
     - scanpy>=1.9.0
+    - scipy
+    - numpy
+    - pandas
     - pip
     - pip:
           - click
