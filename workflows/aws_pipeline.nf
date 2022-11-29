@@ -4,6 +4,6 @@ include { compute_metrics } from params.subworkflows.compute_metrics
 
 workflow run_main {
     main:
-    input = Channel.fromList(params.input.preprocess_data)
+    input = Channel.fromList(params.inputs)
     preprocess_data(input) | run_models | compute_metrics
 }
