@@ -1,7 +1,7 @@
 {
-    "batch_key": "batch",
-    "labels_key": "celltype",
-    "sample_key": "donor",
+    "batch_key": "Site",
+    "labels_key": "str_labels",
+    "sample_key": "batch",
     "hvg_kwargs": {
         "n_top_genes": 2000,
         "flavor": "seurat_v3"

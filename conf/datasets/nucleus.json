@@ -1,0 +1,12 @@
+{
+    "batch_key": "suspension_type",
+    "labels_key": "cell_type",
+    "sample_key": "library_uuid",
+    "hvg_kwargs": {
+        "n_top_genes": 3000,
+        "flavor": "seurat_v3"
+    },
+    "train_kwargs": {
+        "max_epochs": 300
+    }
+}
