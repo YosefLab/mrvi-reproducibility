@@ -6,7 +6,10 @@
         "n_top_genes": 3000,
         "flavor": "seurat_v3"
     },
-    "train_kwargs": {
+    "mrvi_train_kwargs": {
+        "max_epochs": 300
+    },
+    "scviv2_train_kwargs": {
         "max_epochs": 300
     }
 }
