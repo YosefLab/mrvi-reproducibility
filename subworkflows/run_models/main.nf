@@ -8,7 +8,7 @@ workflow run_models {
     inputs // Channel of input AnnDatas
     
     main:
-    fit_scviv2(inputs) | get_latent_scviv2
+    fit_scviv2(inputs) | get_latent_scviv2 | get_outs_scviv2
     fit_mrvi(inputs) | get_latent_mrvi
 
     emit:
