@@ -1,6 +1,6 @@
 import scanpy as sc
 
-from utils import load_config, make_parents, wrap_kwargs
+from utils import load_config, wrap_kwargs
 
 @wrap_kwargs
 def get_outs_scviv2(

@@ -53,7 +53,7 @@ def get_latent_scviv2(
 
     make_parents(adata_out)
     _adata.write(filename=adata_out)
-    return _adata
+    return adata_out
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ include { fit_mrvi } from params.modules.fit_mrvi
 include { get_latent_mrvi } from params.modules.get_latent_mrvi
 include { fit_scviv2 } from params.modules.fit_scviv2
 include { get_latent_scviv2 } from params.modules.get_latent_scviv2
+include { get_outs_scviv2 } from params.modules.get_outs_scviv2
 
 workflow run_models {
     take:
