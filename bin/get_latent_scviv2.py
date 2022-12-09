@@ -35,21 +35,25 @@ def get_latent_scviv2(
     model = scvi_v2.MrVI.load(model_in, adata=adata)
 
     _adata = AnnData(obs=adata.obs)
-    u_latent_key = "X_mrvi_u"
-    z_latent_key = "X_mrvi_z"
+    u_latent_key = "X_scviv2_u"
+    z_latent_key = "X_scviv2_z"
     _adata.obsm[u_latent_key] = model.get_latent_representation(adata, give_z=False)
     _adata.obsm[z_latent_key] = model.get_latent_representation(adata, give_z=True)
     _adata.uns["latent_keys"] = [u_latent_key, z_latent_key]
 
-    local_sample_rep_key = "mrvi_local_sample_rep"
+    local_sample_rep_key = "scviv2_local_sample_rep"
     _adata.obsm[local_sample_rep_key] = model.get_local_sample_representation(adata)
     _adata.uns["local_sample_rep_key"] = local_sample_rep_key
 
-    local_sample_dists_key = "mrvi_local_sample_dists"
+    local_sample_dists_key = "scviv2_local_sample_dists"
     _adata.obsm[local_sample_dists_key] = model.get_local_sample_representation(
         adata, return_distances=True
     )
     _adata.uns["local_sample_dists_key"] = local_sample_dists_key
+
+    avg_local_sample_dists_key = "scviv2_avg_local_sample_dists"
+    _adata.obsm[avg_local_sample_dists_key] = model.get_averaged_local_sample_distances(mc_samples=25, use_vmap=True)
+    _adata.uns["avg_local_sample_dists_key"] = avg_local_sample_dists_key
 
     make_parents(adata_out)
     _adata.write(filename=adata_out)

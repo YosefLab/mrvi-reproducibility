@@ -29,3 +29,4 @@ work/
 */.cache/
 results/
 conf/aws_credentials.config
+notebooks/

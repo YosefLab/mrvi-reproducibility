@@ -1,4 +1,6 @@
 process get_latent_scviv2 {
+    cache false
+
     input:
     path adata_in
     path model_in

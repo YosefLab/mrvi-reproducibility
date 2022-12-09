@@ -51,7 +51,12 @@ def compute_scib(
         silhouette_sample_score = metrics.silhouette_label(
             X_latent, sample, rescale=True
         )
-        silhouette_batch_score = metrics.silhouette_batch(X_latent, labels, batch, rescale=True)
+        try:
+            silhouette_batch_score = metrics.silhouette_batch(
+                X_latent, labels, batch, rescale=True
+            )
+        except:
+            silhouette_batch_score = np.nan
         # (
         #     nmi_kmeans_label_score,
         #     ari_kmeans_label_score,
@@ -106,7 +111,9 @@ def compute_scib(
         all_metrics.update(latent_metrics)
 
     df = pd.DataFrame.from_dict(
-        all_metrics, orient="index", columns=["latent_key", "metric_name", "metric_value"]
+        all_metrics,
+        orient="index",
+        columns=["latent_key", "metric_name", "metric_value"],
     )
     make_parents(table_out)
     df.to_csv(table_out)
