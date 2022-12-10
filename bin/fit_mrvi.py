@@ -13,15 +13,13 @@ def fit_mrvi(
 ) -> mrvi.MrVI:
     """
     Train a MrVI model.
-    
+
     Parameters
     ----------
     adata_in
         Path to the preprocessed AnnData object.
     config_in
         Path to the dataset configuration file.
-    adata_out
-        Path to write the latent AnnData object.
     model_out
         Path to write the trained MrVI model.
     """
@@ -33,7 +31,9 @@ def fit_mrvi(
     adata = sc.read(adata_in)
 
     mrvi.MrVI.setup_anndata(
-        adata, categorical_nuisance_keys=[batch_key], sample_key=sample_key,
+        adata,
+        categorical_nuisance_keys=[batch_key],
+        sample_key=sample_key,
     )
     model = mrvi.MrVI(adata, **model_kwargs)
     model.train(**train_kwargs)
