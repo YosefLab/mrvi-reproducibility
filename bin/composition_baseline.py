@@ -105,7 +105,8 @@ class CompositionBaseline:
         local_dists = np.zeros((self.adata.n_obs, n_sample, n_sample))
         for cluster, freqs in freqs_all.items():
             cell_is_selected = self.adata.obs[self.cluster_key] == cluster
-            cluster_reps = freqs.loc[sample_order].values
+            ordered_freqs = freqs.reindex(sample_order).fillna(1.)
+            cluster_reps = ordered_freqs.values
             cluster_dists = pairwise_distances(cluster_reps, metric="euclidean")
             local_dists[cell_is_selected] = cluster_dists
         return local_dists
