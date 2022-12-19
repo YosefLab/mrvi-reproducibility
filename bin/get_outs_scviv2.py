@@ -1,6 +1,6 @@
 import scanpy as sc
-
 from utils import load_config, wrap_kwargs
+
 
 @wrap_kwargs
 def get_outs_scviv2(
@@ -8,6 +8,10 @@ def get_outs_scviv2(
     config_in: str,
     adata_in: str,
 ):
+    """Get final outputs for scVIV2.
+
+    This includes: cell-type-specific distance matrices.
+    """
     config = load_config(config_in)
     groups = config["groups"]
     _adata = sc.read_h5ad(adata_in)

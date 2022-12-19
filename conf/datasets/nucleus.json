@@ -2,6 +2,7 @@
     "batch_key": "suspension_type",
     "labels_key": "cell_type",
     "sample_key": "library_uuid",
+    "group_keys": ["cell_type"],
     "hvg_kwargs": {
         "n_top_genes": 3000,
         "flavor": "seurat_v3"
