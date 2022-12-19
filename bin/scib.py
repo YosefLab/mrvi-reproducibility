@@ -51,7 +51,6 @@ def compute_scib(
         silhouette_sample_score = metrics.silhouette_label(
             X_latent, sample, rescale=True
         )
-        silhouette_batch_score = metrics.silhouette_batch(X_latent, labels, batch, rescale=True)
         # (
         #     nmi_kmeans_label_score,
         #     ari_kmeans_label_score,
@@ -77,11 +76,11 @@ def compute_scib(
                 "silhouette_sample_score",
                 silhouette_sample_score,
             ],
-            f"{latent_key}_silhouette_batch_score": [
-                latent_key,
-                "silhouette_batch_score",
-                silhouette_batch_score,
-            ],
+            # f"{latent_key}_silhouette_batch_score": [
+            #     latent_key,
+            #     "silhouette_batch_score",
+            #     silhouette_batch_score,
+            # ],
             # f"{latent_key}_nmi_kmeans_label_score": [
             #     latent_key,
             #     "nmi_kmeans_label_score",
@@ -103,6 +102,15 @@ def compute_scib(
             #     ari_leiden_label_score,
             # ],
         }
+        if np.unique(batch).shape[0] >= 2:
+            silhouette_batch_score = metrics.silhouette_batch(
+                X_latent, labels, batch, rescale=True
+            )
+            latent_metrics[f"{latent_key}_silhouette_batch_score"] = [
+                latent_key,
+                "silhouette_batch_score",
+                silhouette_batch_score,
+            ]
         all_metrics.update(latent_metrics)
 
     df = pd.DataFrame.from_dict(
