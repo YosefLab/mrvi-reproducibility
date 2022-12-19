@@ -3,7 +3,7 @@ from utils import load_config, wrap_kwargs
 
 
 @wrap_kwargs
-def get_outs_scviv2(
+def get_outputs_scviv2(
     *,
     config_in: str,
     adata_in: str,
@@ -28,4 +28,4 @@ def get_outs_scviv2(
 
 
 if __name__ == "__main__":
-    get_outs_scviv2()
+    get_outputs_scviv2()
