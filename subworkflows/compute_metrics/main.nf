@@ -13,4 +13,5 @@ workflow compute_metrics {
     emit:
     scib.out
     vendi.out
+    inputs
 }
