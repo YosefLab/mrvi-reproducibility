@@ -1,5 +1,5 @@
 import scanpy as sc
-from utils import load_config, wrap_kwargs
+from utils import load_config, make_parents, wrap_kwargs
 
 
 @wrap_kwargs
@@ -7,16 +7,17 @@ def get_outputs_scviv2(
     *,
     config_in: str,
     adata_in: str,
+    adata_out: str,
 ):
     """Get final outputs for scVIV2.
 
     This includes: cell-type-specific distance matrices.
     """
     config = load_config(config_in)
-    groups = config["groups"]
+    groups = config["group_keys"]
     _adata = sc.read_h5ad(adata_in)
     # compute group-specific distance matrices
-    cell_specific_dists = _adata.uns["mrvi_local_sample_dists"]
+    cell_specific_dists = _adata.obsm["mrvi_local_sample_dists"]
     for group_key in groups:
         cell_groups = _adata.obs[group_key]
         group_to_keys = {}
@@ -25,6 +26,9 @@ def get_outputs_scviv2(
             dists = cell_specific_dists[group_mask].mean(0)
             group_to_keys[group] = dists
         _adata.uns[f"mrvi_local_sample_dists_{group_key}"] = group_to_keys
+
+    make_parents(adata_out)
+    _adata.write(filename=adata_out)
 
 
 if __name__ == "__main__":

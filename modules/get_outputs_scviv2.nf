@@ -9,7 +9,8 @@ process get_outputs_scviv2 {
     """
     python3 ${params.bin.get_outputs_scviv2} \\
         --config_in ${config_in} \\
-        --adata_in ${adata_in}
+        --adata_in ${adata_in} \\
+        --adata_out ${adata_out}
     """
 
     output:

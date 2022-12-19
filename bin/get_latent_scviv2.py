@@ -1,7 +1,6 @@
-import scvi_v2
 import scanpy as sc
+import scvi_v2
 from anndata import AnnData
-
 from utils import load_config, make_parents, wrap_kwargs
 
 
@@ -30,7 +29,7 @@ def get_latent_scviv2(
     adata_out
         Path to write the latent AnnData object.
     """
-    config = load_config(config_in)
+    load_config(config_in)
     adata = sc.read_h5ad(adata_in)
     model = scvi_v2.MrVI.load(model_in, adata=adata)
 
