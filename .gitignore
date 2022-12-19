@@ -29,3 +29,5 @@ work/
 */.cache/
 results/
 conf/aws_credentials.config
+condaenv*
+.nextflow.log*
