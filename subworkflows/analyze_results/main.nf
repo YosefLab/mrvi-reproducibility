@@ -1,18 +1,10 @@
-include { analyze_results_symsim_new } from params.modules.analyze_results_symsim_new
+include { produce_figures } from params.modules.produce_figures
 
 
-process analyze_results {
-    input:
-    path scib_outs
-    path vendi_outs
-    path adatas
+workflow analyze_results {
+    take:
+    inputs
 
-    script:
-    dataset_name = "${params.outputs.data}"
-    if ( dataset_name == "symsim" ) {
-        analyze_results_symsim_new(scib_outs, vendi_outs, adatas)
-    }
-    else {
-
-    }
+    main:
+    produce_figures(inputs)
 }
