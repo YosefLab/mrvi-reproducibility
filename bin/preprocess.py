@@ -1,11 +1,10 @@
 import itertools
 import string
 
-import scanpy as sc
-from anndata import AnnData
 import numpy as np
 import pandas as pd
-
+import scanpy as sc
+from anndata import AnnData
 from utils import load_config, make_parents, wrap_kwargs
 
 
@@ -114,6 +113,69 @@ def _assign_symsim_donors(adata, config):
     donor_meta = adata.obs[sample_key].str.extractall(
         r"donor_meta\(([0-1]), ([0-1]), ([0-1])\)_batch[0-9]_[a-z]"
     )
+
+    # construct GT trees and distance matrices
+    meta_corr = [0, 0.5, 0.9]
+    donor_combos = list(itertools.product(*[[0, 1] for _ in range(len(meta_corr))]))
+    # E[||x - y||_2^2]
+    meta_dist = 2 - 2 * np.array(meta_corr)
+    dist_mtx = np.zeros((len(donor_combos), len(donor_combos)))
+    for i in range(len(donor_combos)):
+        for j in range(i):
+            donor_i, donor_j = donor_combos[i], donor_combos[j]
+            donor_diff = abs(np.array(donor_i) - np.array(donor_j))
+            dist_mtx[i, j] = dist_mtx[j, i] = np.sum(donor_diff * meta_dist)
+    dist_mtx = np.sqrt(dist_mtx)  # E[||x - y||_2]
+
+    # build GT donor metadata
+    gt_donor_meta = (
+        adata.obs.loc[lambda x: ~x[sample_key].duplicated(keep="first")]
+        .set_index(sample_key)
+        .sort_index()
+        .assign(donor_archetype=lambda x: x.index.str[11:18])
+    )
+    adata.uns["sample_metadata"] = gt_donor_meta
+
+    # Map archetype (e.g., (0, 1, 0))
+    # to index in dist_mtx
+    donor_archetype_to_idx = {}
+    for idx, donor in enumerate(donor_combos):
+        donor_archetype_to_idx[donor] = idx
+
+    def _get_donor_archetype(donor):
+        """Convert string pattern to tuple of ints"""
+        split = donor.split(",")
+        return tuple(int(s) for s in split)
+
+    n_donors_final = gt_donor_meta.shape[0]
+    gt_dist_mtx = np.zeros((n_donors_final, n_donors_final))
+    for idx_a, vals_a in gt_donor_meta.reset_index().iterrows():
+        for idx_b, vals_b in gt_donor_meta.reset_index().iterrows():
+            arch_a = _get_donor_archetype(vals_a["donor_archetype"])
+            arch_b = _get_donor_archetype(vals_b["donor_archetype"])
+
+            index_a = donor_archetype_to_idx[arch_a]
+            index_b = donor_archetype_to_idx[arch_b]
+            gt_dist_mtx[idx_a, idx_b] = gt_dist_mtx[idx_b, idx_a] = dist_mtx[
+                index_a, index_b
+            ]
+    gt_control_dist_mtx = pd.DataFrame(
+        1 - np.eye(len(gt_donor_meta.index)),
+        index=gt_donor_meta.index,
+        columns=gt_donor_meta.index,
+    )
+
+    gt_dist_mtx = pd.DataFrame(
+        gt_dist_mtx,
+        index=gt_donor_meta.index,
+        columns=gt_donor_meta.index,
+    )
+
+    adata.uns["gt_distance_matrix"] = {
+        "CT1:1": gt_dist_mtx,
+        "CT2:1": gt_control_dist_mtx,
+    }
+
     for match_idx, meta_key in enumerate(meta_keys):
         adata.obs[f"donor_{meta_key}"] = donor_meta[match_idx].astype(int).tolist()
     return adata
@@ -122,6 +184,7 @@ def _assign_symsim_donors(adata, config):
 def _construct_tree_semisynth(adata, config, depth_tree=3):
     """Modifies gene expression in two cell subpopulations according to a controlled
     donor tree structure
+
     """
     # construct donors
     n_donors = int(2**depth_tree)
@@ -136,12 +199,12 @@ def _construct_tree_semisynth(adata, config, depth_tree=3):
 
     # construct donor trees
     leaves_id = np.array(
-        [format(i, "0{}b".format(depth_tree)) for i in range(n_donors)]
+        [format(i, f"0{depth_tree}b") for i in range(n_donors)]
     )  # ids of leaves
 
     all_node_ids = []
     for dep in range(1, depth_tree + 1):
-        node_ids = [format(i, "0{}b".format(dep)) for i in range(2**dep)]
+        node_ids = [format(i, f"0{dep}b") for i in range(2**dep)]
         all_node_ids += node_ids  # ids of all nodes in the tree
 
     def perturb_gene_exp(ct, X_perturbed, all_node_ids, leaves_id):
@@ -162,7 +225,7 @@ def _construct_tree_semisynth(adata, config, depth_tree=3):
         # modifying gene expression
         # e.g., 001 has perturbed modules 0, 00, and 001
         subpop = adata.obs.loc[:, ct_key].values == ct
-        print("perturbing {}".format(ct))
+        print(f"perturbing {ct}")
         for donor_id in range(n_donors):
             selected_pop = subpop & (random_donors == donor_id)
             leaf_id = leaves_id1[donor_id]
@@ -206,13 +269,13 @@ def _construct_tree_semisynth(adata, config, depth_tree=3):
         int
     )
     n_features1 = meta_id1.shape[1]
-    new_cols1 = ["tree_id1_{}".format(i) for i in range(n_features1)]
+    new_cols1 = [f"tree_id1_{i}" for i in range(n_features1)]
     donor_metadata.loc[:, new_cols1] = meta_id1.values
     meta_id2 = pd.DataFrame([list(x) for x in donor_metadata.tree_id2.values]).astype(
         int
     )
     n_features2 = meta_id2.shape[1]
-    new_cols2 = ["tree_id2_{}".format(i) for i in range(n_features2)]
+    new_cols2 = [f"tree_id2_{i}" for i in range(n_features2)]
     donor_metadata.loc[:, new_cols2] = meta_id2.values
 
     donor_metadata.loc[:, new_cols1 + new_cols2] = donor_metadata.loc[
