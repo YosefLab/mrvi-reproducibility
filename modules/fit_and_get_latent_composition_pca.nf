@@ -14,5 +14,5 @@ process fit_and_get_latent_composition_pca {
     """
 
     output:
-    path adata_out
+    tuple val(adata_name), path(adata_out)
 }

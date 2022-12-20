@@ -18,7 +18,7 @@ workflow run_models {
 
     emit:
     get_latent_mrvi.out.concat(
-        get_latent_scviv2.out,
+        get_outputs_scviv2.out,
         fit_and_get_latent_composition_scvi.out,
         fit_and_get_latent_composition_pca.out
     )

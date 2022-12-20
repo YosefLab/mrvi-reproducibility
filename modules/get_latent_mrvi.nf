@@ -16,5 +16,5 @@ process get_latent_mrvi {
     """
 
     output:
-    path adata_out
+    tuple val(adata_name), path(adata_out)
 }

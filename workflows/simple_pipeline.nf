@@ -6,6 +6,12 @@ include { analyze_results } from params.subworkflows.analyze_results
 
 workflow run_main {
     main:
-    inputs = Channel.fromPath(params.inputs)
-    preprocess_data(inputs) | run_models | compute_metrics | analyze_results
+    input = Channel.fromList(params.inputs)
+
+    adatas = preprocess_data(input) | run_models
+    metrics = compute_metrics(adatas)
+
+    results = adatas.concat(metrics)
+    gped_results = results.groupTuple()
+    gped_results.view()
 }
