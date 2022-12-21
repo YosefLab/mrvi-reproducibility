@@ -13,8 +13,9 @@ workflow run_models {
 
     main:
     // Run scviv2, compute latents, distance matrices, and RF (if there is GT distances)
-    fit_scviv2(inputs) | get_latent_scviv2 | get_outputs_scviv2
-    compute_rf(get_outputs_scviv2.out)
+    scvi_outs = fit_scviv2(inputs) | get_latent_scviv2 | get_outputs_scviv2
+    scvi_adata = scvi_outs.adata
+    compute_rf(scvi_adata)
 
     // Run MRVI, compute latents (old code)
     fit_mrvi(inputs) | get_latent_mrvi
@@ -23,10 +24,16 @@ workflow run_models {
     fit_and_get_latent_composition_scvi(inputs)
     fit_and_get_latent_composition_pca(inputs)
 
-    emit:
-    get_latent_mrvi.out.concat(
-        get_outputs_scviv2.out,
+    distance_matrices = scvi_outs.distance_matrices
+    adatas = get_latent_mrvi.out.concat(
+        scvi_adata,
         fit_and_get_latent_composition_scvi.out,
         fit_and_get_latent_composition_pca.out
     )
+    rfs = compute_rf.out
+
+    emit:
+    adatas
+    distance_matrices
+    rfs
 }

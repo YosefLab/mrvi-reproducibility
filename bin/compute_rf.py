@@ -88,7 +88,9 @@ def main(
         return
 
     dists = []
+    cts = []
     for cluster_name in adata.uns["gt_distance_matrix"]:
+        cts.append(cluster_name)
         dist_gt = adata.uns["gt_distance_matrix"][cluster_name]
         sample_ordering = dist_gt.index.values
         z_gt = hierarchical_clustering(dist_gt)
@@ -102,7 +104,9 @@ def main(
         rf_dist = z_gt.robinson_foulds(z_inferred)
         norm_rf = rf_dist[0] / rf_dist[1]
         dists.append(norm_rf)
-    dists = pd.DataFrame({"rf_dist": dists}).assign(model_name=model_name)
+    dists = pd.DataFrame({"rf_dist": dists, "cell_type": cts}).assign(
+        model_name=model_name
+    )
     dists.to_csv(table_out, index=False)
 
 

@@ -1,6 +1,6 @@
-import scanpy as sc
-from utils import load_config, make_parents, wrap_kwargs
 import pandas as pd
+import scanpy as sc
+from utils import load_config, make_parents, save_pickle, wrap_kwargs
 
 
 @wrap_kwargs
@@ -9,6 +9,7 @@ def get_outputs_scviv2(
     config_in: str,
     adata_in: str,
     adata_out: str,
+    distance_matrices_out: str,
 ):
     """Get final outputs for scVIV2.
 
@@ -38,6 +39,8 @@ def get_outputs_scviv2(
 
     make_parents(adata_out)
     _adata.write(filename=adata_out)
+    make_parents(distance_matrices_out)
+    save_pickle(_adata.uns["group_key_to_dist_keys"], distance_matrices_out)
 
 
 if __name__ == "__main__":
