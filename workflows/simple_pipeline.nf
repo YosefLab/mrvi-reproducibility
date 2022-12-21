@@ -8,10 +8,13 @@ workflow run_main {
     main:
     input = Channel.fromList(params.inputs)
 
-    adatas = preprocess_data(input) | run_models
-    metrics = compute_metrics(adatas)
+    outs = preprocess_data(input) | run_models
+    metrics = compute_metrics(outs.adatas)
 
-    results = adatas.concat(metrics)
+    results = outs.adatas.concat(
+        outs.rfs,
+        metrics,
+    )
 
     analyze_results(results)
 }
