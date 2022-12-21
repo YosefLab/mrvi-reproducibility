@@ -35,7 +35,8 @@ def get_latent_scviv2(
     model = scvi_v2.MrVI.load(model_in, adata=adata)
     sample_key = config["sample_key"]
 
-    _adata = AnnData(obs=adata.obs)
+    _adata = AnnData(obs=adata.obs, uns=adata.uns)
+    _adata.uns["model_name"] = "scVIV2"
     u_latent_key = "X_mrvi_u"
     z_latent_key = "X_mrvi_z"
     _adata.obsm[u_latent_key] = model.get_latent_representation(adata, give_z=False)

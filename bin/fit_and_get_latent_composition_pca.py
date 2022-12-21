@@ -1,8 +1,7 @@
-from anndata import AnnData
 import scanpy as sc
-
-from utils import load_config, make_parents, wrap_kwargs
+from anndata import AnnData
 from composition_baseline import CompositionBaseline
+from utils import load_config, make_parents, wrap_kwargs
 
 
 @wrap_kwargs
@@ -30,7 +29,8 @@ def fit_and_get_latent_composition_pca(
     model_kwargs = config.get("composition_pca_model_kwargs", {})
     train_kwargs = config.get("composition_pca_train_kwargs", {})
     adata = sc.read(adata_in)
-    _adata = AnnData(obs=adata.obs)
+    _adata = AnnData(obs=adata.obs, uns=adata.uns)
+    _adata.uns["model_name"] = "CompositionPCA"
 
     composition_pca = CompositionBaseline(
         adata,

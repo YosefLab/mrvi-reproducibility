@@ -1,7 +1,6 @@
 import mrvi
 import scanpy as sc
 from anndata import AnnData
-
 from utils import load_config, make_parents, wrap_kwargs
 
 
@@ -30,11 +29,12 @@ def get_latent_mrvi(
     adata_out
         Path to write the latent AnnData object.
     """
-    config = load_config(config_in)
+    load_config(config_in)
     adata = sc.read_h5ad(adata_in)
     model = mrvi.MrVI.load(model_in, adata=adata)
 
-    _adata = AnnData(obs=adata.obs)
+    _adata = AnnData(obs=adata.obs, uns=adata.uns)
+    _adata.uns["model_name"] = "MrVI"
     u_latent_key = "X_mrvi_u"
     z_latent_key = "X_mrvi_z"
     _adata.obsm[u_latent_key] = model.get_latent_representation(adata, give_z=False)
