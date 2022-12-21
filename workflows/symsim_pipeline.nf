@@ -12,8 +12,6 @@ workflow run_main {
     metrics = compute_metrics(adatas)
 
     results = adatas.concat(metrics)
-    gped_results = results.groupTuple()
-    gped_results.view()
 
-    analyze_results(gped_results)
+    analyze_results(results)
 }

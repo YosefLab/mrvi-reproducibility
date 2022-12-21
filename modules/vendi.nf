@@ -1,9 +1,9 @@
 process vendi {
     input:
-    tuple val(adata_name), path(adata_in)
+    path adata_in
 
     script:
-    // adata_name = adata_in.getSimpleName()
+    adata_name = adata_in.getSimpleName()
     adata_model_name = adata_in.getBaseName()
     config_in = "${params.conf.datasets}/${adata_name}.json"
     table_out = "${params.outputs.metrics}/${adata_model_name}.vendi.csv"
@@ -15,5 +15,5 @@ process vendi {
     """
 
     output:
-    tuple val(adata_name), path(table_out)
+    path table_out
 }

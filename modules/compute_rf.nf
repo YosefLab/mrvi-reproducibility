@@ -1,6 +1,6 @@
 process compute_rf {
     input:
-    tuple val(adata_name), path(adata_in)
+    path adata_in
 
     script:
     adata_model_name = adata_in.getBaseName()
@@ -16,5 +16,5 @@ process compute_rf {
     """
 
     output:
-    tuple val(adata_name), path(table_out)
+    path table_out
 }

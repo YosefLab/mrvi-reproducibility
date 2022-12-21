@@ -13,5 +13,5 @@ process get_outputs_scviv2 {
     """
 
     output:
-    tuple val(adata_name), path(adata_in)
+    path adata_in
 }

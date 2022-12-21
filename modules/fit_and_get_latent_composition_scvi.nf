@@ -14,5 +14,5 @@ process fit_and_get_latent_composition_scvi {
     """
 
     output:
-    tuple val(adata_name), path(adata_out)
+    path adata_out
 }

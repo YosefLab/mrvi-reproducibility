@@ -1,4 +1,4 @@
-include { produce_figures } from params.modules.produce_figures
+include { produce_figures_symsim_new } from params.modules.produce_figures_symsim_new
 
 
 workflow analyze_results {
@@ -6,5 +6,8 @@ workflow analyze_results {
     inputs
 
     main:
-    produce_figures(inputs)
+    symsim_results = inputs.filter( { it =~ /symsim_new.*/ } ).collect()
+    produce_figures_symsim_new(symsim_results)
+
+    // Dataset-specific scripts can be added here
 }
