@@ -182,10 +182,7 @@ def _assign_symsim_donors(adata, config):
 
 
 def _construct_tree_semisynth(adata, config, depth_tree=3):
-    """Modifies gene expression in two cell subpopulations according to a controlled
-    donor tree structure
-
-    """
+    """Modifies gene expression in two cell subpopulations according to a tree structure."""
     # construct donors
     n_donors = int(2**depth_tree)
     np.random.seed(0)
@@ -256,13 +253,13 @@ def _construct_tree_semisynth(adata, config, depth_tree=3):
     gene_modules1 = pd.DataFrame(gene_mod1)
     gene_modules2 = pd.DataFrame(gene_mod2)
     donor_metadata = pd.DataFrame(
-        dict(
-            donor_id=np.arange(n_donors),
-            tree_id1=leaves1,
-            affected_ct1=ct1,
-            tree_id2=leaves2,
-            affected_ct2=ct2,
-        )
+        {
+            "donor_id": np.arange(n_donors),
+            "tree_id1": leaves1,
+            "affected_ct1": ct1,
+            "tree_id2": leaves2,
+            "affected_ct2": ct2,
+        }
     )
 
     meta_id1 = pd.DataFrame([list(x) for x in donor_metadata.tree_id1.values]).astype(
