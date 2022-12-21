@@ -12,12 +12,16 @@ workflow run_models {
     inputs // Channel of input AnnDatas
 
     main:
+    // Run scviv2, compute latents, distance matrices, and RF (if there is GT distances)
     fit_scviv2(inputs) | get_latent_scviv2 | get_outputs_scviv2
+    compute_rf(get_outputs_scviv2.out)
+
+    // Run MRVI, compute latents (old code)
     fit_mrvi(inputs) | get_latent_mrvi
+
+    // Run compositional models
     fit_and_get_latent_composition_scvi(inputs)
     fit_and_get_latent_composition_pca(inputs)
-
-    compute_rf(get_outputs_scviv2.out)
 
     emit:
     get_latent_mrvi.out.concat(

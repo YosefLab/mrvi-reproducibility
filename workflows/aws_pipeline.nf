@@ -3,6 +3,7 @@ include { run_models } from params.subworkflows.run_models
 include { compute_metrics } from params.subworkflows.compute_metrics
 include { analyze_results } from params.subworkflows.analyze_results
 
+
 workflow run_main {
     main:
     input = Channel.fromList(params.inputs)
@@ -13,4 +14,6 @@ workflow run_main {
     results = adatas.concat(metrics)
     gped_results = results.groupTuple()
     gped_results.view()
+
+    analyze_results(gped_results)
 }

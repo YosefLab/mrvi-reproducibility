@@ -188,6 +188,7 @@ def _construct_tree_semisynth(adata, config, depth_tree=3):
     np.random.seed(0)
     batch_key = config["batch_key"]
     sample_key = config["sample_key"]
+
     random_donors = np.random.randint(0, n_donors, adata.n_obs)
     n_modules = sum([int(2**k) for k in range(1, depth_tree + 1)])
 
@@ -252,14 +253,26 @@ def _construct_tree_semisynth(adata, config, depth_tree=3):
 
     gene_modules1 = pd.DataFrame(gene_mod1)
     gene_modules2 = pd.DataFrame(gene_mod2)
-    donor_metadata = pd.DataFrame(
-        {
-            "donor_id": np.arange(n_donors),
-            "tree_id1": leaves1,
-            "affected_ct1": ct1,
-            "tree_id2": leaves2,
-            "affected_ct2": ct2,
-        }
+    donor_metadata = (
+        pd.DataFrame(
+            {
+                "donor_id": np.arange(n_donors),
+                "tree_id1": leaves1,
+                "affected_ct1": ct1,
+                "tree_id2": leaves2,
+                "affected_ct2": ct2,
+            }
+        )
+        .assign(donor_name=lambda x: "donor_" + x.donor_id.astype(str))
+        .astype(
+            {
+                "tree_id1": "category",
+                "affected_ct1": "category",
+                "tree_id2": "category",
+                "affected_ct2": "category",
+                "donor_name": "category",
+            }
+        )
     )
 
     meta_id1 = pd.DataFrame([list(x) for x in donor_metadata.tree_id1.values]).astype(
@@ -280,6 +293,8 @@ def _construct_tree_semisynth(adata, config, depth_tree=3):
     ].astype("category")
 
     adata.obs.loc[:, sample_key] = random_donors
+    adata.obs.loc[:, sample_key] = "donor_" + adata.obs[sample_key].astype(str)
+    adata.obs.loc[:, sample_key] = adata.obs.loc[:, sample_key].astype("category")
     adata.obs.loc[:, batch_key] = 1
     original_index = adata.obs.index.copy()
     adata.obs = adata.obs.merge(
