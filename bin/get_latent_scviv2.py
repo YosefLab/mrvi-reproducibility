@@ -13,25 +13,27 @@ def get_latent_scviv2(
     adata_out: str,
 ) -> AnnData:
     """
-    Get latent space from a trained MrVI instance.
+        Get latent space from a trained MrVI instance.
 
-    Create a new AnnData object with latent spaces as `obsm` layers and
-    keys stored in `uns`. Only copies over `obs` from the input AnnData.
+        Create a new AnnData object with latent spaces as `obsm` layers and
+        keys stored in `uns`. Only copies over `obs` from the input AnnData.
 
-    Parameters
-    ----------
-    adata_in
-        Path to the setup AnnData object.
-    model_in
-        Path to the trained MrVI model.
-    config_in
-        Path to the dataset configuration file.
-    adata_out
-        Path to write the latent AnnData object.
+        Parameters
+        ----------
+        adata_in
+            Path to the setup AnnData object.
+        model_in
+            Path to the trained MrVI model.
+        config_in
+            Path to the dataset configuration file.
+        adata_out
+            Path to write the latent AnnData object.
+
     """
-    load_config(config_in)
+    config = load_config(config_in)
     adata = sc.read_h5ad(adata_in)
     model = scvi_v2.MrVI.load(model_in, adata=adata)
+    sample_key = config["sample_key"]
 
     _adata = AnnData(obs=adata.obs)
     u_latent_key = "X_mrvi_u"
@@ -48,7 +50,16 @@ def get_latent_scviv2(
     _adata.obsm[local_sample_dists_key] = model.get_local_sample_representation(
         adata, return_distances=True
     )
+
+    # compute donor ordering
+    sample_order_key = "mrvi_sample_order"
+    donor_metadata = adata.obs.loc[
+        lambda x: ~x[sample_key].duplicated(keep="first")
+    ].sort_values("_scvi_sample")
+    _adata.uns[sample_order_key] = donor_metadata[sample_key].values
+
     _adata.uns["local_sample_dists_key"] = local_sample_dists_key
+    _adata.uns["sample_order_key"] = sample_order_key
 
     make_parents(adata_out)
     _adata.write(filename=adata_out)
