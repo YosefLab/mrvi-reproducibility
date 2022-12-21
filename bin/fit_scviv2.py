@@ -13,15 +13,13 @@ def fit_scviv2(
 ) -> scvi_v2.MrVI:
     """
     Train a MrVI model.
-    
+
     Parameters
     ----------
     adata_in
         Path to the preprocessed AnnData object.
     config_in
         Path to the dataset configuration file.
-    adata_out
-        Path to write the latent AnnData object.
     model_out
         Path to write the trained MrVI model.
     """
@@ -33,7 +31,9 @@ def fit_scviv2(
     adata = sc.read(adata_in)
 
     scvi_v2.MrVI.setup_anndata(
-        adata, batch_key=batch_key, sample_key=sample_key,
+        adata,
+        batch_key=batch_key,
+        sample_key=sample_key,
     )
     model = scvi_v2.MrVI(adata, **model_kwargs)
     model.train(**train_kwargs)
