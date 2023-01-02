@@ -29,7 +29,6 @@ def get_latent_mrvi(
     adata_out
         Path to write the latent AnnData object.
     """
-    load_config(config_in)
     adata = sc.read_h5ad(adata_in)
     model = mrvi.MrVI.load(model_in, adata=adata)
 
