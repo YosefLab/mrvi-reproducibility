@@ -15,5 +15,6 @@
     },
     "composition_scvi_train_kwargs": {
         "max_epochs": 300
-    }
+    },
+    "clustering_method": "ward"
 }

@@ -38,11 +38,11 @@ def linkage_to_ete(linkage_obj):
     return root
 
 
-def hierarchical_clustering(dist_mtx):
+def hierarchical_clustering(dist_mtx, method="ward"):
     """Perform hierarchical clustering on squared distance matrix."""
     assert dist_mtx.shape[0] == dist_mtx.shape[1]
     red_mtx = squareform(dist_mtx.values)
-    z = linkage(red_mtx, method="ward")
+    z = linkage(red_mtx, method=method)
     return linkage_to_ete(z)
 
 
@@ -80,6 +80,8 @@ def main(
     config = load_config(config_in)
 
     ct_key = config["labels_key"]
+    # Linkage method to use for hierarchical clustering
+    clustering_method = config["clustering_method"]
     make_parents(table_out)
     inferred_distance_key = adata.uns["group_key_to_dist_keys"][ct_key]
 
@@ -93,11 +95,11 @@ def main(
         cts.append(cluster_name)
         dist_gt = adata.uns["gt_distance_matrix"][cluster_name]
         sample_ordering = dist_gt.index.values
-        z_gt = hierarchical_clustering(dist_gt)
+        z_gt = hierarchical_clustering(dist_gt, method=clustering_method)
 
         dist_inferred = adata.uns[inferred_distance_key][cluster_name]
         dist_inferred = dist_inferred.loc[sample_ordering, sample_ordering]
-        z_inferred = hierarchical_clustering(dist_inferred)
+        z_inferred = hierarchical_clustering(dist_inferred, method=clustering_method)
         assert (dist_inferred.index == dist_gt.index).all()
         assert (dist_inferred.columns == dist_gt.columns).all()
 
