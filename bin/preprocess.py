@@ -68,7 +68,7 @@ def _run_dataset_specific_preprocessing(
 ) -> AnnData:
     distance_matrices = None
     if adata_in == "symsim_new.h5ad":
-        adata = _assign_symsim_donors(adata, config)
+        adata, distance_matrices = _assign_symsim_donors(adata, config)
     if adata_in == "scvi_pbmcs.h5ad":
         adata = _construct_tree_semisynth(
             adata,
@@ -187,7 +187,7 @@ def _assign_symsim_donors(adata, config):
 
     for match_idx, meta_key in enumerate(meta_keys):
         adata.obs[f"donor_{meta_key}"] = donor_meta[match_idx].astype(int).tolist()
-    return adata
+    return adata, all_distances
 
 
 def _construct_tree_semisynth(adata, config, depth_tree=3):

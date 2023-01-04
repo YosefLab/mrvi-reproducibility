@@ -1,4 +1,3 @@
-import argparse
 import os
 from pathlib import Path
 
@@ -7,7 +6,8 @@ import pandas as pd
 import xarray as xr
 from scipy.cluster.hierarchy import linkage, to_tree
 from scipy.spatial.distance import squareform
-from utils import load_config, make_parents
+from utils import (determine_if_file_empty, load_config, make_parents,
+                   wrap_kwargs)
 
 
 def linkage_to_ete(linkage_obj):
@@ -42,30 +42,14 @@ def linkage_to_ete(linkage_obj):
 def hierarchical_clustering(dist_mtx, method="ward"):
     """Perform hierarchical clustering on squared distance matrix."""
     assert dist_mtx.shape[0] == dist_mtx.shape[1]
-    red_mtx = squareform(dist_mtx.values)
+    red_mtx = squareform(dist_mtx)
     z = linkage(red_mtx, method=method)
     return linkage_to_ete(z)
 
 
-def determine_if_file_empty(file_path):
-    """Determine if file is empty."""
-    return Path(file_path).stat().st_size == 0
-
-
-def parse_args():
-    """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(description="Compute RF distance")
-    parser.add_argument("--adata_in", type=str, required=True, help="Input adata file")
-    parser.add_argument(
-        "--config_in", type=str, required=True, help="Path to dataset file"
-    )
-    parser.add_argument(
-        "--table_out", type=str, required=True, help="Output table file"
-    )
-    return vars(parser.parse_args())
-
-
-def main(
+@wrap_kwargs
+def compute_rf(
+    *,
     distance_matrices,
     distance_matrices_gt,
     config_in,
@@ -85,6 +69,7 @@ def main(
     basename = os.path.basename(distance_matrices)
     model_name = basename.split(".")[1]
     config = load_config(config_in)
+    celltype_key = config["labels_key"]
 
     # Linkage method to use for hierarchical clustering
     clustering_method = config["clustering_method"]
@@ -101,16 +86,14 @@ def main(
     dists = []
     cts = []
 
-    clusters = aligned_mats.coords[aligned_mats.dims[0]].values
+    clusters = aligned_mats.coords[celltype_key].values
     for cluster_name in clusters:
         cts.append(cluster_name)
+
         dist_gt = aligned_mats.distance_gt.loc[cluster_name].values
         z_gt = hierarchical_clustering(dist_gt, method=clustering_method)
-
         dist_inferred = aligned_mats.distance.loc[cluster_name].values
         z_inferred = hierarchical_clustering(dist_inferred, method=clustering_method)
-        assert (dist_inferred.index == dist_gt.index).all()
-        assert (dist_inferred.columns == dist_gt.columns).all()
 
         rf_dist = z_gt.robinson_foulds(z_inferred)
         norm_rf = rf_dist[0] / rf_dist[1]
@@ -122,5 +105,4 @@ def main(
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    main(**args)
+    compute_rf()

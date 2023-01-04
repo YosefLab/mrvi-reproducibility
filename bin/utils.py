@@ -3,6 +3,7 @@ import os
 import pathlib
 import pickle
 from inspect import signature
+from pathlib import Path
 from typing import Callable
 
 import click
@@ -43,6 +44,11 @@ def load_pickle(path):
         return pickle.load(handle)
 
 
+def determine_if_file_empty(file_path):
+    """Determine if file is empty."""
+    return Path(file_path).stat().st_size == 0
+
+
 def load_results(results_paths):
     """Load and sort all results from a list of paths.
 
@@ -60,6 +66,8 @@ def load_results(results_paths):
         "distances_metrics": pd.DataFrame(),
     }
     for file in results_paths:
+        if determine_if_file_empty(file):
+            continue
         if file.endswith(".h5ad"):
             continue
         df = pd.read_csv(file)

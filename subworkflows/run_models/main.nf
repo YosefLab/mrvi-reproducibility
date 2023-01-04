@@ -39,7 +39,11 @@ workflow run_models {
 
     // Step 2: Compute metrics
     // Compute RF
-    rfs = compute_rf(distance_matrices)
+    dmat_gt_symsim=distance_matrices_gt.filter( { it =~ /symsim_new.*/ } )
+    dmat_inf_symsim=distance_matrices.filter( { it =~ /symsim_new.*/ } )
+    dmats=dmat_gt_symsim.combine(dmat_inf_symsim)
+    dmats.view()
+    rfs = compute_rf(dmats)
 
     emit:
     adatas

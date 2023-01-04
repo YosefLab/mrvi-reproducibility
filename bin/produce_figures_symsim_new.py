@@ -18,11 +18,26 @@ def parser():
 args = parser()
 results_paths = args.results_paths
 output_dir = args.output_dir
-os.makedirs(output_dir, exist_ok=True)
 # %% # Uncomment this cell to run the script interactively
-# results_paths = [
-#     # COMPLETE
-# ]
+output_dir = "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/figures"
+results_paths = [
+    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/data/symsim_new.mrvi.h5ad",
+    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/symsim_new.scviv2.h5ad",
+    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/data/symsim_new.composition_scvi.h5ad",
+    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/data/symsim_new.composition_pca.h5ad",
+    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/metrics/symsim_new.scviv2.distance_matrices.rf.csv",
+    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/metrics/symsim_new.mrvi.distance_matrices.rf.csv",
+    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/metrics/symsim_new.composition_scvi.scib.csv",
+    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/metrics/symsim_new.composition_pca.scib.csv",
+    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/metrics/symsim_new.mrvi.scib.csv",
+    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/metrics/symsim_new.scviv2.scib.csv",
+    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/metrics/symsim_new.composition_pca.vendi.csv",
+    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/metrics/symsim_new.composition_scvi.vendi.csv",
+    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/metrics/symsim_new.mrvi.vendi.csv",
+    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/metrics/symsim_new.scviv2.vendi.csv",
+]
+# %%
+os.makedirs(output_dir, exist_ok=True)
 
 # %%
 all_results = load_results(results_paths)
