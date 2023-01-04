@@ -2,7 +2,7 @@
     "batch_key": "Site",
     "labels_key": "str_labels",
     "sample_key": "batch",
-    "group_keys": ["str_labels"],
+    "group_keys": "str_labels",
     "hvg_kwargs": {
         "n_top_genes": 2000,
         "flavor": "seurat_v3"

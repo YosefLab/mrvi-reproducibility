@@ -16,6 +16,10 @@ dependencies:
     - cuda-nvcc
     - plotnine==0.8.0
     - matplotlib==3.5
+    - xarray=2022.12.0
+    - dask=2022.12.1
+    - netcdf4=1.6.2
+    - bottleneck=1.3.5
     - pip
     - pip:
           - click

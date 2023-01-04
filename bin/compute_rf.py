@@ -1,9 +1,10 @@
 import argparse
+import os
 from pathlib import Path
 
 import ete3
 import pandas as pd
-import scanpy as sc
+import xarray as xr
 from scipy.cluster.hierarchy import linkage, to_tree
 from scipy.spatial.distance import squareform
 from utils import load_config, make_parents
@@ -46,6 +47,11 @@ def hierarchical_clustering(dist_mtx, method="ward"):
     return linkage_to_ete(z)
 
 
+def determine_if_file_empty(file_path):
+    """Determine if file is empty."""
+    return Path(file_path).stat().st_size == 0
+
+
 def parse_args():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description="Compute RF distance")
@@ -60,7 +66,8 @@ def parse_args():
 
 
 def main(
-    adata_in,
+    distance_matrices,
+    distance_matrices_gt,
     config_in,
     table_out,
 ):
@@ -75,30 +82,32 @@ def main(
     table_out :
         desired output table file
     """
-    adata = sc.read_h5ad(adata_in)
-    model_name = adata.uns["model_name"]
+    basename = os.path.basename(distance_matrices)
+    model_name = basename.split(".")[1]
     config = load_config(config_in)
 
-    ct_key = config["labels_key"]
     # Linkage method to use for hierarchical clustering
     clustering_method = config["clustering_method"]
     make_parents(table_out)
-    inferred_distance_key = adata.uns["group_key_to_dist_keys"][ct_key]
 
-    if "gt_distance_matrix" not in adata.uns:
+    if determine_if_file_empty(distance_matrices_gt):
         Path(table_out).touch()
         return
 
+    gt_mats = xr.open_dataarray(distance_matrices_gt)
+    inferred_mats = xr.open_dataarray(distance_matrices)
+
+    aligned_mats = xr.merge([gt_mats, inferred_mats], join="left")
     dists = []
     cts = []
-    for cluster_name in adata.uns["gt_distance_matrix"]:
+
+    clusters = aligned_mats.coords[aligned_mats.dims[0]].values
+    for cluster_name in clusters:
         cts.append(cluster_name)
-        dist_gt = adata.uns["gt_distance_matrix"][cluster_name]
-        sample_ordering = dist_gt.index.values
+        dist_gt = aligned_mats.distance_gt.loc[cluster_name].values
         z_gt = hierarchical_clustering(dist_gt, method=clustering_method)
 
-        dist_inferred = adata.uns[inferred_distance_key][cluster_name]
-        dist_inferred = dist_inferred.loc[sample_ordering, sample_ordering]
+        dist_inferred = aligned_mats.distance.loc[cluster_name].values
         z_inferred = hierarchical_clustering(dist_inferred, method=clustering_method)
         assert (dist_inferred.index == dist_gt.index).all()
         assert (dist_inferred.columns == dist_gt.columns).all()

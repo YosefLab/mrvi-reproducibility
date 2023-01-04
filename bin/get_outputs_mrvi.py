@@ -5,14 +5,14 @@ from utils import load_config, make_parents, wrap_kwargs
 
 
 @wrap_kwargs
-def get_outputs_scviv2(
+def get_outputs_mrvi(
     *,
     config_in: str,
     adata_in: str,
     adata_out: str,
     distance_matrices_out: str,
 ):
-    """Get final outputs for scVIV2.
+    """Get final outputs for MrVI.
 
     This includes: cell-type-specific distance matrices.
     """
@@ -43,7 +43,8 @@ def get_outputs_scviv2(
     make_parents(adata_out)
     _adata.write(filename=adata_out)
     make_parents(distance_matrices_out)
+    all_dists.to_netcdf(distance_matrices_out)
 
 
 if __name__ == "__main__":
-    get_outputs_scviv2()
+    get_outputs_mrvi()

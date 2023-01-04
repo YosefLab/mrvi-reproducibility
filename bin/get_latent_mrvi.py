@@ -29,8 +29,10 @@ def get_latent_mrvi(
     adata_out
         Path to write the latent AnnData object.
     """
+    config = load_config(config_in)
     adata = sc.read_h5ad(adata_in)
     model = mrvi.MrVI.load(model_in, adata=adata)
+    sample_key = config["sample_key"]
 
     _adata = AnnData(obs=adata.obs, uns=adata.uns)
     _adata.uns["model_name"] = "MrVI"
@@ -48,7 +50,16 @@ def get_latent_mrvi(
     _adata.obsm[local_sample_dists_key] = model.get_local_sample_representation(
         adata, return_distances=True
     )
+
+    # compute donor ordering
+    sample_order_key = "mrvi_sample_order"
+    donor_metadata = adata.obs.loc[
+        lambda x: ~x[sample_key].duplicated(keep="first")
+    ].sort_values("_scvi_sample")
+    _adata.uns[sample_order_key] = donor_metadata[sample_key].values
+
     _adata.uns["local_sample_dists_key"] = local_sample_dists_key
+    _adata.uns["sample_order_key"] = sample_order_key
 
     make_parents(adata_out)
     _adata.write(filename=adata_out)
