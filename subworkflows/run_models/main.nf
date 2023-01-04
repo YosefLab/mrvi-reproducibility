@@ -28,6 +28,7 @@ workflow run_models {
     fit_and_get_latent_composition_scvi(adatas)
     fit_and_get_latent_composition_pca(adatas)
 
+    // Organize all outputs
     distance_matrices = scvi_outs.distance_matrices.concat(
         mrvi_outs.distance_matrices,
     )

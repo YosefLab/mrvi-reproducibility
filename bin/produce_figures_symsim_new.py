@@ -1,9 +1,13 @@
 # %%
 import argparse
+import glob
 import os
 
 import plotnine as p9
 from utils import INCH_TO_CM, load_results
+
+# Change to False if you want to run this script directly
+RUN_WITH_PARSER = True
 
 
 def parser():
@@ -15,35 +19,18 @@ def parser():
 
 
 # %%
-args = parser()
-results_paths = args.results_paths
-output_dir = args.output_dir
-# %% # Uncomment this cell to run the script interactively
-output_dir = "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/figures"
-results_paths = [
-    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/data/symsim_new.mrvi.h5ad",
-    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/symsim_new.scviv2.h5ad",
-    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/data/symsim_new.composition_scvi.h5ad",
-    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/data/symsim_new.composition_pca.h5ad",
-    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/metrics/symsim_new.scviv2.distance_matrices.rf.csv",
-    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/metrics/symsim_new.mrvi.distance_matrices.rf.csv",
-    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/metrics/symsim_new.composition_scvi.scib.csv",
-    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/metrics/symsim_new.composition_pca.scib.csv",
-    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/metrics/symsim_new.mrvi.scib.csv",
-    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/metrics/symsim_new.scviv2.scib.csv",
-    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/metrics/symsim_new.composition_pca.vendi.csv",
-    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/metrics/symsim_new.composition_scvi.vendi.csv",
-    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/metrics/symsim_new.mrvi.vendi.csv",
-    "/home/pierre/scvi-v2-reproducibility/results/symsim_pipeline/metrics/symsim_new.scviv2.vendi.csv",
-]
-# %%
+if RUN_WITH_PARSER:
+    args = parser()
+    results_paths = args.results_paths
+    output_dir = args.output_dir
+else:
+    output_dir = "../results/symsim_pipeline/figures"
+    results_paths = glob.glob("../results/symsim_pipeline/*/*.csv") + glob.glob(
+        "../results/symsim_pipeline/*/*.h5ad"
+    )
 os.makedirs(output_dir, exist_ok=True)
-
 # %%
 all_results = load_results(results_paths)
-
-# %%
-
 # %%
 # Latent visualization
 
@@ -62,6 +49,7 @@ fig = (
     + p9.labs(x="", y="VENDI score")
 )
 fig.save(os.path.join(output_dir, "symsim_new.vendi_score.svg"))
+fig
 # %%
 plot_df = all_results["scib_metrics"]
 # COMPLETE
@@ -83,6 +71,8 @@ fig = (
     + p9.labs(x="", y="RF distance")
 )
 fig.save(os.path.join(output_dir, "symsim_new.rf.svg"))
+fig
+# %%
 plot_df
 # %%
 # Distance matrix comparison
