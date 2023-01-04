@@ -43,6 +43,7 @@ def get_outputs_scviv2(
     make_parents(adata_out)
     _adata.write(filename=adata_out)
     make_parents(distance_matrices_out)
+    all_dists.to_netcdf(distance_matrices_out)
 
 
 if __name__ == "__main__":
