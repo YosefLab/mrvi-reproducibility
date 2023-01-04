@@ -1,4 +1,4 @@
-name: run-models
+name: analyze-results
 channels:
     - conda-forge
     - bioconda
@@ -9,12 +9,13 @@ dependencies:
     - python=3.10
     - anndata>=0.8.0
     - scanpy>=1.9.0
-    - pytorch
-    - scvi-tools=0.17.4
-    - torchvision
-    - torchaudio
+    - numpy
+    - pandas
     - jax
     - jaxlib
+    - cuda-nvcc
+    - plotnine==0.8.0
+    - matplotlib==3.5
     - xarray=2022.12.0
     - dask=2022.12.1
     - netcdf4=1.6.2
@@ -22,7 +23,5 @@ dependencies:
     - pip
     - pip:
           - click
-          - scikit-learn==1.0.2
-          - scikit-misc==0.1.4
-          - mrvi>=0.1.0
-          - git+ssh://git@github.com/YosefLab/scvi-v2.git
+          - scib-metrics>=0.0.7
+          - vendi-score==0.0.3

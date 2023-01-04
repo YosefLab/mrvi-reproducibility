@@ -1,7 +1,6 @@
-import scvi_v2
 import scanpy as sc
+import scvi_v2
 from anndata import AnnData
-
 from utils import load_config, make_parents, wrap_kwargs
 
 
@@ -29,12 +28,15 @@ def get_latent_scviv2(
         Path to the dataset configuration file.
     adata_out
         Path to write the latent AnnData object.
+
     """
     config = load_config(config_in)
     adata = sc.read_h5ad(adata_in)
     model = scvi_v2.MrVI.load(model_in, adata=adata)
+    sample_key = config["sample_key"]
 
-    _adata = AnnData(obs=adata.obs)
+    _adata = AnnData(obs=adata.obs, uns=adata.uns)
+    _adata.uns["model_name"] = "scVIV2"
     u_latent_key = "X_mrvi_u"
     z_latent_key = "X_mrvi_z"
     _adata.obsm[u_latent_key] = model.get_latent_representation(adata, give_z=False)
@@ -49,11 +51,20 @@ def get_latent_scviv2(
     _adata.obsm[local_sample_dists_key] = model.get_local_sample_representation(
         adata, return_distances=True
     )
+
+    # compute donor ordering
+    sample_order_key = "mrvi_sample_order"
+    donor_metadata = adata.obs.loc[
+        lambda x: ~x[sample_key].duplicated(keep="first")
+    ].sort_values("_scvi_sample")
+    _adata.uns[sample_order_key] = donor_metadata[sample_key].values
+
     _adata.uns["local_sample_dists_key"] = local_sample_dists_key
+    _adata.uns["sample_order_key"] = sample_order_key
 
     make_parents(adata_out)
     _adata.write(filename=adata_out)
-    return _adata
+    return adata_out
 
 
 if __name__ == "__main__":

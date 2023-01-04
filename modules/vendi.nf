@@ -13,7 +13,7 @@ process vendi {
         --config_in ${config_in} \\
         --table_out ${table_out}
     """
-    
+
     output:
     path table_out
 }
