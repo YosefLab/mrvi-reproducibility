@@ -6,6 +6,8 @@ import pandas as pd
 import xarray as xr
 from scipy.cluster.hierarchy import linkage, to_tree
 from scipy.spatial.distance import squareform
+from scipy.linalg import issymmetric
+import warnings
 from utils import (determine_if_file_empty, load_config, make_parents,
                    wrap_kwargs)
 
@@ -42,6 +44,9 @@ def linkage_to_ete(linkage_obj):
 def hierarchical_clustering(dist_mtx, method="ward"):
     """Perform hierarchical clustering on squared distance matrix."""
     assert dist_mtx.shape[0] == dist_mtx.shape[1]
+    if not issymmetric(dist_mtx):
+        warnings.warn("Distance matrix may not be symmetric.")
+        dist_mtx = (dist_mtx + dist_mtx.T) / 2.0
     red_mtx = squareform(dist_mtx)
     z = linkage(red_mtx, method=method)
     return linkage_to_ete(z)
