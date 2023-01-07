@@ -39,6 +39,9 @@ def fit_and_get_latent_composition_pca(
     _adata = AnnData(obs=adata.obs, uns=adata.uns)
     _adata.uns["model_name"] = "CompositionPCA"
 
+    model_kwargs["clustering_on"] = "cluster_key"
+    model_kwargs["cluster_key"] = group_key
+
     composition_pca = CompositionBaseline(
         adata,
         batch_key,

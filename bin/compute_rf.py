@@ -3,6 +3,7 @@ from pathlib import Path
 
 import ete3
 import pandas as pd
+import numpy as np
 import xarray as xr
 from scipy.cluster.hierarchy import linkage, to_tree
 from scipy.spatial.distance import squareform
@@ -44,8 +45,11 @@ def linkage_to_ete(linkage_obj):
 def hierarchical_clustering(dist_mtx, method="ward"):
     """Perform hierarchical clustering on squared distance matrix."""
     assert dist_mtx.shape[0] == dist_mtx.shape[1]
-    if not issymmetric(dist_mtx):
-        warnings.warn("Distance matrix may not be symmetric.")
+    is_symmetric = issymmetric(dist_mtx)
+    has_zero_diag = (dist_mtx.diagonal() == 0).all()
+    if not (is_symmetric and has_zero_diag):
+        warnings.warn("Distance matrix may be invalid.")
+        dist_mtx = dist_mtx - np.diag(dist_mtx.diagonal())
         dist_mtx = (dist_mtx + dist_mtx.T) / 2.0
     red_mtx = squareform(dist_mtx)
     z = linkage(red_mtx, method=method)

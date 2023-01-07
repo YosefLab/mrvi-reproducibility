@@ -31,6 +31,7 @@ class CompositionBaseline:
             "clustering_on", "leiden"
         )  # one of leiden, cluster_key
         self.cluster_key = model_kwargs.pop("cluster_key", None)
+        self.subcluster_key = "leiden_subcluster"
 
     def preprocess_data(self):
         if self.rep == "PCA":
@@ -56,7 +57,7 @@ class CompositionBaseline:
             sc.pp.neighbors(self.adata, n_neighbors=30, use_rep=self.rep_key)
             sc.tl.leiden(self.adata, resolution=1.0, key_added="leiden_1.0")
             self.cluster_key = "leiden_1.0"
-        elif self.clustering_on == "cluster_key" and self.cluster_key is None:
+        elif (self.clustering_on == "cluster_key") and (self.cluster_key is not None):
             pass
         else:
             raise ValueError(
@@ -71,25 +72,25 @@ class CompositionBaseline:
 
             # Step 1: subcluster
             sc.pp.neighbors(subann, n_neighbors=30, use_rep=self.rep_key)
-            sc.tl.leiden(subann, resolution=1.0, key_added=self.cluster_key)
+            sc.tl.leiden(subann, resolution=1.0, key_added=self.subcluster_key)
 
             szs = (
-                subann.obs.groupby([self.cluster_key, self.sample_key])
+                subann.obs.groupby([self.subcluster_key, self.sample_key])
                 .size()
                 .to_frame("n_cells")
                 .reset_index()
             )
             szs_total = (
-                szs.groupby(self.sample_key)
+                szs.groupby(self.subcluster_key)
                 .sum()
                 .rename(columns={"n_cells": "n_cells_total"})
             )
-            comps = szs.merge(szs_total, on=self.sample_key).assign(
+            comps = szs.merge(szs_total, on=self.subcluster_key).assign(
                 freqs=lambda x: x.n_cells / x.n_cells_total
             )
             freqs = (
-                comps.loc[:, [self.sample_key, self.cluster_key, "freqs"]]
-                .set_index([self.sample_key, self.cluster_key])
+                comps.loc[:, [self.sample_key, self.subcluster_key, "freqs"]]
+                .set_index([self.sample_key, self.subcluster_key])
                 .squeeze()
                 .unstack()
             )
@@ -110,4 +111,3 @@ class CompositionBaseline:
             cluster_dists = pairwise_distances(cluster_reps, metric="euclidean")
             local_dists[cell_is_selected] = cluster_dists
         return local_dists
-        
