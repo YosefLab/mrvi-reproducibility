@@ -7,6 +7,7 @@ include { get_outputs_scviv2 } from params.modules.get_outputs_scviv2
 include { fit_and_get_latent_composition_scvi } from params.modules.fit_and_get_latent_composition_scvi
 include { fit_and_get_latent_composition_pca } from params.modules.fit_and_get_latent_composition_pca
 include { compute_rf } from params.modules.compute_rf
+include { compute_2drep } from params.modules.compute_2drep
 
 workflow run_models {
     take:
@@ -48,6 +49,9 @@ workflow run_models {
     dmats=dmat_gt_symsim.combine(dmat_inf_symsim)
     dmats.view()
     rfs = compute_rf(dmats)
+
+    // Step 3: Compute UMAPs
+    adatas=compute_2drep(adatas)
 
     emit:
     adatas
