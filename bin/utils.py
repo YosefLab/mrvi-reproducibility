@@ -100,4 +100,4 @@ def set_breakpoint(host: str = "127.0.0.1", port: int = 4444):
     To move up and down the callstack, type in `up` or `down`.
     To exit, use `exit` or ctrl + c.
     """
-    RemotePdb("127.0.0.1", 4444).set_trace()
+    RemotePdb(host, port).set_trace()
