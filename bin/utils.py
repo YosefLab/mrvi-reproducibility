@@ -92,7 +92,7 @@ def load_results(results_paths):
     return all_results
 
 
-def set_breakpoint():
+def set_breakpoint(host: str = "127.0.0.1", port: int = 4444):
     """Set a breakpoint for debugging.
 
     The interactive debugger can be accessed by running locally
