@@ -8,6 +8,7 @@ from typing import Callable
 
 import click
 import pandas as pd
+from remote_pdb import RemotePdb
 
 INCH_TO_CM = 1 / 2.54
 
@@ -89,3 +90,14 @@ def load_results(results_paths):
                 df
             )
     return all_results
+
+
+def set_breakpoint():
+    """Set a breakpoint for debugging.
+
+    The interactive debugger can be accessed by running locally
+    `telnet 127.0.0.1 4444` in a separate terminal.
+    To move up and down the callstack, type in `up` or `down`.
+    To exit, use `exit` or ctrl + c.
+    """
+    RemotePdb("127.0.0.1", 4444).set_trace()
