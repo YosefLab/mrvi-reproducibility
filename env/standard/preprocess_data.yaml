@@ -15,3 +15,4 @@ dependencies:
     - pip:
           - click
           - scikit-misc
+          - remote-pdb==2.1.0
