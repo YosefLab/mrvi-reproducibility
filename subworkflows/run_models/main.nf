@@ -14,32 +14,39 @@ workflow run_models {
     inputs // Channel of input AnnDatas
 
     main:
-    adatas=inputs.map { it[0] }
+    adatas_in=inputs.map { it[0] }
     distance_matrices_gt=inputs.map { it[1] }
+
     // Step 1: Run models
     // Run scviv2, compute latents, distance matrices
-    scvi_outs = fit_scviv2(adatas) | get_latent_scviv2 | get_outputs_scviv2
+    scvi_outs = fit_scviv2(adatas_in) | get_latent_scviv2 | get_outputs_scviv2
     scvi_adata = scvi_outs.adata
 
-    // Run MRVI, compute latents, distance matrices (old code)
-    mrvi_outs = fit_mrvi(adatas) | get_latent_mrvi | get_outputs_mrvi
-    mrvi_adata = mrvi_outs.adata
+    distance_matrices = scvi_outs.distance_matrices
+    adatas = get_latent_scviv2.out
 
-    // Run compositional models
-    c_scvi_outs=fit_and_get_latent_composition_scvi(adatas)
-    c_pca_outs=fit_and_get_latent_composition_pca(adatas)
+    if ( params.runAllModels) {
+        // Run MRVI, compute latents, distance matrices
+        mrvi_outs = fit_mrvi(adatas_in) | get_latent_mrvi | get_outputs_mrvi
+        mrvi_adata = mrvi_outs.adata
 
-    // Organize outputs
-    distance_matrices = scvi_outs.distance_matrices.concat(
+        // Run compositional models
+        c_scvi_outs=fit_and_get_latent_composition_scvi(adatas_in)
+        c_pca_outs=fit_and_get_latent_composition_pca(adatas_in)
+
+        distance_matrices = distance_matrices.concat(
         mrvi_outs.distance_matrices,
         c_pca_outs.distance_matrices,
         c_scvi_outs.distance_matrices
-    )
-    adatas = get_latent_mrvi.out.concat(
-        scvi_adata,
-        c_pca_outs.adata,
-        c_scvi_outs.adata
-    )
+        )
+        adatas = adatas.concat(
+            get_latent_mrvi.out,
+            scvi_adata,
+            c_pca_outs.adata,
+            c_scvi_outs.adata
+        )
+
+    }
     adatas.view()
 
     // Step 2: Compute metrics
