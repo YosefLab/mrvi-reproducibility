@@ -1,0 +1,16 @@
+{
+    "batch_key": "TODO",
+    "labels_key": "TODO",
+    "sample_key": "TODO",
+    "group_keys": "TODO",
+    "mrvi_train_kwargs": {
+        "max_epochs": 300
+    },
+    "scviv2_train_kwargs": {
+        "max_epochs": 300
+    },
+    "composition_scvi_train_kwargs": {
+        "max_epochs": 300
+    },
+    "clustering_method": "ward"
+}
