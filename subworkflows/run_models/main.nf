@@ -30,6 +30,7 @@ workflow run_models {
 
     // Organize all outputs
     distance_matrices = scvi_outs.distance_matrices.concat(
+        scvi_outs.normalized_distance_matrices,
         mrvi_outs.distance_matrices,
     )
     adatas = get_latent_mrvi.out.concat(

@@ -48,8 +48,8 @@ def get_latent_scviv2(
     _adata.uns["local_sample_rep_key"] = local_sample_rep_key
 
     local_sample_dists_key = "mrvi_local_sample_dists"
-    _adata.obsm[local_sample_dists_key] = model.get_local_sample_representation(
-        adata, return_distances=True
+    _adata.obsm[local_sample_dists_key] = model.get_local_sample_distances(
+        adata
     )
 
     # compute donor ordering
@@ -61,6 +61,12 @@ def get_latent_scviv2(
 
     _adata.uns["local_sample_dists_key"] = local_sample_dists_key
     _adata.uns["sample_order_key"] = sample_order_key
+
+    local_sample_normalized_dists_key = "mrvi_local_sample_normalized_dists"
+    _adata.obsm[local_sample_normalized_dists_key] = model.get_local_sample_distances(
+        adata, normalize_distances=True
+    )
+    _adata.uns["local_sample_normalized_dists_key"] = local_sample_normalized_dists_key
 
     make_parents(adata_out)
     _adata.write(filename=adata_out)

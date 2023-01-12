@@ -11,6 +11,7 @@ def get_outputs_scviv2(
     adata_in: str,
     adata_out: str,
     distance_matrices_out: str,
+    normalized_distance_matrices_out: str,
 ):
     """Get final outputs for scVIV2.
 
@@ -20,21 +21,32 @@ def get_outputs_scviv2(
     group_key = config["group_keys"]
     _adata = sc.read_h5ad(adata_in)
     # compute group-specific distance matrices
-    cell_specific_dists = _adata.obsm["mrvi_local_sample_dists"]
+    cell_specific_dists = _adata.obsm[_adata.uns["local_sample_dists_key"]]
+    cell_specific_normalized_dists = _adata.obsm[_adata.uns["local_sample_normalized_dists_key"]]
 
     sample_ordering_key = _adata.uns["sample_order_key"]
     sample_ordering = _adata.uns[sample_ordering_key]
 
     cell_groups = _adata.obs[group_key]
     all_dists = []
+    all_normalized_dists = []
     groups = cell_groups.unique()
     for group in groups:
         group_mask = cell_groups == group
         dists = cell_specific_dists[group_mask].mean(0)
+        normalized_dists = cell_specific_normalized_dists[group_mask].mean(0)
         all_dists.append(dists[None])
+        all_normalized_dists.append(normalized_dists[None])
     all_dists = np.concatenate(all_dists, axis=0)
     all_dists = xr.DataArray(
         all_dists,
+        dims=[group_key, "sample", "sample"],
+        coords={group_key: groups, "sample": sample_ordering},
+        name="distance",
+    )
+    all_normalized_dists = np.concatenate(all_normalized_dists, axis=0)
+    all_normalized_dists = xr.DataArray(
+        all_normalized_dists,
         dims=[group_key, "sample", "sample"],
         coords={group_key: groups, "sample": sample_ordering},
         name="distance",
@@ -44,6 +56,8 @@ def get_outputs_scviv2(
     _adata.write(filename=adata_out)
     make_parents(distance_matrices_out)
     all_dists.to_netcdf(distance_matrices_out)
+    make_parents(normalized_distance_matrices_out)
+    normalized_all_dists.to_netcdf(normalized_distance_matrices_out)
 
 
 if __name__ == "__main__":
