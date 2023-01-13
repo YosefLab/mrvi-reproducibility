@@ -1,4 +1,4 @@
-process compute_2drep {
+process compute_2dreps {
     input:
     path adata_in
 
@@ -7,7 +7,7 @@ process compute_2drep {
     adata_out = "${params.outputs.data}/${adata_model_name}.final.h5ad"
 
     """
-    python3 ${params.bin.compute_2drep} \\
+    python3 ${params.bin.compute_2dreps} \\
         --adata_in ${adata_in} \\
         --adata_out ${adata_out}
     """

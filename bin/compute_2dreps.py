@@ -1,10 +1,11 @@
 import scanpy as sc
 from tsnecuda import TSNE
+import pymde
 from utils import make_parents, wrap_kwargs
 
 
 @wrap_kwargs
-def compute_2drep(
+def compute_2dreps(
     *,
     adata_in,
     adata_out,
@@ -35,4 +36,4 @@ def compute_2drep(
 
 
 if __name__ == "__main__":
-    compute_2drep()
+    compute_2dreps()
