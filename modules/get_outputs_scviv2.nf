@@ -15,9 +15,9 @@ process get_outputs_scviv2 {
         --config_in ${config_in} \\
         --adata_in ${adata_in} \\
         --adata_out ${adata_in} \\
-        --cell_distance_matrices_in ${cell_distance_matrices_in}
-        --cell_normalized_distance_matrices_in ${cell_normalized_distance_matrices_in}
-        --distance_matrices_out ${distance_matrices_out}
+        --cell_distance_matrices_in ${cell_distance_matrices_in} \\
+        --cell_normalized_distance_matrices_in ${cell_normalized_distance_matrices_in} \\
+        --distance_matrices_out ${distance_matrices_out} \\
         --normalized_distance_matrices_out ${normalized_distance_matrices_out}
     """
 

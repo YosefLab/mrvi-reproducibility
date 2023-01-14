@@ -8,8 +8,9 @@ workflow compute_metrics {
 
     main:
     scib(inputs)
-    vendi(inputs)
+    // vendi(inputs)
 
     emit:
-    scib.out.concat(vendi.out)
+    // scib.out.concat(vendi.out)
+    scib.out
 }
