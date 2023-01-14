@@ -92,7 +92,7 @@ def compute_rf(
 
         dist_gt = aligned_mats.distance_gt.loc[cluster_name].values
         z_gt = hierarchical_clustering(dist_gt, method=clustering_method)
-        dist_inferred = aligned_mats.group_distances.loc[cluster_name].values
+        dist_inferred = aligned_mats.distance.loc[cluster_name].values
         z_inferred = hierarchical_clustering(dist_inferred, method=clustering_method)
 
         rf_dist = z_gt.robinson_foulds(z_inferred)
