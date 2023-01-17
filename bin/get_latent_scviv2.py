@@ -12,8 +12,8 @@ def get_latent_scviv2(
     config_in: str,
     adata_out: str,
     cell_representations_out: str,
-    cell_distance_matrices_out: str,
-    cell_normalized_distance_matrices_out: str,
+    distance_matrices_out: str,
+    normalized_distance_matrices_out: str,
 ) -> AnnData:
     """
     Get latent space from a trained MrVI instance.
@@ -33,6 +33,8 @@ def get_latent_scviv2(
         Path to write the latent AnnData object.
 
     """
+    config = load_config(config_in)
+    group_keys = config["group_keys"]
     adata = sc.read_h5ad(adata_in)
     model = scvi_v2.MrVI.load(model_in, adata=adata)
 
@@ -45,20 +47,20 @@ def get_latent_scviv2(
     _adata.uns["latent_keys"] = [u_latent_key, z_latent_key]
 
     cell_reps = model.get_local_sample_representation(adata)
-    cell_dists = model.get_local_sample_distances(adata)
+    cell_dists = model.get_local_sample_distances(adata, groupby=group_keys)
     cell_normalized_dists = model.get_local_sample_distances(
-        adata, normalize_distances=True
+        adata, normalize_distances=True, groupby=group_keys
     )
 
     make_parents(adata_out)
     _adata.write(filename=adata_out)
     make_parents(cell_representations_out)
     cell_reps.to_netcdf(cell_representations_out)
-    make_parents(cell_distance_matrices_out)
-    cell_dists.to_netcdf(cell_distance_matrices_out)
-    make_parents(cell_normalized_distance_matrices_out)
-    cell_normalized_dists.to_netcdf(cell_normalized_distance_matrices_out)
-    return adata_out, cell_distance_matrices_out, cell_normalized_distance_matrices_out
+    make_parents(distance_matrices_out)
+    cell_dists.to_netcdf(distance_matrices_out)
+    make_parents(normalized_distance_matrices_out)
+    cell_normalized_dists.to_netcdf(normalized_distance_matrices_out)
+    return adata_out, distance_matrices_out, normalized_distance_matrices_out
 
 
 if __name__ == "__main__":

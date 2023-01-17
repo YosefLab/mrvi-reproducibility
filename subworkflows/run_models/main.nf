@@ -3,7 +3,6 @@ include { get_latent_mrvi } from params.modules.get_latent_mrvi
 include { get_outputs_mrvi } from params.modules.get_outputs_mrvi
 include { fit_scviv2 } from params.modules.fit_scviv2
 include { get_latent_scviv2 } from params.modules.get_latent_scviv2
-include { get_outputs_scviv2 } from params.modules.get_outputs_scviv2
 include { fit_and_get_latent_composition_scvi } from params.modules.fit_and_get_latent_composition_scvi
 include { fit_and_get_latent_composition_pca } from params.modules.fit_and_get_latent_composition_pca
 include { compute_rf } from params.modules.compute_rf
@@ -17,7 +16,7 @@ workflow run_models {
     distance_matrices_gt=inputs.map { it[1] }
     // Step 1: Run models
     // Run scviv2, compute latents, distance matrices
-    scvi_outs = fit_scviv2(adatas) | get_latent_scviv2 | get_outputs_scviv2
+    scvi_outs = fit_scviv2(adatas) | get_latent_scviv2
     scvi_adata = scvi_outs.adata
 
     // Run MRVI, compute latents, distance matrices (old code)

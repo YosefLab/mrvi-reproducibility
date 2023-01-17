@@ -1,6 +1,7 @@
 import pandas as pd
 import scanpy as sc
 from vendi_score import vendi
+import xarray as xr
 
 from utils import load_config, make_parents, wrap_kwargs
 
@@ -8,7 +9,7 @@ from utils import load_config, make_parents, wrap_kwargs
 @wrap_kwargs
 def compute_vendi(
     *,
-    adata_in: str,
+    distance_matrix_in: str,
     config_in: str,
     table_out: str,
 ) -> pd.DataFrame:
@@ -17,7 +18,7 @@ def compute_vendi(
 
     Parameters
     ----------
-    adata_in
+    distance_matrix_in
         Path to input AnnData object with integrated data.
     config_in
         Path to the dataset configuration file.
@@ -25,7 +26,7 @@ def compute_vendi(
         Path to write output CSV table with Vendi score.
     """
     config = load_config(config_in)
-    adata = sc.read_h5ad(adata_in)
+    distance_matrix = xr.open_dataset(distance_matrix_in)
 
     local_sample_dists_key = adata.uns["local_sample_dists_key"]
     local_sample_dists = adata.obsm[local_sample_dists_key]

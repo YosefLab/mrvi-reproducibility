@@ -69,7 +69,7 @@ def load_results(results_paths):
     for file in results_paths:
         if determine_if_file_empty(file):
             continue
-        if file.endswith(".h5ad"):
+        if file.endswith(".h5ad") or file.endswith(".nc"):
             continue
         df = pd.read_csv(file)
         basename = os.path.basename(file)

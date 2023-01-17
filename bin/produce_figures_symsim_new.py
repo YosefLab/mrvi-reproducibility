@@ -2,6 +2,7 @@
 import argparse
 import glob
 import os
+import re
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -80,11 +81,17 @@ fig
 plot_df
 # %%
 # Distance matrix comparison
+scviv2_dists_path = re.match(
+    r".*scviv2.distance_matrices.nc", " ".join(results_paths)
+)
+scviv2_normalized_dists_path = re.match(
+    r".*scviv2.normalized_distance_matrices.nc", " ".join(results_paths)
+)
 dists = xr.open_dataarray(
-    "/home/justin/ghrepos/scvi-v2-reproducibility/results/symsim_pipeline/distance_matrices/symsim_new.scviv2.distance_matrices.nc"
+    scviv2_dists_path
 )
 normalized_dists = xr.open_dataarray(
-    "/home/justin/ghrepos/scvi-v2-reproducibility/results/symsim_pipeline/distance_matrices/symsim_new.scviv2.normalized_distance_matrices.nc"
+    scviv2_normalized_dists_path
 )
 
 # %%
@@ -98,7 +105,9 @@ for ct in normalized_dists.celltype:
         vmin=0,
         vmax=vmax,
     )
-    plt.show()
+    plt.savefig(
+        os.path.join(output_dir, f"symsim_new.normalized_distance_matrix.{ct}.svg")
+    )
     plt.clf()
 # %%
 # Labeled histogram of distances vs normalized distances
@@ -107,6 +116,8 @@ plt.hist(
     normalized_dists.values.flatten(), bins=100, alpha=0.5, label="normalized distances"
 )
 plt.legend()
+plt.savefig(os.path.join(output_dir, "symsim_new.normalized_distance_matrix_hist.svg"))
+plt.clf()
 # %%
 binwidth = 0.1
 bins = np.arange(0, vmax + binwidth, binwidth)
@@ -123,5 +134,7 @@ for ct in normalized_dists.celltype.values:
     plt.title(ct)
     plt.legend()
     plt.xlim(-0.5, vmax + 0.5)
-    plt.show()
+    plt.savefig(
+        os.path.join(output_dir, f"symsim_new.compare_distance_matrix_hist.{ct}.svg")
+    )
     plt.clf()
