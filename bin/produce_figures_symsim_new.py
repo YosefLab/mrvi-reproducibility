@@ -3,7 +3,11 @@ import argparse
 import glob
 import os
 
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 import plotnine as p9
+import xarray as xr
 from utils import INCH_TO_CM, load_results
 
 # Change to False if you want to run this script directly
@@ -76,3 +80,48 @@ fig
 plot_df
 # %%
 # Distance matrix comparison
+dists = xr.open_dataarray(
+    "/home/justin/ghrepos/scvi-v2-reproducibility/results/symsim_pipeline/distance_matrices/symsim_new.scviv2.distance_matrices.nc"
+)
+normalized_dists = xr.open_dataarray(
+    "/home/justin/ghrepos/scvi-v2-reproducibility/results/symsim_pipeline/distance_matrices/symsim_new.scviv2.normalized_distance_matrices.nc"
+)
+
+# %%
+vmax = np.percentile(normalized_dists.values, 95)
+for ct in normalized_dists.celltype:
+    sns.heatmap(
+        normalized_dists.sel(celltype=ct),
+        cmap="YlGnBu",
+        xticklabels=False,
+        yticklabels=False,
+        vmin=0,
+        vmax=vmax,
+    )
+    plt.show()
+    plt.clf()
+# %%
+# Labeled histogram of distances vs normalized distances
+plt.hist(dists.values.flatten(), bins=100, alpha=0.5, label="distances")
+plt.hist(
+    normalized_dists.values.flatten(), bins=100, alpha=0.5, label="normalized distances"
+)
+plt.legend()
+# %%
+binwidth = 0.1
+bins = np.arange(0, vmax + binwidth, binwidth)
+for ct in normalized_dists.celltype.values:
+    plt.hist(
+        dists.sel(celltype=ct).values.flatten(), bins=bins, alpha=0.5, label="distances"
+    )
+    plt.hist(
+        normalized_dists.sel(celltype=ct).values.flatten(),
+        bins=bins,
+        alpha=0.5,
+        label="normalized distances",
+    )
+    plt.title(ct)
+    plt.legend()
+    plt.xlim(-0.5, vmax + 0.5)
+    plt.show()
+    plt.clf()
