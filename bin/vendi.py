@@ -2,6 +2,7 @@ import pandas as pd
 import scanpy as sc
 from vendi_score import vendi
 import xarray as xr
+import numpy as np
 
 from utils import load_config, make_parents, wrap_kwargs
 
@@ -26,17 +27,28 @@ def compute_vendi(
         Path to write output CSV table with Vendi score.
     """
     config = load_config(config_in)
-    distance_matrix = xr.open_dataset(distance_matrix_in)
+    celltype_key = config["labels_key"]
 
-    local_sample_dists_key = adata.uns["local_sample_dists_key"]
-    local_sample_dists = adata.obsm[local_sample_dists_key]
-    local_sample_similarities = 1 / (1 + local_sample_dists)
+    try:
+        distance_matrix = xr.open_dataarray(distance_matrix_in)
+    except ValueError:
+        distance_matrix = xr.open_dataset(distance_matrix_in)[celltype_key]
+        distance_matrix = distance_matrix.rename("distance")
 
+    vmax = np.percentile(distance_matrix.values, 95)
+    local_sample_similarities = (vmax - distance_matrix) / vmax
+
+
+    try:
+        clusters = local_sample_similarities.coords[celltype_key].values
+    except KeyError:
+        clusters = local_sample_similarities.coords[f"{celltype_key}_name"].values
     vendi_scores = []
-    for i in range(local_sample_similarities.shape[0]):
-        vendi_scores.append(vendi.score_K(local_sample_similarities[i]))
+    for cluster in clusters:
+        cluster_sims = local_sample_similarities.loc[cluster].values
+        vendi_scores.append(vendi.score_K(cluster_sims))
 
-    vendi_dict = {"obs_id": adata.obs.index, "vendi_score": vendi_scores}
+    vendi_dict = {"cluster_name": clusters, "vendi_score": vendi_scores}
     df = pd.DataFrame.from_dict(vendi_dict)
 
     make_parents(table_out)

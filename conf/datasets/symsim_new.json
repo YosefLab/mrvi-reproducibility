@@ -11,7 +11,7 @@
         "max_epochs": 1
     },
     "scviv2_train_kwargs": {
-        "max_epochs": 400
+        "max_epochs": 50
     },
     "composition_scvi_train_kwargs": {
         "max_epochs": 1

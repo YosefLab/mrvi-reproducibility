@@ -81,24 +81,19 @@ fig
 plot_df
 # %%
 # Distance matrix comparison
-scviv2_dists_path = re.match(
-    r".*scviv2.distance_matrices.nc", " ".join(results_paths)
-)
-scviv2_normalized_dists_path = re.match(
-    r".*scviv2.normalized_distance_matrices.nc", " ".join(results_paths)
-)
-dists = xr.open_dataarray(
+scviv2_dists_path = "symsim_new.scviv2.distance_matrices.nc"
+scviv2_normalized_dists_path = "symsim_new.scviv2.normalized_distance_matrices.nc"
+dists = xr.open_dataset(
     scviv2_dists_path
-)
-normalized_dists = xr.open_dataarray(
+).celltype
+normalized_dists = xr.open_dataset(
     scviv2_normalized_dists_path
-)
-
+).celltype
 # %%
-vmax = np.percentile(normalized_dists.values, 95)
-for ct in normalized_dists.celltype:
+vmax = np.percentile(normalized_dists.data, 95)
+for ct in normalized_dists.celltype_name.values:
     sns.heatmap(
-        normalized_dists.sel(celltype=ct),
+        normalized_dists.sel(celltype_name=ct),
         cmap="YlGnBu",
         xticklabels=False,
         yticklabels=False,
@@ -111,9 +106,9 @@ for ct in normalized_dists.celltype:
     plt.clf()
 # %%
 # Labeled histogram of distances vs normalized distances
-plt.hist(dists.values.flatten(), bins=100, alpha=0.5, label="distances")
+plt.hist(dists.data.flatten(), bins=100, alpha=0.5, label="distances")
 plt.hist(
-    normalized_dists.values.flatten(), bins=100, alpha=0.5, label="normalized distances"
+    normalized_dists.data.flatten(), bins=100, alpha=0.5, label="normalized distances"
 )
 plt.legend()
 plt.savefig(os.path.join(output_dir, "symsim_new.normalized_distance_matrix_hist.svg"))
@@ -121,12 +116,12 @@ plt.clf()
 # %%
 binwidth = 0.1
 bins = np.arange(0, vmax + binwidth, binwidth)
-for ct in normalized_dists.celltype.values:
+for ct in normalized_dists.celltype_name.values:
     plt.hist(
-        dists.sel(celltype=ct).values.flatten(), bins=bins, alpha=0.5, label="distances"
+        dists.sel(celltype_name=ct).data.flatten(), bins=bins, alpha=0.5, label="distances"
     )
     plt.hist(
-        normalized_dists.sel(celltype=ct).values.flatten(),
+        normalized_dists.sel(celltype_name=ct).data.flatten(),
         bins=bins,
         alpha=0.5,
         label="normalized distances",

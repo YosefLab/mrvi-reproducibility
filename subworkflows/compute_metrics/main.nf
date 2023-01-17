@@ -13,5 +13,4 @@ workflow compute_metrics {
 
     emit:
     scib.out.concat(vendi.out)
-    scib.out
 }
