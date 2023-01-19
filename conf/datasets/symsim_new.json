@@ -2,7 +2,6 @@
     "batch_key": "batch",
     "labels_key": "celltype",
     "sample_key": "donor",
-    "group_keys": "celltype",
     "hvg_kwargs": {
         "n_top_genes": 2000,
         "flavor": "seurat_v3"

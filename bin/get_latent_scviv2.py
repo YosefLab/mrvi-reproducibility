@@ -35,7 +35,7 @@ def get_latent_scviv2(
 
     """
     config = load_config(config_in)
-    group_keys = config["group_keys"]
+    labels_key = config.get("labels_key", None)
     adata = sc.read_h5ad(adata_in)
     model = scvi_v2.MrVI.load(model_in, adata=adata)
 
@@ -48,9 +48,9 @@ def get_latent_scviv2(
     _adata.uns["latent_keys"] = [u_latent_key, z_latent_key]
 
     cell_reps = model.get_local_sample_representation(adata)
-    cell_dists = model.get_local_sample_distances(adata, groupby=group_keys)
+    cell_dists = model.get_local_sample_distances(adata, groupby=labels_key)
     cell_normalized_dists = model.get_local_sample_distances(
-        adata, normalize_distances=True, groupby=group_keys
+        adata, normalize_distances=True, groupby=labels_key
     )
 
     make_parents(adata_out)

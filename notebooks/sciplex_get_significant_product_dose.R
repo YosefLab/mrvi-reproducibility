@@ -5,9 +5,9 @@ library(reshape2)
 
 # From https://github.com/cole-trapnell-lab/sci-plex/blob/079639c50811dd43a206a779ab2f0199a147c98f/large_screen/Notebook4_Figure3.R
 sciPlex_cds.list = list()
-sciPlex_cds.list[["A549"]] = readRDS("data/A549.RDS")
-sciPlex_cds.list[["K562"]] = readRDS("data/K562.RDS")
-sciPlex_cds.list[["MCF7"]] = readRDS("data/MCF7.RDS")
+sciPlex_cds.list[["A549"]] = readRDS("data/archive/A549.RDS")
+sciPlex_cds.list[["K562"]] = readRDS("data/archive/K562.RDS")
+sciPlex_cds.list[["MCF7"]] = readRDS("data/archive/MCF7.RDS")
 
 product_cluster_mat.list <- list()
 cluster.enrichment.df = list()

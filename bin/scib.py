@@ -1,3 +1,5 @@
+from typing import Optional
+
 import numpy as np
 import pandas as pd
 import scanpy as sc
@@ -7,7 +9,9 @@ from anndata import AnnData
 from utils import load_config, make_parents, wrap_kwargs
 
 
-def categorical_obs(adata: AnnData, key: str) -> np.ndarray:
+def categorical_obs(adata: AnnData, key: Optional[str]) -> Optional[np.ndarray]:
+    if key is None:
+        return
     return np.array(adata.obs[key].astype("category").cat.codes).ravel()
 
 
@@ -44,12 +48,20 @@ def compute_scib(
         batch = categorical_obs(adata, batch_key)
         sample = categorical_obs(adata, sample_key)
 
-        isolated_label_score = metrics.isolated_labels(X_latent, labels, batch)
-        silhouette_label_score = metrics.silhouette_label(
-            X_latent, labels, rescale=True
-        )
-        silhouette_sample_score = metrics.silhouette_label(
-            X_latent, sample, rescale=True
+        isolated_label_score = None
+        if labels is not None and batch is not None:
+            isolated_label_score = metrics.isolated_labels(X_latent, labels, batch)
+        
+        silhouette_label_score = None
+        if labels is not None:
+            silhouette_label_score = metrics.silhouette_label(
+                X_latent, labels, rescale=True
+            )
+
+        silhouette_sample_score = None
+        if sample is not None:
+            silhouette_sample_score = metrics.silhouette_label(
+                X_latent, sample, rescale=True
         )
         # (
         #     nmi_kmeans_label_score,
@@ -102,7 +114,7 @@ def compute_scib(
             #     ari_leiden_label_score,
             # ],
         }
-        if np.unique(batch).shape[0] >= 2:
+        if batch is not None and np.unique(batch).shape[0] >= 2:
             silhouette_batch_score = metrics.silhouette_batch(
                 X_latent, labels, batch, rescale=True
             )

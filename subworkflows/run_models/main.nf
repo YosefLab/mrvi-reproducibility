@@ -20,8 +20,8 @@ workflow run_models {
     scvi_adata = scvi_outs.adata
 
     // Run MRVI, compute latents, distance matrices (old code)
-    mrvi_outs = fit_mrvi(adatas) | get_latent_mrvi | get_outputs_mrvi
-    mrvi_adata = mrvi_outs.adata
+    // mrvi_outs = fit_mrvi(adatas) | get_latent_mrvi | get_outputs_mrvi
+    // mrvi_adata = mrvi_outs.adata
 
     // Run compositional models
     fit_and_get_latent_composition_scvi(adatas)
@@ -30,10 +30,10 @@ workflow run_models {
     // Organize all outputs
     distance_matrices = scvi_outs.distance_matrices.concat(
         scvi_outs.normalized_distance_matrices,
-        mrvi_outs.distance_matrices,
+        // mrvi_outs.distance_matrices,
     )
-    adatas = get_latent_mrvi.out.concat(
-        scvi_adata,
+    adatas = scvi_adata.concat(
+        // get_latent_mrvi.out,
         fit_and_get_latent_composition_scvi.out,
         fit_and_get_latent_composition_pca.out
     )

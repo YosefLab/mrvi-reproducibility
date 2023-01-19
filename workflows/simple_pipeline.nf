@@ -6,7 +6,7 @@ include { analyze_results } from params.subworkflows.analyze_results
 
 workflow run_main {
     main:
-    input = Channel.fromList(params.inputs)
+    input = Channel.fromPath(params.inputs)
 
     outs = preprocess_data(input) | run_models
     metrics = compute_metrics(outs.adatas, outs.distance_matrices)

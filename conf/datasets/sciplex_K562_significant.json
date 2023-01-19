@@ -1,19 +1,18 @@
 {
-    "batch_key": "Site",
-    "labels_key": "str_labels",
-    "sample_key": "batch",
+    "batch_key": "dummy_batch",
+    "sample_key": "product_dose",
     "hvg_kwargs": {
-        "n_top_genes": 2000,
+        "n_top_genes": 3000,
         "flavor": "seurat_v3"
     },
     "mrvi_train_kwargs": {
-        "max_epochs": 1
+        "max_epochs": 4
     },
     "scviv2_train_kwargs": {
-        "max_epochs": 1
+        "max_epochs": 400
     },
     "composition_scvi_train_kwargs": {
-        "max_epochs": 1
+        "max_epochs": 4
     },
     "clustering_method": "ward"
 }
