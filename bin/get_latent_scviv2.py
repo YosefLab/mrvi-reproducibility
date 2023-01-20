@@ -1,6 +1,7 @@
 import scanpy as sc
 import scvi_v2
 from anndata import AnnData
+import numpy as np
 from utils import load_config, make_parents, wrap_kwargs
 
 
@@ -11,6 +12,9 @@ def get_latent_scviv2(
     model_in: str,
     config_in: str,
     adata_out: str,
+    cell_representations_out: str,
+    distance_matrices_out: str,
+    normalized_distance_matrices_out: str,
 ) -> AnnData:
     """
     Get latent space from a trained MrVI instance.
@@ -31,9 +35,9 @@ def get_latent_scviv2(
 
     """
     config = load_config(config_in)
+    group_keys = config["group_keys"]
     adata = sc.read_h5ad(adata_in)
     model = scvi_v2.MrVI.load(model_in, adata=adata)
-    sample_key = config["sample_key"]
 
     _adata = AnnData(obs=adata.obs, uns=adata.uns)
     _adata.uns["model_name"] = "scVIV2"
@@ -43,28 +47,21 @@ def get_latent_scviv2(
     _adata.obsm[z_latent_key] = model.get_latent_representation(adata, give_z=True)
     _adata.uns["latent_keys"] = [u_latent_key, z_latent_key]
 
-    local_sample_rep_key = "mrvi_local_sample_rep"
-    _adata.obsm[local_sample_rep_key] = model.get_local_sample_representation(adata)
-    _adata.uns["local_sample_rep_key"] = local_sample_rep_key
-
-    local_sample_dists_key = "mrvi_local_sample_dists"
-    _adata.obsm[local_sample_dists_key] = model.get_local_sample_representation(
-        adata, return_distances=True
+    cell_reps = model.get_local_sample_representation(adata)
+    cell_dists = model.get_local_sample_distances(adata, groupby=group_keys)
+    cell_normalized_dists = model.get_local_sample_distances(
+        adata, normalize_distances=True, groupby=group_keys
     )
-
-    # compute donor ordering
-    sample_order_key = "mrvi_sample_order"
-    donor_metadata = adata.obs.loc[
-        lambda x: ~x[sample_key].duplicated(keep="first")
-    ].sort_values("_scvi_sample")
-    _adata.uns[sample_order_key] = donor_metadata[sample_key].values
-
-    _adata.uns["local_sample_dists_key"] = local_sample_dists_key
-    _adata.uns["sample_order_key"] = sample_order_key
 
     make_parents(adata_out)
     _adata.write(filename=adata_out)
-    return adata_out
+    make_parents(cell_representations_out)
+    cell_reps.to_netcdf(cell_representations_out)
+    make_parents(distance_matrices_out)
+    cell_dists.to_netcdf(distance_matrices_out)
+    make_parents(normalized_distance_matrices_out)
+    cell_normalized_dists.to_netcdf(normalized_distance_matrices_out)
+    return adata_out, distance_matrices_out, normalized_distance_matrices_out
 
 
 if __name__ == "__main__":

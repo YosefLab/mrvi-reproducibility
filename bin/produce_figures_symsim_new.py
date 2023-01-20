@@ -2,8 +2,13 @@
 import argparse
 import glob
 import os
+import re
 
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 import plotnine as p9
+import xarray as xr
 from utils import INCH_TO_CM, load_results
 
 # Change to False if you want to run this script directly
@@ -76,3 +81,55 @@ fig
 plot_df
 # %%
 # Distance matrix comparison
+scviv2_dists_path = "symsim_new.scviv2.distance_matrices.nc"
+scviv2_normalized_dists_path = "symsim_new.scviv2.normalized_distance_matrices.nc"
+dists = xr.open_dataset(
+    scviv2_dists_path
+).celltype
+normalized_dists = xr.open_dataset(
+    scviv2_normalized_dists_path
+).celltype
+# %%
+vmax = np.percentile(normalized_dists.data, 95)
+for ct in normalized_dists.celltype_name.values:
+    sns.heatmap(
+        normalized_dists.sel(celltype_name=ct),
+        cmap="YlGnBu",
+        xticklabels=False,
+        yticklabels=False,
+        vmin=0,
+        vmax=vmax,
+    )
+    plt.savefig(
+        os.path.join(output_dir, f"symsim_new.normalized_distance_matrix.{ct}.svg")
+    )
+    plt.clf()
+# %%
+# Labeled histogram of distances vs normalized distances
+plt.hist(dists.data.flatten(), bins=100, alpha=0.5, label="distances")
+plt.hist(
+    normalized_dists.data.flatten(), bins=100, alpha=0.5, label="normalized distances"
+)
+plt.legend()
+plt.savefig(os.path.join(output_dir, "symsim_new.normalized_distance_matrix_hist.svg"))
+plt.clf()
+# %%
+binwidth = 0.1
+bins = np.arange(0, vmax + binwidth, binwidth)
+for ct in normalized_dists.celltype_name.values:
+    plt.hist(
+        dists.sel(celltype_name=ct).data.flatten(), bins=bins, alpha=0.5, label="distances"
+    )
+    plt.hist(
+        normalized_dists.sel(celltype_name=ct).data.flatten(),
+        bins=bins,
+        alpha=0.5,
+        label="normalized distances",
+    )
+    plt.title(ct)
+    plt.legend()
+    plt.xlim(-0.5, vmax + 0.5)
+    plt.savefig(
+        os.path.join(output_dir, f"symsim_new.compare_distance_matrix_hist.{ct}.svg")
+    )
+    plt.clf()

@@ -6,7 +6,7 @@ process get_outputs_mrvi {
     adata_name = adata_in.getSimpleName()
     adata_model_name = adata_in.getBaseName()
     config_in = "${params.conf.datasets}/${adata_name}.json"
-    distance_matrices_out = "${params.conf.distance_matrices}/${adata_model_name}.distance_matrices.nc"
+    distance_matrices_out = "${params.outputs.distance_matrices}/${adata_model_name}.distance_matrices.nc"
     """
     python3 ${params.bin.get_outputs_mrvi} \\
         --config_in ${config_in} \\

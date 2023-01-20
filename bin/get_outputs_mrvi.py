@@ -35,8 +35,12 @@ def get_outputs_mrvi(
     all_dists = np.concatenate(all_dists, axis=0)
     all_dists = xr.DataArray(
         all_dists,
-        dims=[group_key, "sample", "sample"],
-        coords={group_key: groups, "sample": sample_ordering},
+        dims=[f"{group_key}_name", "sample_x", "sample_y"],
+        coords={
+            f"{group_key}_name": groups,
+            "sample_x": sample_ordering,
+            "sample_y": sample_ordering,
+        },
         name="distance",
     )
 
