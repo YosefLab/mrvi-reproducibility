@@ -39,10 +39,7 @@ def compute_vendi(
     local_sample_similarities = (vmax - distance_matrix) / vmax
 
 
-    try:
-        clusters = local_sample_similarities.coords[celltype_key].values
-    except KeyError:
-        clusters = local_sample_similarities.coords[f"{celltype_key}_name"].values
+    clusters = local_sample_similarities.coords[f"{celltype_key}_name"].values
     vendi_scores = []
     for cluster in clusters:
         cluster_sims = local_sample_similarities.loc[cluster].values

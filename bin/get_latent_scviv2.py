@@ -1,6 +1,7 @@
 import scanpy as sc
 import scvi_v2
 from anndata import AnnData
+import numpy as np
 from utils import load_config, make_parents, wrap_kwargs
 
 
