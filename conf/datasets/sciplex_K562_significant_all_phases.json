@@ -1,5 +1,5 @@
 {
-    "batch_key": "dummy_batch",
+    "batch_key": "plate_oligo",
     "sample_key": "product_dose",
     "labels_key": "phase",
     "hvg_kwargs": {
