@@ -24,19 +24,20 @@ workflow run_models {
     // mrvi_adata = mrvi_outs.adata
 
     // Run compositional models
-    fit_and_get_latent_composition_scvi(adatas)
-    fit_and_get_latent_composition_pca(adatas)
+    // fit_and_get_latent_composition_scvi(adatas)
+    // fit_and_get_latent_composition_pca(adatas)
 
     // Organize all outputs
     distance_matrices = scvi_outs.distance_matrices.concat(
         scvi_outs.normalized_distance_matrices,
         // mrvi_outs.distance_matrices,
     )
-    adatas = scvi_adata.concat(
+    adatas = scvi_adata
+    // adatas = scvi_adata.concat(
         // get_latent_mrvi.out,
-        fit_and_get_latent_composition_scvi.out,
-        fit_and_get_latent_composition_pca.out
-    )
+        // fit_and_get_latent_composition_scvi.out,
+        // fit_and_get_latent_composition_pca.out
+    // )
 
     // Step 2: Compute metrics
     // Compute RF

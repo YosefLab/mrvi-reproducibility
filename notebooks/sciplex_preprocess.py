@@ -110,8 +110,8 @@ for cl in cell_lines:
         sub_adata.obs["product_name"].isin(all_sig_prods)
     ].copy()
 
-    # Filter out lowest dose (for mem reasons)
-    sub_adata = sub_adata[sub_adata.obs["dose"] > 10]
+    # Filter out lowest doses (for mem reasons)
+    sub_adata = sub_adata[sub_adata.obs["dose"] >= 1000]
 
     # Add back control
     sub_adata = sub_adata.concatenate(adata[(adata.obs["product_name"] == "Vehicle") & (adata.obs["cell_type"] == cl)])
@@ -123,6 +123,9 @@ for cl in cell_lines:
     sig_prod_doses = pd.read_csv(f"output/{cl}.csv", header=None)
     sig_prod_doses.columns = ["product_dose"]
     sub_adata.obs["sig_prod_dose_cell_line"] = sub_adata.obs["product_dose"].isin(sig_prod_doses["product_dose"].values)
+
+    # Subsample to 30k cells
+    sc.pp.subsample(sub_adata, n_obs=min(30000, sub_adata.shape[0]))
 
     # label phases (Too much mem to do this before filtering doses)
     sub_adata.layers["counts"] = sub_adata.X.copy()
