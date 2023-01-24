@@ -12,7 +12,7 @@ import xarray as xr
 from utils import INCH_TO_CM, load_results
 
 # Change to False if you want to run this script directly
-RUN_WITH_PARSER = True
+RUN_WITH_PARSER = False
 
 
 def parser():
@@ -33,6 +33,7 @@ else:
     results_paths = glob.glob("../results/symsim_pipeline/*/*.csv") + glob.glob(
         "../results/symsim_pipeline/*/*.h5ad"
     )
+results_path_root = os.path.join(output_dir, "..")
 os.makedirs(output_dir, exist_ok=True)
 # %%
 all_results = load_results(results_paths)
@@ -81,8 +82,8 @@ fig
 plot_df
 # %%
 # Distance matrix comparison
-scviv2_dists_path = "symsim_new.scviv2.distance_matrices.nc"
-scviv2_normalized_dists_path = "symsim_new.scviv2.normalized_distance_matrices.nc"
+scviv2_dists_path = os.path.join(results_path_root, "distance_matrices/symsim_new.scviv2.distance_matrices.nc")
+scviv2_normalized_dists_path = os.path.join(results_path_root, "distance_matrices/symsim_new.scviv2.normalized_distance_matrices.nc")
 dists = xr.open_dataset(
     scviv2_dists_path
 ).celltype
@@ -90,7 +91,8 @@ normalized_dists = xr.open_dataset(
     scviv2_normalized_dists_path
 ).celltype
 # %%
-vmax = np.percentile(normalized_dists.data, 95)
+normalized_vmax = np.percentile(normalized_dists.data, 95)
+vmax = np.percentile(dists.data, 95)
 for ct in normalized_dists.celltype_name.values:
     sns.heatmap(
         normalized_dists.sel(celltype_name=ct),
@@ -98,10 +100,23 @@ for ct in normalized_dists.celltype_name.values:
         xticklabels=False,
         yticklabels=False,
         vmin=0,
-        vmax=vmax,
+        vmax=normalized_vmax,
     )
     plt.savefig(
         os.path.join(output_dir, f"symsim_new.normalized_distance_matrix.{ct}.svg")
+    )
+    plt.clf()
+
+    sns.heatmap(
+        dists.sel(celltype_name=ct),
+        cmap="YlGnBu",
+        xticklabels=False,
+        yticklabels=False,
+        vmin=0,
+        vmax=vmax,
+    )
+    plt.savefig(
+        os.path.join(output_dir, f"symsim_new.distance_matrix.{ct}.svg")
     )
     plt.clf()
 # %%
@@ -133,3 +148,5 @@ for ct in normalized_dists.celltype_name.values:
         os.path.join(output_dir, f"symsim_new.compare_distance_matrix_hist.{ct}.svg")
     )
     plt.clf()
+
+# %%
