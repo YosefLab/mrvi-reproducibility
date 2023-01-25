@@ -50,7 +50,7 @@ def get_latent_scviv2(
     cell_reps = model.get_local_sample_representation(adata)
     cell_dists = model.get_local_sample_distances(adata, groupby=labels_key)
     cell_normalized_dists = model.get_local_sample_distances(
-        adata, normalize_distances=True, groupby=labels_key
+        adata, use_mean=False, normalize_distances=True, groupby=labels_key
     )
 
     make_parents(adata_out)

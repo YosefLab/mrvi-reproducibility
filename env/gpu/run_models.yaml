@@ -10,7 +10,7 @@ dependencies:
     - anndata>=0.8.0
     - scanpy>=1.9.0
     - pytorch
-    - scvi-tools=0.17.4
+    - scvi-tools=0.20.0b0
     - torchvision
     - torchaudio
     - cudatoolkit=11.6

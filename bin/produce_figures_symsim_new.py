@@ -81,9 +81,11 @@ fig
 # %%
 plot_df
 # %%
+model_name = "scviv2"
+# model_name = "scviv2_nonlinear"
 # Distance matrix comparison
-scviv2_dists_path = os.path.join(results_path_root, "distance_matrices/symsim_new.scviv2.distance_matrices.nc")
-scviv2_normalized_dists_path = os.path.join(results_path_root, "distance_matrices/symsim_new.scviv2.normalized_distance_matrices.nc")
+scviv2_dists_path = os.path.join(results_path_root, f"distance_matrices/symsim_new.{model_name}.distance_matrices.nc")
+scviv2_normalized_dists_path = os.path.join(results_path_root, f"distance_matrices/symsim_new.{model_name}.normalized_distance_matrices.nc")
 dists = xr.open_dataset(
     scviv2_dists_path
 ).celltype
@@ -103,7 +105,7 @@ for ct in normalized_dists.celltype_name.values:
         vmax=normalized_vmax,
     )
     plt.savefig(
-        os.path.join(output_dir, f"symsim_new.normalized_distance_matrix.{ct}.svg")
+        os.path.join(output_dir, f"symsim_new.normalized_distance_matrix.{model_name}.{ct}.svg")
     )
     plt.clf()
 
@@ -116,7 +118,7 @@ for ct in normalized_dists.celltype_name.values:
         vmax=vmax,
     )
     plt.savefig(
-        os.path.join(output_dir, f"symsim_new.distance_matrix.{ct}.svg")
+        os.path.join(output_dir, f"symsim_new.distance_matrix.{model_name}.{ct}.svg")
     )
     plt.clf()
 # %%
@@ -126,7 +128,7 @@ plt.hist(
     normalized_dists.data.flatten(), bins=100, alpha=0.5, label="normalized distances"
 )
 plt.legend()
-plt.savefig(os.path.join(output_dir, "symsim_new.normalized_distance_matrix_hist.svg"))
+plt.savefig(os.path.join(output_dir, f"symsim_new.normalized_distance_matrix_hist.{model_name}.svg"))
 plt.clf()
 # %%
 binwidth = 0.1
@@ -145,7 +147,7 @@ for ct in normalized_dists.celltype_name.values:
     plt.legend()
     plt.xlim(-0.5, vmax + 0.5)
     plt.savefig(
-        os.path.join(output_dir, f"symsim_new.compare_distance_matrix_hist.{ct}.svg")
+        os.path.join(output_dir, f"symsim_new.compare_distance_matrix_hist.{ct}.{model_name}.svg")
     )
     plt.clf()
 

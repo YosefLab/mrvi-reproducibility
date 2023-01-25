@@ -1,8 +1,8 @@
 include { fit_mrvi } from params.modules.fit_mrvi
 include { get_latent_mrvi } from params.modules.get_latent_mrvi
 include { get_outputs_mrvi } from params.modules.get_outputs_mrvi
-include { fit_scviv2 } from params.modules.fit_scviv2
-include { get_latent_scviv2 } from params.modules.get_latent_scviv2
+include { fit_scviv2; fit_scviv2 as fit_scviv2_nonlinear } from params.modules.fit_scviv2
+include { get_latent_scviv2; get_latent_scviv2 as get_latent_scviv2_nonlinear } from params.modules.get_latent_scviv2
 include { fit_and_get_latent_composition_scvi } from params.modules.fit_and_get_latent_composition_scvi
 include { fit_and_get_latent_composition_pca } from params.modules.fit_and_get_latent_composition_pca
 include { compute_rf } from params.modules.compute_rf
@@ -16,8 +16,12 @@ workflow run_models {
     distance_matrices_gt=inputs.map { it[1] }
     // Step 1: Run models
     // Run scviv2, compute latents, distance matrices
-    scvi_outs = fit_scviv2(adatas) | get_latent_scviv2
+    scvi_outs = fit_scviv2(adatas, false) | get_latent_scviv2
     scvi_adata = scvi_outs.adata
+    
+    // Run scviv2 nonlinear
+    scvi_nonlinear_outs = fit_scviv2_nonlinear(adatas, true) | get_latent_scviv2_nonlinear
+    scvi_nonlinear_adata = scvi_nonlinear_outs.adata
 
     // Run MRVI, compute latents, distance matrices (old code)
     // mrvi_outs = fit_mrvi(adatas) | get_latent_mrvi | get_outputs_mrvi
@@ -30,14 +34,16 @@ workflow run_models {
     // Organize all outputs
     distance_matrices = scvi_outs.distance_matrices.concat(
         scvi_outs.normalized_distance_matrices,
+        scvi_nonlinear_outs.distance_matrices,
+        scvi_nonlinear_outs.normalized_distance_matrices,    
         // mrvi_outs.distance_matrices,
     )
-    adatas = scvi_adata
-    // adatas = scvi_adata.concat(
+    adatas = scvi_adata.concat(
+        scvi_nonlinear_adata,
         // get_latent_mrvi.out,
         // fit_and_get_latent_composition_scvi.out,
         // fit_and_get_latent_composition_pca.out
-    // )
+    )
 
     // Step 2: Compute metrics
     // Compute RF

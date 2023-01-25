@@ -2,10 +2,6 @@
     "batch_key": "plate_oligo",
     "sample_key": "product_dose",
     "labels_key": "phase",
-    "hvg_kwargs": {
-        "n_top_genes": 3000,
-        "flavor": "seurat_v3"
-    },
     "mrvi_train_kwargs": {
         "max_epochs": 4
     },
