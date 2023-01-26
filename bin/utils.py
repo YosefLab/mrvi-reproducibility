@@ -75,11 +75,11 @@ def load_results(results_paths):
         basename = os.path.basename(file)
         model_name = basename.split(".")[1]
         df.loc[:, "model_name"] = model_name
-        if file.endswith("vendi.csv"):
+        if file.endswith(".distance_matrices.vendi.csv"):
             all_results["vendi_metrics"] = all_results["vendi_metrics"].append(df)
-        elif file.endswith("scib.csv"):
+        elif file.endswith(".distance_matrices.scib.csv"):
             all_results["scib_metrics"] = all_results["scib_metrics"].append(df)
-        elif file.endswith("rf.csv"):
+        elif file.endswith(".distance_matrices.rf.csv"):
             all_results["rf_metrics"] = all_results["rf_metrics"].append(df)
         elif file.endswith("losses.csv"):
             all_results["losses_metrics"] = all_results["losses_metrics"].append(df)
