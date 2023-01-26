@@ -122,8 +122,8 @@ for cl in cell_lines:
     sc.pp.scale(sub_adata)
     sc.tl.score_genes_cell_cycle(sub_adata, s_genes=s_genes, g2m_genes=g2m_genes)
 
-    # Subsample to 30k cells
-    sc.pp.subsample(sub_adata, n_obs=min(30000, sub_adata.shape[0]))
+    # Subsample cells
+    sc.pp.subsample(sub_adata, n_obs=min(25000, sub_adata.shape[0]))
 
     # Revert counts to X
     sub_adata.X = sub_adata.layers["counts"]

@@ -1,6 +1,4 @@
 process get_latent_scviv2 {
-    maxForks 1
-
     input:
     path adata_in
     path model_in
