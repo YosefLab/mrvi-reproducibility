@@ -27,7 +27,13 @@ def compute_vendi(
         Path to write output CSV table with Vendi score.
     """
     config = load_config(config_in)
-    celltype_key = config["labels_key"]
+    celltype_key = config.get("labels_key", None)
+    if celltype_key is None:
+        # Empty dataframe
+        df = pd.DataFrame()
+        make_parents(table_out)
+        df.to_csv(table_out)
+        return df
 
     try:
         distance_matrix = xr.open_dataarray(distance_matrix_in)
@@ -37,7 +43,6 @@ def compute_vendi(
 
     vmax = np.percentile(distance_matrix.values, 95)
     local_sample_similarities = (vmax - distance_matrix) / vmax
-
 
     clusters = local_sample_similarities.coords[f"{celltype_key}_name"].values
     vendi_scores = []
