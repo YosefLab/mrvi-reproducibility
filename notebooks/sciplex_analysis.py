@@ -121,6 +121,7 @@ for method_name in method_names:
             plt.clf()
 
             # normalized with same order
+            normalized_vmax = np.percentile(normalized_dists.phase.values, 90)
             dists_sample_order = g_dists.data.columns[
                 g_dists.dendrogram_col.reordered_ind
             ]
@@ -136,8 +137,8 @@ for method_name in method_names:
                 col_colors=sample_to_color_df,
                 row_cluster=False,
                 col_cluster=False,
-                vmin=1,
-                vmax=4,
+                vmin=0,
+                vmax=normalized_vmax,
             )
             g.ax_heatmap.set_xticklabels(
                 g.ax_heatmap.get_xmajorticklabels(), fontsize=2
@@ -296,3 +297,5 @@ for method_name in method_names:
             dpi=300,
         )
         plt.clf()
+
+# %%

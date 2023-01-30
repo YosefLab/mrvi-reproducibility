@@ -9,11 +9,6 @@
     "mrvi_train_kwargs": {
         "max_epochs": 1
     },
-    "scviv2_model_kwargs": {
-        "pz_kwargs": {
-            "use_nonlinear": true
-        }
-    },
     "scviv2_train_kwargs": {
         "max_epochs": 400
     },

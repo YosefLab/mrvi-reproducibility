@@ -10,7 +10,6 @@ dependencies:
     - anndata>=0.8.0
     - scanpy>=1.9.0
     - pytorch
-    - scvi-tools=0.20.0b0
     - torchvision
     - torchaudio
     - cudatoolkit=11.6
@@ -26,6 +25,7 @@ dependencies:
           - click
           - scikit-learn==1.0.2
           - scikit-misc==0.1.4
+          - scvi-tools==0.20.0b0
           - mrvi>=0.1.0
-          - git+ssh://git@github.com/YosefLab/scvi-v2.git@jhong/nonlinear
+          - git+ssh://git@github.com/YosefLab/scvi-v2.git
           - remote-pdb==2.1.0
