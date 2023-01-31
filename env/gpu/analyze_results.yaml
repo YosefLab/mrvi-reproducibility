@@ -20,6 +20,8 @@ dependencies:
     - dask=2022.12.1
     - netcdf4=1.6.2
     - bottleneck=1.3.5
+    - jupyter==1.0.0
+    - jupyterlab==3.5.3
     - pip
     - pip:
           - click
