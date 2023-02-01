@@ -6,6 +6,7 @@ include { get_latent_scviv2; get_latent_scviv2 as get_latent_scviv2_nonlinear } 
 include { fit_and_get_latent_composition_scvi } from params.modules.fit_and_get_latent_composition_scvi
 include { fit_and_get_latent_composition_pca } from params.modules.fit_and_get_latent_composition_pca
 include { compute_rf } from params.modules.compute_rf
+include { compute_2dreps } from params.modules.compute_2dreps
 
 workflow run_models {
     take:
@@ -18,7 +19,7 @@ workflow run_models {
     // Run scviv2, compute latents, distance matrices
     scvi_outs = fit_scviv2(adatas, false) | get_latent_scviv2
     scvi_adata = scvi_outs.adata
-    
+
     // Run scviv2 nonlinear
     scvi_nonlinear_outs = fit_scviv2_nonlinear(adatas, true) | get_latent_scviv2_nonlinear
     scvi_nonlinear_adata = scvi_nonlinear_outs.adata
@@ -35,7 +36,7 @@ workflow run_models {
     distance_matrices = scvi_outs.distance_matrices.concat(
         scvi_outs.normalized_distance_matrices,
         scvi_nonlinear_outs.distance_matrices,
-        scvi_nonlinear_outs.normalized_distance_matrices,    
+        scvi_nonlinear_outs.normalized_distance_matrices,
         // mrvi_outs.distance_matrices,
     )
     adatas = scvi_adata.concat(
@@ -52,6 +53,8 @@ workflow run_models {
     dmats=dmat_gt_symsim.combine(dmat_inf_symsim)
     dmats.view()
     rfs = compute_rf(dmats)
+
+    adatas=compute_2dreps(adatas)
 
     emit:
     adatas
