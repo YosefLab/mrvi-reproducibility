@@ -62,12 +62,14 @@ def load_results(results_paths):
 
     def _append_representations(adata, uns_latent_key, representation_name):
         if uns_latent_key in adata.uns.keys():
+            obs = pd.DataFrame()
             for latent_key in adata.uns[uns_latent_key]:
                 obs_ = adata.obs.copy().reset_index()
                 obs_.loc[:, ["REP1", "REP2"]] = adata.obsm[latent_key]
                 obs_.loc[:, "representation_name"] = latent_key
                 obs_.loc[:, "representation_type"] = representation_name
-            return obs_
+                obs = obs.append(obs_)
+            return obs
         return None
 
     all_results = {
@@ -86,8 +88,6 @@ def load_results(results_paths):
             continue
         basename = os.path.basename(file)
         model_name = basename.split(".")[1]
-        print(file, model_name)
-        print()
         if file.endswith("csv"):
             df = pd.read_csv(file)
             df.loc[:, "model_name"] = model_name

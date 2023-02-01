@@ -10,7 +10,7 @@ import glob
 from utils import load_results, load_config
 
 # Change to False if you want to run this script directly
-RUN_WITH_PARSER = False
+RUN_WITH_PARSER = True
 SHARED_THEME = (
     p9.theme_classic()
     + p9.theme(
@@ -28,18 +28,24 @@ def parser():
     parser.add_argument("--config_in", type=str)
     return parser.parse_args()
 
+
+def extract_colors_from_config_file(config):
+    """Infers which colors to use for plotting latent representations."""
+    colors = config.get("latent_color_by", None)
+    if colors is None:
+        colors = [config["batch_key"], config["labels_key"]]
+    return colors
+
+
 # %%
 if RUN_WITH_PARSER:
     args = parser()
     results_paths = args.results_paths
     output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
-    config = load_config(args.config_in)
+    config_path = args.config_in
     pd.Series(results_paths).to_csv(os.path.join(output_dir, "path_to_intermediary_files.txt"), index=False)
 
-    colors = config.get("latent_color_by", None)
-    if colors is None:
-        colors = [config["batch_key"], config["labels_key"]]
 else:
     dataset_name = "symsim_new"
     output_dir = f"../results/aws_pipeline/figures/{dataset_name}"
@@ -51,6 +57,8 @@ else:
     all_results_files = glob.glob(os.path.join(basedir, "**"), recursive=True)
     results_paths = [x for x in all_results_files if os.path.basename(x) in good_filenames]
     assert len(results_paths) == len(good_filenames)
+    config_path = f"../conf/datasets/{dataset_name}.json"
+
 
 
 def save_figures(fig, filename, save_svg=True):
@@ -61,7 +69,8 @@ def save_figures(fig, filename, save_svg=True):
     if save_svg:
         fig.save(basename + ".svg")
 
-
+config = load_config(config_path)
+colors = extract_colors_from_config_file(config)
 all_results = load_results(results_paths)
 
 # %%
@@ -165,3 +174,5 @@ if all_results["representations"].size >= 1:
                     )
                 )
                 save_figures(rep_fig, f"representations/{rep}_{color_by}", save_svg=False)
+
+# %%
