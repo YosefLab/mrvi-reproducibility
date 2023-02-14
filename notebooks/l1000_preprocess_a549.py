@@ -82,9 +82,7 @@ for prod in filtered_a549_df["product_name"].unique():
     if (prod_df["is_exemplar"] == 1).any():
         sig_id = prod_df[prod_df["is_exemplar"] == 1].iloc[0]["signatureID"]
     else:
-        sig_id = prod_df[
-            "signatureID"
-        ].unique()[0]
+        sig_id = prod_df["signatureID"].unique()[0]
     simple_filtered_a549_df_lst.append(
         filtered_a549_df[filtered_a549_df["signatureID"] == sig_id]
     )
@@ -129,19 +127,28 @@ prod_deg_map = {}
 for prod in simple_filtered_a549_df["product_name"].unique():
     prod_df = simple_filtered_a549_df[simple_filtered_a549_df["product_name"] == prod]
     prod_deg_map[prod] = set(
-        [(gene, "+") for gene in prod_df[
-            (prod_df["Value_LogDiffExp"] >= 0.5) & (prod_df["corr_p_val"] <= 0.05)
-        ]["Name_GeneSymbol"]
-        .unique()
-        .tolist()]
+        [
+            (gene, "+")
+            for gene in prod_df[
+                (prod_df["Value_LogDiffExp"] >= 0.5) & (prod_df["corr_p_val"] <= 0.05)
+            ]["Name_GeneSymbol"]
+            .unique()
+            .tolist()
+        ]
     )
-    prod_deg_map[prod] = prod_deg_map[prod].union(set(
-        [(gene, "-") for gene in prod_df[
-            (prod_df["Value_LogDiffExp"] <= -0.5) & (prod_df["corr_p_val"] <= 0.05)
-        ]["Name_GeneSymbol"]
-        .unique()
-        .tolist()]
-    ))
+    prod_deg_map[prod] = prod_deg_map[prod].union(
+        set(
+            [
+                (gene, "-")
+                for gene in prod_df[
+                    (prod_df["Value_LogDiffExp"] <= -0.5)
+                    & (prod_df["corr_p_val"] <= 0.05)
+                ]["Name_GeneSymbol"]
+                .unique()
+                .tolist()
+            ]
+        )
+    )
 
 # %%
 # Construct matrix describing jaccard sim of sets of DEGs between drugs (and in same direction)
@@ -151,11 +158,19 @@ for i, prodi in enumerate(prod_order):
     for j, prodj in enumerate(prod_order):
         if i <= j:
             # jaccard similarity
-            intersection = len(list(set(prod_deg_map[prodi]).intersection(prod_deg_map[prodj])))
+            intersection = len(
+                list(set(prod_deg_map[prodi]).intersection(prod_deg_map[prodj]))
+            )
             union = (len(prod_deg_map[prodi]) + len(prod_deg_map[prodj])) - intersection
             deg_sim_mtx[i, j] = float(intersection) / union if union > 0 else 0
             deg_sim_mtx[j, i] = deg_sim_mtx[i, j]
 deg_sim_mtx
+
+# %%
+# Filter out zero diagonal elements (no degs)
+has_deg_idxs = np.where(np.diag(deg_sim_mtx) != 0)[0]
+deg_sim_mtx = deg_sim_mtx[has_deg_idxs, :][:, has_deg_idxs]
+prod_order = list(np.array(prod_order)[has_deg_idxs])
 
 # %%
 # Viz matrix
@@ -167,9 +182,19 @@ plt.show()
 
 # %%
 # clustermap
-g = sns.clustermap(deg_sim_df, cmap="YlGnBu", xticklabels=True, yticklabels=True, row_cluster=False)
+g = sns.clustermap(
+    deg_sim_df, cmap="YlGnBu", xticklabels=True, yticklabels=True, row_cluster=False
+)
+plt.clf()
 col_cluster_ord = g.dendrogram_col.reordered_ind
-g2 = sns.clustermap(deg_sim_df.iloc[col_cluster_ord, col_cluster_ord], cmap="YlGnBu", xticklabels=True, yticklabels=True, col_cluster=False, row_cluster=False)
+g2 = sns.clustermap(
+    deg_sim_df.iloc[col_cluster_ord, col_cluster_ord],
+    cmap="YlGnBu",
+    xticklabels=True,
+    yticklabels=True,
+    col_cluster=False,
+    row_cluster=False,
+)
 plt.show()
 
 # %%

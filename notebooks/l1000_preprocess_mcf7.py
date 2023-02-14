@@ -164,6 +164,12 @@ for i, prodi in enumerate(prod_order):
 deg_sim_mtx
 
 # %%
+# Filter out zero diagonal elements (no degs)
+has_deg_idxs = np.where(np.diag(deg_sim_mtx) != 0)[0]
+deg_sim_mtx = deg_sim_mtx[has_deg_idxs, :][:, has_deg_idxs]
+prod_order = list(np.array(prod_order)[has_deg_idxs])
+
+# %%
 # Viz matrix
 deg_sim_df = pd.DataFrame(deg_sim_mtx, index=prod_order, columns=prod_order)
 
@@ -176,6 +182,7 @@ plt.show()
 g = sns.clustermap(
     deg_sim_df, cmap="YlGnBu", xticklabels=True, yticklabels=True, row_cluster=False
 )
+plt.clf()
 col_cluster_ord = g.dendrogram_col.reordered_ind
 g2 = sns.clustermap(
     deg_sim_df.iloc[col_cluster_ord, col_cluster_ord],
