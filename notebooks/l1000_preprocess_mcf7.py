@@ -70,15 +70,20 @@ filtered_mcf7_df = pd.read_csv(
 
 # %%
 # Filter on one signature for every chemical at random (for simplicity)
-simple_filtered_mcf7_df = []
+# Should use exemplar if available
+simple_filtered_mcf7_df_lst = []
 for prod in filtered_mcf7_df["product_name"].unique():
-    first_sig_id = filtered_mcf7_df[filtered_mcf7_df["product_name"] == prod][
-        "signatureID"
-    ].unique()[0]
-    simple_filtered_mcf7_df.append(
-        filtered_mcf7_df[filtered_mcf7_df["signatureID"] == first_sig_id]
+    prod_df = filtered_mcf7_df[filtered_mcf7_df["product_name"] == prod]
+    if (prod_df["is_exemplar"] == 1).any():
+        sig_id = prod_df[prod_df["is_exemplar"] == 1].iloc[0]["signatureID"]
+    else:
+        sig_id = prod_df[
+            "signatureID"
+        ].unique()[0]
+    simple_filtered_mcf7_df_lst.append(
+        filtered_mcf7_df[filtered_mcf7_df["signatureID"] == sig_id]
     )
-simple_filtered_mcf7_df = pd.concat(simple_filtered_mcf7_df)
+simple_filtered_mcf7_df = pd.concat(simple_filtered_mcf7_df_lst)
 simple_filtered_mcf7_df.to_csv(
     f"../data/l1000_signatures/MCF7_sig_filtered_simple.csv", sep=","
 )
@@ -96,7 +101,7 @@ simple_filtered_mcf7_df["product_name"].value_counts()
 # First correct for multiple testing
 for prod in simple_filtered_mcf7_df["product_name"].unique():
     prod_mask = simple_filtered_mcf7_df["product_name"] == prod
-    simple_filtered_mcf7_df.loc[prod_mask]["corr_p_val"] = multipletests(
+    simple_filtered_mcf7_df.loc[prod_mask, "corr_p_val"] = multipletests(
         simple_filtered_mcf7_df.loc[prod_mask]["Significance_pvalue"],
         alpha=0.05,
         method="fdr_bh",
@@ -143,7 +148,7 @@ for i, prodi in enumerate(prod_order):
             # jaccard similarity
             intersection = len(list(set(prod_deg_map[prodi]).intersection(prod_deg_map[prodj])))
             union = (len(prod_deg_map[prodi]) + len(prod_deg_map[prodj])) - intersection
-            deg_sim_mtx[i, j] = float(intersection) / union
+            deg_sim_mtx[i, j] = float(intersection) / (union + 1)
             deg_sim_mtx[j, i] = deg_sim_mtx[i, j]
 deg_sim_mtx
 
