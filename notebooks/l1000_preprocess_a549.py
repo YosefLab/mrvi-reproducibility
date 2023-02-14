@@ -42,15 +42,15 @@ sig_product_names = set(a549_sig_meta_df["Perturbagen"])
 sciplex_product_names.intersection(sig_product_names)
 
 # %%
+# remove incorrect one
+sig_product_names.remove("Estradiol")
+
 valid_mapping = {}
 for pn in sciplex_product_names:
     match, score = process.extractOne(pn, sig_product_names)
     if score >= 90:
         print(f"{pn} match: {match}, score: {score}")
         valid_mapping[match] = pn
-
-# remove incorrect one
-del valid_mapping["Estradiol"]
 # %%
 # Filter df on valid mapping
 filtered_a549_df = full_a549_df_w_meta[
@@ -152,7 +152,7 @@ for i, prodi in enumerate(prod_order):
             # jaccard similarity
             intersection = len(list(set(prod_deg_map[prodi]).intersection(prod_deg_map[prodj])))
             union = (len(prod_deg_map[prodi]) + len(prod_deg_map[prodj])) - intersection
-            deg_sim_mtx[i, j] = float(intersection) / (union + 1)
+            deg_sim_mtx[i, j] = float(intersection) / union if union > 0 else 0
             deg_sim_mtx[j, i] = deg_sim_mtx[i, j]
 deg_sim_mtx
 

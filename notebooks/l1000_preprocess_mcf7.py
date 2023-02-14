@@ -38,6 +38,9 @@ sig_product_names = set(mcf7_sig_meta_df["Perturbagen"])
 sciplex_product_names.intersection(sig_product_names)
 
 # %%
+# remove incorrect one
+sig_product_names.remove("Estradiol")
+
 valid_mapping = {}
 for pn in sciplex_product_names:
     match, score = process.extractOne(pn, sig_product_names)
@@ -45,8 +48,6 @@ for pn in sciplex_product_names:
         print(f"{pn} match: {match}, score: {score}")
         valid_mapping[match] = pn
 
-# remove incorrect one
-del valid_mapping["Estradiol"]
 # %%
 # Filter df on valid mapping
 filtered_mcf7_df = full_mcf7_df_w_meta[
@@ -77,9 +78,7 @@ for prod in filtered_mcf7_df["product_name"].unique():
     if (prod_df["is_exemplar"] == 1).any():
         sig_id = prod_df[prod_df["is_exemplar"] == 1].iloc[0]["signatureID"]
     else:
-        sig_id = prod_df[
-            "signatureID"
-        ].unique()[0]
+        sig_id = prod_df["signatureID"].unique()[0]
     simple_filtered_mcf7_df_lst.append(
         filtered_mcf7_df[filtered_mcf7_df["signatureID"] == sig_id]
     )
@@ -124,19 +123,28 @@ prod_deg_map = {}
 for prod in simple_filtered_mcf7_df["product_name"].unique():
     prod_df = simple_filtered_mcf7_df[simple_filtered_mcf7_df["product_name"] == prod]
     prod_deg_map[prod] = set(
-        [(gene, "+") for gene in prod_df[
-            (prod_df["Value_LogDiffExp"] >= 0.5) & (prod_df["corr_p_val"] <= 0.05)
-        ]["Name_GeneSymbol"]
-        .unique()
-        .tolist()]
+        [
+            (gene, "+")
+            for gene in prod_df[
+                (prod_df["Value_LogDiffExp"] >= 0.5) & (prod_df["corr_p_val"] <= 0.05)
+            ]["Name_GeneSymbol"]
+            .unique()
+            .tolist()
+        ]
     )
-    prod_deg_map[prod] = prod_deg_map[prod].union(set(
-        [(gene, "-") for gene in prod_df[
-            (prod_df["Value_LogDiffExp"] <= -0.5) & (prod_df["corr_p_val"] <= 0.05)
-        ]["Name_GeneSymbol"]
-        .unique()
-        .tolist()]
-    ))
+    prod_deg_map[prod] = prod_deg_map[prod].union(
+        set(
+            [
+                (gene, "-")
+                for gene in prod_df[
+                    (prod_df["Value_LogDiffExp"] <= -0.5)
+                    & (prod_df["corr_p_val"] <= 0.05)
+                ]["Name_GeneSymbol"]
+                .unique()
+                .tolist()
+            ]
+        )
+    )
 
 # %%
 # Construct matrix describing jaccard sim of sets of DEGs between drugs (and in same direction)
@@ -146,9 +154,11 @@ for i, prodi in enumerate(prod_order):
     for j, prodj in enumerate(prod_order):
         if i <= j:
             # jaccard similarity
-            intersection = len(list(set(prod_deg_map[prodi]).intersection(prod_deg_map[prodj])))
+            intersection = len(
+                list(set(prod_deg_map[prodi]).intersection(prod_deg_map[prodj]))
+            )
             union = (len(prod_deg_map[prodi]) + len(prod_deg_map[prodj])) - intersection
-            deg_sim_mtx[i, j] = float(intersection) / (union + 1)
+            deg_sim_mtx[i, j] = float(intersection) / union if union > 0 else 0
             deg_sim_mtx[j, i] = deg_sim_mtx[i, j]
 deg_sim_mtx
 
@@ -162,9 +172,18 @@ plt.show()
 
 # %%
 # clustermap
-g = sns.clustermap(deg_sim_df, cmap="YlGnBu", xticklabels=True, yticklabels=True, row_cluster=False)
+g = sns.clustermap(
+    deg_sim_df, cmap="YlGnBu", xticklabels=True, yticklabels=True, row_cluster=False
+)
 col_cluster_ord = g.dendrogram_col.reordered_ind
-g2 = sns.clustermap(deg_sim_df.iloc[col_cluster_ord, col_cluster_ord], cmap="YlGnBu", xticklabels=True, yticklabels=True, col_cluster=False, row_cluster=False)
+g2 = sns.clustermap(
+    deg_sim_df.iloc[col_cluster_ord, col_cluster_ord],
+    cmap="YlGnBu",
+    xticklabels=True,
+    yticklabels=True,
+    col_cluster=False,
+    row_cluster=False,
+)
 plt.show()
 
 # %%
