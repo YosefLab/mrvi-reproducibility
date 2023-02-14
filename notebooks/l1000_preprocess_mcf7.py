@@ -11,6 +11,7 @@ from statsmodels.stats.multitest import multipletests
 from bioinfokit import visuz
 
 # %%
+# Collected from http://www.ilincs.org/ilincs/signatures/search/MCF7
 full_mcf7_df_list = []
 for i in range(1, 6):
     df = pd.read_csv(f"../data/l1000_signatures/MCF7_sig_batch_{i}.xls", sep="\t")

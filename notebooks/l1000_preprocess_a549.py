@@ -11,6 +11,7 @@ from statsmodels.stats.multitest import multipletests
 from bioinfokit import visuz
 
 # %%
+# Collected from http://www.ilincs.org/ilincs/signatures/search/A549
 full_a549_df_list = []
 for i in range(1, 7):
     df = pd.read_csv(f"../data/l1000_signatures/A549_sig_batch_{i}.xls", sep="\t")
