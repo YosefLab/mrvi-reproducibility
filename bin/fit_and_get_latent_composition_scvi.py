@@ -75,8 +75,8 @@ def fit_and_get_latent_composition_scvi(
     dists = np.concatenate(dists, axis=0)
     distances = xr.DataArray(
         dists,
-        dims=[label_key, "sample", "sample"],
-        coords={label_key: celltypes, "sample": unique_samples},
+        dims=[label_key, "sample_x", "sample_y"],
+        coords={label_key: celltypes, "sample_x": unique_samples, "sample_y": unique_samples},
         name="distance",
     )
     distances.to_netcdf(distance_matrices_out)
