@@ -1,10 +1,10 @@
-from typing import Union, Literal, Optional
+from typing import Literal, Optional, Union
 
-from anndata import AnnData
+import numpy as np
 import scanpy as sc
+from anndata import AnnData
 from scvi.model import SCVI
 from sklearn.metrics import pairwise_distances
-import numpy as np
 
 
 class CompositionBaseline:
@@ -107,7 +107,7 @@ class CompositionBaseline:
         local_dists = np.zeros((self.adata.n_obs, n_sample, n_sample))
         for cluster, freqs in freqs_all.items():
             cell_is_selected = self.adata.obs[self.cluster_key] == cluster
-            ordered_freqs = freqs.reindex(sample_order).fillna(1.)
+            ordered_freqs = freqs.reindex(sample_order).fillna(1.0)
             cluster_reps = ordered_freqs.values
             cluster_dists = pairwise_distances(cluster_reps, metric="euclidean")
             local_dists[cell_is_selected] = cluster_dists

@@ -1,14 +1,14 @@
 import os
+import warnings
 from pathlib import Path
 
 import ete3
-import pandas as pd
 import numpy as np
+import pandas as pd
 import xarray as xr
 from scipy.cluster.hierarchy import linkage, to_tree
-from scipy.spatial.distance import squareform
 from scipy.linalg import issymmetric
-import warnings
+from scipy.spatial.distance import squareform
 from utils import (determine_if_file_empty, load_config, make_parents,
                    wrap_kwargs)
 
