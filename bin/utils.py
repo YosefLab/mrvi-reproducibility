@@ -60,12 +60,24 @@ def load_results(results_paths):
         List of paths to results files.
     """
 
-    def _append_representations(adata, uns_latent_key, representation_name):
+    def append_representations(adata, uns_latent_key, representation_name):
+        """
+        Retrieve latent representations from some adata.
+
+        Parameters
+        ----------
+        adata :
+            Anndata object.
+        uns_latent_key :
+            Key in adata.uns containing the list of cell representations to extract.
+        representation_name :
+            Name of the representation type.
+        """
         if uns_latent_key in adata.uns.keys():
             obs = pd.DataFrame()
             for latent_key in adata.uns[uns_latent_key]:
                 obs_ = adata.obs.copy().reset_index()
-                obs_.loc[:, ["REP1", "REP2"]] = adata.obsm[latent_key]
+                obs_.loc[:, ["x", "y"]] = adata.obsm[latent_key]
                 obs_.loc[:, "representation_name"] = latent_key
                 obs_.loc[:, "representation_type"] = representation_name
                 obs = obs.append(obs_)
@@ -102,20 +114,14 @@ def load_results(results_paths):
             elif file.endswith("umap.csv"):
                 all_results["umaps_metrics"] = all_results["umaps_metrics"].append(df)
             elif file.endswith("distances.csv"):
-                all_results["distances_metrics"] = all_results["distances_metrics"].append(
-                    df
-                )
+                all_results["distances_metrics"] = all_results[
+                    "distances_metrics"
+                ].append(df)
         elif file.endswith(".h5ad"):
             adata = sc.read_h5ad(file)
-            mde_reps = _append_representations(
-                adata, "latent_mde_keys", "MDE"
-            )
-            pca_reps = _append_representations(
-                adata, "latent_pca_keys", "PCA"
-            )
-            umaps_reps = _append_representations(
-                adata, "latent_umap_keys", "UMAP"
-            )
+            mde_reps = append_representations(adata, "latent_mde_keys", "MDE")
+            pca_reps = append_representations(adata, "latent_pca_keys", "PCA")
+            umaps_reps = append_representations(adata, "latent_umap_keys", "UMAP")
             for rep in [mde_reps, pca_reps, umaps_reps]:
                 if rep is not None:
                     all_results["representations"] = all_results[
@@ -133,3 +139,25 @@ def set_breakpoint(host: str = "127.0.0.1", port: int = 4444):
     To exit, use `exit` or ctrl + c.
     """
     RemotePdb(host, port).set_trace()
+
+
+def save_figures(fig, output_dir, filename, save_svg=True):
+    """Save a figure to disk.
+
+    Parameters
+    ----------
+    fig :
+        Plotnine figure.
+    output_dir :
+        Directory to save the figure to.
+    filename :
+        Filename to save the figure to, without extension.
+    save_svg :
+        Whether to save the figure as an SVG file in addition to a PNG file.
+    """
+    basename = os.path.join(output_dir, filename)
+    basedir = os.path.dirname(basename)
+    os.makedirs(basedir, exist_ok=True)
+    fig.save(basename + ".png", dpi=300)
+    if save_svg:
+        fig.save(basename + ".svg")

@@ -7,7 +7,6 @@ process conduct_generic_analysis {
     dataset_name = results_paths[0].getSimpleName()
     config_in = "${params.conf.datasets}/${dataset_name}.json"
     output_dir = "${params.outputs.figures}/${dataset_name}"
-    dataset_config =
 
     """
     python3 ${params.bin.conduct_generic_analysis} \\
