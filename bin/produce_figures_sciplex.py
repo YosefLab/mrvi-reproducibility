@@ -1,6 +1,7 @@
 # %%
 import argparse
 import os
+import re
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -10,11 +11,9 @@ import seaborn as sns
 import scanpy as sc
 import scvi
 from matplotlib.patches import Patch
-from scipy.stats import norm
-from utils import load_results
 
 # Change to False if you want to run this script directly
-RUN_WITH_PARSER = True
+RUN_WITH_PARSER = False
 plt.rcParams["svg.fonttype"] = "none"
 
 # %%
@@ -80,10 +79,98 @@ pathway_color_map = {
 }
 
 # %%
+# Cross method comparison plots
+if not RUN_WITH_PARSER:
+    bulk_sim_dfs = {
+        "A549": pd.read_csv(
+            "/home/justin/ghrepos/scvi-v2-reproducibility/data/l1000_signatures/A549_deg_sim.csv"
+        ),
+        "MCF7": pd.read_csv(
+            "/home/justin/ghrepos/scvi-v2-reproducibility/data/l1000_signatures/MCF7_deg_sim.csv"
+        ),
+    }
+
+    dists_paths = [
+        re.match(
+            r"sciplex_[a-zA-Z0-9]+_significant_all_phases.[a-zA-Z0-9_]+.distance_matrices.nc",
+            results_path,
+        )[0]
+        for results_path in results_paths
+    ]
+
+    in_product_all_dist_ratio = []
+    in_product_top_2_dist_ratio = []
+    bulk_compare_rf = []
+    for dists_path in dists_paths:
+        match = re.match(
+            r"sciplex_([a-zA-Z0-9]+)_significant_all_phases.([a-zA-Z0-9_]+).distance_matrices.nc",
+            dists_path,
+        )
+        cl = match.group(1)
+        method_name = match.group(2)
+        base_row = {"method_name": method_name, "cell_type": cl}
+
+        dists = xr.open_dataset(
+            os.path.join(output_dir, "../distance_matrices/", dists_path)
+        )
+        all_products = set()
+        all_doses = set()
+        for sample_name in dists.sample_x.data:
+            product_name, dose = sample_name.split("_")
+            if product_name != "Vehicle":
+                all_products.add(product_name)
+            if dose != "0":
+                all_doses.add(dose)
+
+        # Compute metrics
+        top_two_doses = ["1000", "10000"]
+        for phase in dists.phase_name.data:
+            phase_dists = dists.sel(phase_name=phase).phase
+            phase_dists_arr = phase_dists.data
+            non_diag_mask = (
+                np.ones(shape=phase_dists_arr.shape)
+                - np.identity(phase_dists_arr.shape[0])
+            ).astype(bool)
+            off_diag_dist_avg = phase_dists_arr[non_diag_mask].mean()
+            in_prod_mask = np.zeros(shape=phase_dists_arr.shape, dtype=bool)
+            in_prod_top_two_mask = np.zeros(shape=phase_dists_arr.shape, dtype=bool)
+            for product_name in all_products:
+                for dosex in all_doses:
+                    for dosey in all_doses:
+                        if dosex == dosey:
+                            continue
+                        dosex_idx = np.where(
+                            phase_dists.sample_x.data == f"{product_name}_{dosex}"
+                        )[0][0]
+                        dosey_idx = np.where(
+                            phase_dists.sample_y.data == f"{product_name}_{dosey}"
+                        )[0][0]
+                        in_prod_mask[dosex_idx, dosey_idx] = True
+
+                        if dosex in top_two_doses and dosey in top_two_doses:
+                            in_prod_top_two_mask[dosex_idx, dosey_idx] = True
+            in_prod_dist_avg = phase_dists_arr[in_prod_mask].mean()
+            in_prod_top_two_dist_avg = phase_dists_arr[in_prod_top_two_mask].mean()
+            ratio = in_prod_dist_avg / off_diag_dist_avg
+            in_product_all_dist_ratio.append(
+                {"in_product_all_dist_ratio": ratio, "phase": phase, **base_row}
+            )
+
+            two_two_ratio = in_prod_top_two_dist_avg / off_diag_dist_avg
+            in_product_top_2_dist_ratio.append(
+                {
+                    "in_product_top_2_dist_ratio": two_two_ratio,
+                    "phase": phase,
+                    **base_row,
+                }
+            )
+
+
+# %%
 cell_lines = ["A549", "MCF7", "K562"]
 method_names = ["scviv2", "scviv2_nonlinear"]
 
-# Same figures for all phases
+# Per dataset plots
 for method_name in method_names:
     for cl in cell_lines:
         normalized_dists_path = f"sciplex_{cl}_significant_all_phases.{method_name}.normalized_distance_matrices.nc"
@@ -92,6 +179,7 @@ for method_name in method_names:
         dists_path = (
             f"sciplex_{cl}_significant_all_phases.{method_name}.distance_matrices.nc"
         )
+        check_if_in_results(dists_path)
         dists = xr.open_dataset(dists_path)
 
         adata_path = f"sciplex_{cl}_significant_all_phases.{method_name}.h5ad"
@@ -299,5 +387,3 @@ for method_name in method_names:
         plt.clf()
 
 # %%
-# Cross method comparison plots
-all_results = load_results(results_paths)
