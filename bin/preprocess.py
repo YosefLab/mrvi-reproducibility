@@ -177,10 +177,11 @@ def _assign_symsim_donors(adata, config):
     )  # shape (2, n_donors, n_donors)
     all_distances = xr.DataArray(
         all_distances,
-        dims=["celltype", "sample", "sample"],
+        dims=["celltype_name", "sample_x", "sample_y"],
         coords={
-            "celltype": ["CT1:1", "CT2:1"],
-            "sample": gt_donor_meta.index.values,
+            "celltype_name": ["CT1:1", "CT2:1"],
+            "sample_x": gt_donor_meta.index.values,
+            "sample_y": gt_donor_meta.index.values,
         },
         name="distance_gt",
     )

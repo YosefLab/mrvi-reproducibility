@@ -1,6 +1,7 @@
 import scanpy as sc
 import scvi_v2
 from anndata import AnnData
+import numpy as np
 from utils import load_config, make_parents, wrap_kwargs
 
 
@@ -11,6 +12,9 @@ def get_latent_scviv2(
     model_in: str,
     config_in: str,
     adata_out: str,
+    cell_representations_out: str,
+    distance_matrices_out: str,
+    normalized_distance_matrices_out: str,
 ) -> AnnData:
     """
     Get latent space from a trained MrVI instance.
@@ -31,9 +35,9 @@ def get_latent_scviv2(
 
     """
     config = load_config(config_in)
+    labels_key = config.get("labels_key", None)
     adata = sc.read_h5ad(adata_in)
     model = scvi_v2.MrVI.load(model_in, adata=adata)
-    sample_key = config["sample_key"]
 
     _adata = AnnData(obs=adata.obs, uns=adata.uns)
     _adata.uns["model_name"] = "scVIV2"
@@ -42,29 +46,28 @@ def get_latent_scviv2(
     _adata.obsm[u_latent_key] = model.get_latent_representation(adata, give_z=False)
     _adata.obsm[z_latent_key] = model.get_latent_representation(adata, give_z=True)
     _adata.uns["latent_keys"] = [u_latent_key, z_latent_key]
-
-    local_sample_rep_key = "mrvi_local_sample_rep"
-    _adata.obsm[local_sample_rep_key] = model.get_local_sample_representation(adata)
-    _adata.uns["local_sample_rep_key"] = local_sample_rep_key
-
-    local_sample_dists_key = "mrvi_local_sample_dists"
-    _adata.obsm[local_sample_dists_key] = model.get_local_sample_representation(
-        adata, return_distances=True
-    )
-
-    # compute donor ordering
-    sample_order_key = "mrvi_sample_order"
-    donor_metadata = adata.obs.loc[
-        lambda x: ~x[sample_key].duplicated(keep="first")
-    ].sort_values("_scvi_sample")
-    _adata.uns[sample_order_key] = donor_metadata[sample_key].values
-
-    _adata.uns["local_sample_dists_key"] = local_sample_dists_key
-    _adata.uns["sample_order_key"] = sample_order_key
-
     make_parents(adata_out)
     _adata.write(filename=adata_out)
-    return adata_out
+    del _adata
+
+    cell_reps = model.get_local_sample_representation(adata)
+    make_parents(cell_representations_out)
+    cell_reps.to_netcdf(cell_representations_out)
+    del cell_reps
+
+    cell_dists = model.get_local_sample_distances(adata, keep_cell=False, groupby=labels_key)
+    make_parents(distance_matrices_out)
+    cell_dists.to_netcdf(distance_matrices_out)
+    del cell_dists
+
+    cell_normalized_dists = model.get_local_sample_distances(
+        adata, use_mean=False, normalize_distances=True, keep_cell=False, groupby=labels_key
+    )
+    make_parents(normalized_distance_matrices_out)
+    cell_normalized_dists.to_netcdf(normalized_distance_matrices_out)
+    del cell_normalized_dists
+
+    return adata_out, distance_matrices_out, normalized_distance_matrices_out
 
 
 if __name__ == "__main__":

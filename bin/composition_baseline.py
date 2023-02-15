@@ -53,6 +53,7 @@ class CompositionBaseline:
         return self.adata.obsm[self.rep_key]
 
     def get_local_sample_representation(self):
+
         if self.clustering_on == "leiden":
             sc.pp.neighbors(self.adata, n_neighbors=30, use_rep=self.rep_key)
             sc.tl.leiden(self.adata, resolution=1.0, key_added="leiden_1.0")

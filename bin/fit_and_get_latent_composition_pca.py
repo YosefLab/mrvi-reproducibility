@@ -32,7 +32,7 @@ def fit_and_get_latent_composition_pca(
     config = load_config(config_in)
     batch_key = config.get("batch_key", None)
     sample_key = config.get("sample_key", None)
-    group_key = config.get("group_keys", None)
+    label_key = config.get("labels_key", None)
     model_kwargs = config.get("composition_pca_model_kwargs", {})
     train_kwargs = config.get("composition_pca_train_kwargs", {})
     adata = sc.read(adata_in)
@@ -40,7 +40,7 @@ def fit_and_get_latent_composition_pca(
     _adata.uns["model_name"] = "CompositionPCA"
 
     model_kwargs["clustering_on"] = "cluster_key"
-    model_kwargs["cluster_key"] = group_key
+    model_kwargs["cluster_key"] = label_key
 
     composition_pca = CompositionBaseline(
         adata,
@@ -75,8 +75,8 @@ def fit_and_get_latent_composition_pca(
     dists = np.concatenate(dists, axis=0)
     distances = xr.DataArray(
         dists,
-        dims=[group_key, "sample", "sample"],
-        coords={group_key: celltypes, "sample": unique_samples},
+        dims=[label_key, "sample", "sample"],
+        coords={label_key: celltypes, "sample": unique_samples},
         name="distance",
     )
     distances.to_netcdf(distance_matrices_out)

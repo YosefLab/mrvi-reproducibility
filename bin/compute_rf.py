@@ -79,6 +79,7 @@ def compute_rf(
     model_name = basename.split(".")[1]
     config = load_config(config_in)
     celltype_key = config["labels_key"]
+    dim_name = f"{celltype_key}_name"
 
     # Linkage method to use for hierarchical clustering
     clustering_method = config["clustering_method"]
@@ -89,13 +90,16 @@ def compute_rf(
         return
 
     gt_mats = xr.open_dataarray(distance_matrices_gt)
-    inferred_mats = xr.open_dataarray(distance_matrices)
-
+    try:
+        inferred_mats = xr.open_dataarray(distance_matrices)
+    except ValueError:
+        inferred_mats = xr.open_dataset(distance_matrices)[celltype_key]
+    inferred_mats = inferred_mats.rename("distance")
     aligned_mats = xr.merge([gt_mats, inferred_mats], join="left")
     dists = []
     cts = []
 
-    clusters = aligned_mats.coords[celltype_key].values
+    clusters = aligned_mats.coords[dim_name].values
     for cluster_name in clusters:
         cts.append(cluster_name)
 

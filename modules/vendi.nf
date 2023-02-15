@@ -1,15 +1,15 @@
 process vendi {
     input:
-    path adata_in
+    path distance_matrix_in
 
     script:
-    adata_name = adata_in.getSimpleName()
-    adata_model_name = adata_in.getBaseName()
+    adata_name = distance_matrix_in.getSimpleName()
+    distance_matrix_name = distance_matrix_in.getBaseName()
     config_in = "${params.conf.datasets}/${adata_name}.json"
-    table_out = "${params.outputs.metrics}/${adata_model_name}.vendi.csv"
+    table_out = "${params.outputs.metrics}/${distance_matrix_name}.vendi.csv"
     """
     python3 ${params.bin.vendi} \\
-        --adata_in ${adata_in} \\
+        --distance_matrix_in ${distance_matrix_in} \\
         --config_in ${config_in} \\
         --table_out ${table_out}
     """

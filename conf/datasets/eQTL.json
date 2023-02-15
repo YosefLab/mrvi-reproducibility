@@ -2,7 +2,6 @@
     "batch_key": "pool_number",
     "labels_key": "cell_type",
     "sample_key": "donor_id_harmonized",
-    "group_keys": "cell_type",
     "mrvi_train_kwargs": {
         "max_epochs": 300
     },
