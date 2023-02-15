@@ -55,19 +55,30 @@ def get_latent_scviv2(
     cell_reps.to_netcdf(cell_representations_out)
     del cell_reps
 
-    cell_dists = model.get_local_sample_distances(adata, keep_cell=False, groupby=labels_key)
+    cell_dists = model.get_local_sample_distances(
+        adata, keep_cell=False, groupby=labels_key
+    )
     make_parents(distance_matrices_out)
     cell_dists.to_netcdf(distance_matrices_out)
     del cell_dists
 
     cell_normalized_dists = model.get_local_sample_distances(
-        adata, use_mean=False, normalize_distances=True, keep_cell=False, groupby=labels_key
+        adata,
+        use_mean=False,
+        normalize_distances=True,
+        keep_cell=False,
+        groupby=labels_key,
     )
     make_parents(normalized_distance_matrices_out)
     cell_normalized_dists.to_netcdf(normalized_distance_matrices_out)
     del cell_normalized_dists
 
-    return adata_out, distance_matrices_out, normalized_distance_matrices_out
+    return (
+        adata_out,
+        cell_representations_out,
+        distance_matrices_out,
+        normalized_distance_matrices_out,
+    )
 
 
 if __name__ == "__main__":

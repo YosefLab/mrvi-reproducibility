@@ -9,7 +9,6 @@ import xarray as xr
 import seaborn as sns
 import scanpy as sc
 import scvi
-import scvi_v2
 from matplotlib.patches import Patch
 from scipy.stats import norm
 from utils import load_results
@@ -32,24 +31,24 @@ if RUN_WITH_PARSER:
     args = parser()
     results_paths = args.results_paths
     output_dir = args.output_dir
-    base_output_dir = ""
     os.makedirs(output_dir, exist_ok=True)
 
     pd.Series(results_paths).to_csv(
         os.path.join(output_dir, "path_to_intermediary_files.txt"), index=False
     )
 else:
-    base_output_dir = "../results/symsim_pipeline"
-    output_dir = os.path.join(base_output_dir, "figures")
+    output_dir = os.path.join("../results/sciplex_pipeline/figures")
     results_paths = (
         pd.read_csv(os.path.join(output_dir, "path_to_intermediary_files.txt"))
         .squeeze()
         .values.flatten()
     )
 # %%
-def save_figures(fig, filename):
-    fig.save(os.path.join(output_dir, filename + ".svg"))
-    fig.save(os.path.join(output_dir, filename + ".png"), dpi=300)
+def save_figures(filename):
+    plt.savefig(os.path.join(output_dir, filename + ".svg"))
+    plt.savefig(
+        os.path.join(output_dir, filename + ".png"), dpi=300, bbox_inches="tight"
+    )
 
 
 def check_if_in_results(filepath):
@@ -87,22 +86,15 @@ method_names = ["scviv2", "scviv2_nonlinear"]
 # Same figures for all phases
 for method_name in method_names:
     for cl in cell_lines:
-        normalized_dists_path = os.path.join(
-            base_output_dir,
-            f"distance_matrices/sciplex_{cl}_significant_all_phases.{method_name}.normalized_distance_matrices.nc",
-        )
-        normalized_dists = xr.open_dataset(normalized_dists_path)
+        normalized_dists_path = f"sciplex_{cl}_significant_all_phases.{method_name}.normalized_distance_matrices.nc"
         check_if_in_results(normalized_dists_path)
-        dists_path = os.path.join(
-            base_output_dir,
-            f"distance_matrices/sciplex_{cl}_significant_all_phases.{method_name}.distance_matrices.nc",
+        normalized_dists = xr.open_dataset(normalized_dists_path)
+        dists_path = (
+            f"sciplex_{cl}_significant_all_phases.{method_name}.distance_matrices.nc"
         )
         dists = xr.open_dataset(dists_path)
 
-        adata_path = os.path.join(
-            base_output_dir,
-            f"data/sciplex_{cl}_significant_all_phases.{method_name}.h5ad",
-        )
+        adata_path = f"sciplex_{cl}_significant_all_phases.{method_name}.h5ad"
         check_if_in_results(adata_path)
         adata = sc.read(adata_path)
 
@@ -149,14 +141,12 @@ for method_name in method_names:
                 handles,
                 pathway_color_map,
                 title="Product Name",
-                bbox_to_anchor=(1.3, 0.9),
+                bbox_to_anchor=(1, 0.9),
                 bbox_transform=plt.gcf().transFigure,
                 loc="upper right",
             )
             plt.gca().add_artist(product_legend)
-            plt.tight_layout()
             save_figures(
-                plt.gcf(),
                 f"sciplex_{cl}_significant_phase_{phase}.{method_name}.distance_matrices_heatmap",
             )
             plt.clf()
@@ -195,14 +185,12 @@ for method_name in method_names:
                 handles,
                 pathway_color_map,
                 title="Product Name",
-                bbox_to_anchor=(1.3, 0.9),
+                bbox_to_anchor=(1, 0.9),
                 bbox_transform=plt.gcf().transFigure,
                 loc="upper right",
             )
             plt.gca().add_artist(product_legend)
-            plt.tight_layout()
             save_figures(
-                plt.gcf(),
                 f"sciplex_{cl}_significant_phase_{phase}.{method_name}.normalized_distance_matrices_heatmap",
             )
             plt.clf()
@@ -237,64 +225,58 @@ for method_name in method_names:
                 handles,
                 pathway_color_map,
                 title="Product Name",
-                bbox_to_anchor=(1.3, 0.9),
+                bbox_to_anchor=(1, 0.9),
                 bbox_transform=plt.gcf().transFigure,
                 loc="upper right",
             )
             plt.gca().add_artist(product_legend)
-            plt.tight_layout()
             save_figures(
-                plt.gcf(),
                 f"sciplex_{cl}_significant_phase_{phase}.{method_name}.clipped_normalized_distance_matrices_heatmap",
             )
             plt.clf()
 
         # Histograms showing before and after normalization dists
-        model_dir_path = os.path.join(
-            base_output_dir, f"models/sciplex_{cl}_significant_all_phases.{method_name}"
-        )
+        # model_dir_path = os.path.join(
+        #     base_output_dir, f"models/sciplex_{cl}_significant_all_phases.{method_name}"
+        # )
 
-        model_input_adata = sc.read(
-            os.path.join(
-                base_output_dir,
-                f"data/sciplex_{cl}_significant_all_phases.preprocessed.h5ad",
-            )
-        )
-        check_if_in_results(model_input_adata)
-        model = scvi_v2.MrVI.load(model_dir_path, adata=model_input_adata)
-        baseline_means, baseline_vars = model._compute_local_baseline_dists(None)
-        avg_baseline_mean = np.mean(baseline_means)
-        avg_baseline_var = np.mean(baseline_vars)
+        # model_input_adata = sc.read(
+        #         f"sciplex_{cl}_significant_all_phases.preprocessed.h5ad",
+        # )
+        # check_if_in_results(model_input_adata)
+        # model = scvi_v2.MrVI.load(model_dir_path, adata=model_input_adata)
+        # baseline_means, baseline_vars = model._compute_local_baseline_dists(None)
+        # avg_baseline_mean = np.mean(baseline_means)
+        # avg_baseline_var = np.mean(baseline_vars)
 
-        vmax = max(
-            np.percentile(dists.phase.data, 95),
-            np.percentile(normalized_dists.phase.data, 95),
-        )
-        binwidth = 0.1
-        bins = np.arange(0, vmax + binwidth, binwidth)
-        dists_hist = plt.hist(
-            dists.phase.data.flatten(), bins=bins, alpha=0.5, label="distances"
-        )
-        plt.hist(
-            normalized_dists.phase.data.flatten(),
-            bins=bins,
-            alpha=0.5,
-            label="normalized distances",
-        )
-        x = np.linspace(-0.5, vmax + 0.5, 100)
-        p = np.max(dists_hist[0]) * norm.pdf(
-            x, avg_baseline_mean, avg_baseline_var**0.5
-        )
+        # vmax = max(
+        #     np.percentile(dists.phase.data, 95),
+        #     np.percentile(normalized_dists.phase.data, 95),
+        # )
+        # binwidth = 0.1
+        # bins = np.arange(0, vmax + binwidth, binwidth)
+        # dists_hist = plt.hist(
+        #     dists.phase.data.flatten(), bins=bins, alpha=0.5, label="distances"
+        # )
+        # plt.hist(
+        #     normalized_dists.phase.data.flatten(),
+        #     bins=bins,
+        #     alpha=0.5,
+        #     label="normalized distances",
+        # )
+        # x = np.linspace(-0.5, vmax + 0.5, 100)
+        # p = np.max(dists_hist[0]) * norm.pdf(
+        #     x, avg_baseline_mean, avg_baseline_var**0.5
+        # )
 
-        plt.plot(x, p, "k", linewidth=2)
+        # plt.plot(x, p, "k", linewidth=2)
 
-        plt.xlim(-0.5, vmax + 0.5)
-        plt.legend()
-        save_figures(
-            plt.gcf(),
-            f"sciplex_{cl}_significant_all_phases.{method_name}.distance_matrix_hist_compare",
-        )
-        plt.clf()
+        # plt.xlim(-0.5, vmax + 0.5)
+        # plt.legend()
+        # save_figures(
+        #     f"sciplex_{cl}_significant_all_phases.{method_name}.distance_matrix_hist_compare",
+        # )
+        # plt.clf()
 
         # u and z UMAPs for each cell line
         adata.obsm["mrvi_u_mde"] = scvi.model.utils.mde(
@@ -307,23 +289,15 @@ for method_name in method_names:
         sc.pl.embedding(
             adata, "mrvi_u_mde", color=["pathway", "phase"], ncols=1, show=False
         )
-        plt.tight_layout()
-        save_figures(
-            plt.gcf(), f"sciplex_{cl}_significant_all_phases.{method_name}.u_latent_mde"
-        )
+        save_figures(f"sciplex_{cl}_significant_all_phases.{method_name}.u_latent_mde")
         plt.clf()
 
         sc.pl.embedding(
             adata, "mrvi_z_mde", color=["pathway", "phase"], ncols=1, show=False
         )
-        plt.tight_layout()
-        save_figures(
-            plt.gcf(), f"sciplex_{cl}_significant_all_phases.{method_name}.z_latent_mde"
-        )
+        save_figures(f"sciplex_{cl}_significant_all_phases.{method_name}.z_latent_mde")
         plt.clf()
 
 # %%
 # Cross method comparison plots
 all_results = load_results(results_paths)
-
-

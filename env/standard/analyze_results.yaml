@@ -25,8 +25,8 @@ dependencies:
     - pip
     - pip:
           - click
+          - pymde
           - scib-metrics>=0.0.7
           - scvi-tools==0.20.0
-          - git+ssh://git@github.com/YosefLab/scvi-v2.git@main
           - vendi-score==0.0.3
           - remote-pdb==2.1.0
