@@ -85,7 +85,6 @@ def compute_rf(
         inferred_mats = xr.open_dataarray(distance_matrices)
     except ValueError:
         inferred_mats = xr.open_dataset(distance_matrices)[celltype_key]
-        inferred_mats = inferred_mats.rename("distance")
     inferred_mats = inferred_mats.rename("distance")
     aligned_mats = xr.merge([gt_mats, inferred_mats], join="left")
     dists = []
