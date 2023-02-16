@@ -156,10 +156,10 @@ if not RUN_WITH_PARSER:
                 {"in_product_all_dist_ratio": ratio, "phase": phase, **base_row}
             )
 
-            two_two_ratio = in_prod_top_two_dist_avg / off_diag_dist_avg
+            top_two_ratio = in_prod_top_two_dist_avg / off_diag_dist_avg
             in_product_top_2_dist_ratio.append(
                 {
-                    "in_product_top_2_dist_ratio": two_two_ratio,
+                    "in_product_top_2_dist_ratio": top_two_ratio,
                     "phase": phase,
                     **base_row,
                 }
