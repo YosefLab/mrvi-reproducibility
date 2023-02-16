@@ -1,4 +1,6 @@
 process fit_scviv2 {
+    maxForks 1
+
     input:
     path adata_in
     val use_nonlinear

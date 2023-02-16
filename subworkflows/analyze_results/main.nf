@@ -14,7 +14,8 @@ workflow analyze_results {
 
     all_results = symsim_results.concat(
         pbmcs_results,
-        nucleus_results
+        nucleus_results,
+        sciplex_results
     )
     all_results.view()
 

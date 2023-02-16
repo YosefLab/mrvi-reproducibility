@@ -37,20 +37,20 @@ workflow run_models {
 
     if ( params.runAllModels) {
         // Run MRVI, compute latents, distance matrices (old code)
-        mrvi_outs = fit_mrvi(adatas_in) | get_latent_mrvi | get_outputs_mrvi
-        mrvi_adata = mrvi_outs.adata
+        // mrvi_outs = fit_mrvi(adatas_in) | get_latent_mrvi | get_outputs_mrvi
+        // mrvi_adata = mrvi_outs.adata
 
         // Run compositional models
         c_scvi_outs=fit_and_get_latent_composition_scvi(adatas_in)
         c_pca_outs=fit_and_get_latent_composition_pca(adatas_in)
 
         distance_matrices = distance_matrices.concat(
-            mrvi_outs.distance_matrices,
+            // mrvi_outs.distance_matrices,
             c_pca_outs.distance_matrices,
             c_scvi_outs.distance_matrices
         )
         adatas = adatas.concat(
-            get_latent_mrvi.out,
+            // get_latent_mrvi.out,
             // c_pca_outs.adata,
             c_scvi_outs.adata
         )

@@ -1,4 +1,6 @@
 process fit_and_get_latent_composition_scvi {
+    maxForks 1
+
     input:
     path adata_in
 

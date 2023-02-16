@@ -60,7 +60,9 @@ def load_results(results_paths):
         List of paths to results files.
     """
 
-    def append_representations(adata, uns_latent_key, representation_name):
+    def append_representations(
+        adata, uns_latent_key, representation_name, dataset_name
+    ):
         """
         Retrieve latent representations from some adata.
 
@@ -80,6 +82,7 @@ def load_results(results_paths):
                 obs_.loc[:, ["x", "y"]] = adata.obsm[latent_key]
                 obs_.loc[:, "representation_name"] = latent_key
                 obs_.loc[:, "representation_type"] = representation_name
+                obs_.loc[:, "dataset_name"] = dataset_name
                 obs = obs.append(obs_)
             return obs
         return None
@@ -92,6 +95,7 @@ def load_results(results_paths):
         "umaps_metrics": pd.DataFrame(),
         "distances_metrics": pd.DataFrame(),
         "representations": pd.DataFrame(),
+        "sciplex_metrics": pd.DataFrame(),
     }
     for file in results_paths:
         if determine_if_file_empty(file):
@@ -99,9 +103,11 @@ def load_results(results_paths):
         if file.endswith(".nc"):
             continue
         basename = os.path.basename(file)
+        dataset_name = basename.split(".")[0]
         model_name = basename.split(".")[1]
         if file.endswith("csv"):
             df = pd.read_csv(file)
+            df.loc[:, "dataset_name"] = dataset_name
             df.loc[:, "model_name"] = model_name
             if file.endswith(".distance_matrices.vendi.csv"):
                 all_results["vendi_metrics"] = all_results["vendi_metrics"].append(df)
@@ -117,11 +123,21 @@ def load_results(results_paths):
                 all_results["distances_metrics"] = all_results[
                     "distances_metrics"
                 ].append(df)
+            elif file.endswith("sciplex_metrics.csv"):
+                all_results["sciplex_metrics"] = all_results["sciplex_metrics"].append(
+                    df
+                )
         elif file.endswith(".h5ad"):
             adata = sc.read_h5ad(file)
-            mde_reps = append_representations(adata, "latent_mde_keys", "MDE")
-            pca_reps = append_representations(adata, "latent_pca_keys", "PCA")
-            umaps_reps = append_representations(adata, "latent_umap_keys", "UMAP")
+            mde_reps = append_representations(
+                adata, "latent_mde_keys", "MDE", dataset_name
+            )
+            pca_reps = append_representations(
+                adata, "latent_pca_keys", "PCA", dataset_name
+            )
+            umaps_reps = append_representations(
+                adata, "latent_umap_keys", "UMAP", dataset_name
+            )
             for rep in [mde_reps, pca_reps, umaps_reps]:
                 if rep is not None:
                     all_results["representations"] = all_results[

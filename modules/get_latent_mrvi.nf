@@ -1,4 +1,6 @@
 process get_latent_mrvi {
+    maxForks 1
+
     input:
     path adata_in
     path model_in
