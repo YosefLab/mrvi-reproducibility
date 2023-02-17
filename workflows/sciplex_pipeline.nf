@@ -8,14 +8,14 @@ include { analyze_results } from params.subworkflows.analyze_results
 workflow run_main {
     main:
     input = Channel.fromPath(params.inputs)
-    gt_matrices = Channel.fromPath(params.gt_matrices)
+    gt_matrices = Channel.fromPath(params.gt_matrices).collect()
 
     outs = preprocess_data(input) | run_models
+
+    sciplex_metrics = compute_sciplex_metrics(outs.distance_matrices, gt_matrices)
     metrics = compute_metrics(outs.adatas, outs.distance_matrices)
 
-    sciplex_metrics = compute_sciplex_metrics(outs.adatas, outs.distance_matrices, gt_matrices)
-
-    metrics = metrics.concat(sciplex_metrics)
+    metrics = sciplex_metrics.concat(metrics)
 
     results = outs.adatas.concat(
         outs.rfs,

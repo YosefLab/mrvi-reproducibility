@@ -2,6 +2,7 @@ import json
 import os
 import pathlib
 import pickle
+import gc
 from inspect import signature
 from pathlib import Path
 from typing import Callable
@@ -74,6 +75,8 @@ def load_results(results_paths):
             Key in adata.uns containing the list of cell representations to extract.
         representation_name :
             Name of the representation type.
+        dataset_name :
+            Name of the dataset.
         """
         if uns_latent_key in adata.uns.keys():
             obs = pd.DataFrame()
@@ -88,14 +91,14 @@ def load_results(results_paths):
         return None
 
     all_results = {
-        "vendi_metrics": pd.DataFrame(),
-        "scib_metrics": pd.DataFrame(),
-        "rf_metrics": pd.DataFrame(),
-        "losses_metrics": pd.DataFrame(),
-        "umaps_metrics": pd.DataFrame(),
-        "distances_metrics": pd.DataFrame(),
-        "representations": pd.DataFrame(),
-        "sciplex_metrics": pd.DataFrame(),
+        "vendi_metrics": [],
+        "scib_metrics": [],
+        "rf_metrics": [],
+        "losses_metrics": [],
+        "umaps_metrics": [],
+        "distances_metrics": [],
+        "representations": [],
+        "sciplex_metrics": [],
     }
     for file in results_paths:
         if determine_if_file_empty(file):
@@ -110,39 +113,35 @@ def load_results(results_paths):
             df.loc[:, "dataset_name"] = dataset_name
             df.loc[:, "model_name"] = model_name
             if file.endswith(".distance_matrices.vendi.csv"):
-                all_results["vendi_metrics"] = all_results["vendi_metrics"].append(df)
+                all_results["vendi_metrics"].append(df)
             elif file.endswith(".scib.csv"):
-                all_results["scib_metrics"] = all_results["scib_metrics"].append(df)
+                all_results["scib_metrics"].append(df)
             elif file.endswith(".distance_matrices.rf.csv"):
-                all_results["rf_metrics"] = all_results["rf_metrics"].append(df)
+                all_results["rf_metrics"].append(df)
             elif file.endswith("losses.csv"):
-                all_results["losses_metrics"] = all_results["losses_metrics"].append(df)
+                all_results["losses_metrics"].append(df)
             elif file.endswith("umap.csv"):
-                all_results["umaps_metrics"] = all_results["umaps_metrics"].append(df)
+                all_results["umaps_metrics"].append(df)
             elif file.endswith("distances.csv"):
-                all_results["distances_metrics"] = all_results[
-                    "distances_metrics"
-                ].append(df)
+                all_results["distances_metrics"].append(df)
             elif file.endswith("sciplex_metrics.csv"):
-                all_results["sciplex_metrics"] = all_results["sciplex_metrics"].append(
-                    df
-                )
+                all_results["sciplex_metrics"].append(df)
+            pass
         elif file.endswith(".h5ad"):
-            adata = sc.read_h5ad(file)
-            mde_reps = append_representations(
-                adata, "latent_mde_keys", "MDE", dataset_name
-            )
-            pca_reps = append_representations(
-                adata, "latent_pca_keys", "PCA", dataset_name
-            )
-            umaps_reps = append_representations(
-                adata, "latent_umap_keys", "UMAP", dataset_name
-            )
-            for rep in [mde_reps, pca_reps, umaps_reps]:
-                if rep is not None:
-                    all_results["representations"] = all_results[
-                        "representations"
-                    ].append(rep)
+            adata = sc.read_h5ad(file, backed="r")
+            for rep_type in ["MDE", "PCA", "UMAP"]:
+                uns_key = f"latent_{rep_type.lower()}_keys"
+                if uns_key in adata.uns.keys():
+                    all_results["representations"].append(
+                        append_representations(adata, uns_key, rep_type, dataset_name)
+                    )
+            del adata
+            gc.collect()  # Adata uns creates weak reference that must be manually gc.
+    for key in all_results.keys():
+        if len(all_results[key]) > 0:
+            all_results[key] = pd.concat(all_results[key])
+        else:
+            all_results[key] = pd.DataFrame()
     return all_results
 
 

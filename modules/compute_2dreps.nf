@@ -1,4 +1,6 @@
 process compute_2dreps {
+    maxForks 1
+
     input:
     path adata_in
 

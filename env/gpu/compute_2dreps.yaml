@@ -18,6 +18,7 @@ dependencies:
     - pip
     - pip:
           - click
+          - matplotlib<3.7
           - scikit-learn==1.0.2
           - scikit-misc==0.1.4
           - remote-pdb==2.1.0

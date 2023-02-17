@@ -1,6 +1,7 @@
 # %%
 import argparse
 import os
+import glob
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -13,7 +14,7 @@ from matplotlib.patches import Patch
 from utils import load_results, INCH_TO_CM
 
 # Change to False if you want to run this script directly
-RUN_WITH_PARSER = False
+RUN_WITH_PARSER = True
 plt.rcParams["svg.fonttype"] = "none"
 
 # %%
@@ -37,24 +38,10 @@ if RUN_WITH_PARSER:
     )
 else:
     output_dir = os.path.join("../results/sciplex_pipeline/figures")
-    results_paths = (
-        pd.read_csv(os.path.join(output_dir, "path_to_intermediary_files.txt"))
-        .squeeze()
-        .values.flatten()
-    )
+    results_paths = set(glob.glob("../results/sciplex_pipeline/*/*.csv"))
 # %%
-def save_figures(filename):
-    plt.savefig(os.path.join(output_dir, filename + ".svg"))
-    plt.savefig(
-        os.path.join(output_dir, filename + ".png"), dpi=300, bbox_inches="tight"
-    )
-
-
-def check_if_in_results(filepath):
-    for result_path in results_paths:
-        if os.path.samefile(result_path, filepath):
-            return True
-    raise ValueError(f"{filepath} not found in results_paths")
+def save_figures(filename, dataset_name):
+    plt.savefig(os.path.join(output_dir, dataset_name, filename + ".svg"))
 
 
 # %%
@@ -84,9 +71,16 @@ all_results = load_results(results_paths)
 sciplex_metrics_df = all_results["sciplex_metrics"]
 
 for dataset_name in sciplex_metrics_df["dataset_name"].unique():
-    plot_df = sciplex_metrics_df[sciplex_metrics_df["dataset_name"] == dataset_name]
+    plot_df = sciplex_metrics_df[
+        (sciplex_metrics_df["dataset_name"] == dataset_name)
+        & (
+            sciplex_metrics_df["distance_type"] == "distance_matrices"
+        )  # Exclude normalized matrices
+    ]
     for metric in sciplex_metrics_df.columns:
-        if metric in ["model_name", "dataset_name", "phase"]:
+        if metric in ["model_name", "dataset_name", "phase", "distance_type"]:
+            continue
+        if plot_df[metric].isna().any():
             continue
         fig = (
             p9.ggplot(
@@ -97,12 +91,12 @@ for dataset_name in sciplex_metrics_df["dataset_name"].unique():
             + p9.theme_classic()
             + p9.coord_flip()
             + p9.theme(
-                legend_position="none",
+                legend_position="top",
                 figure_size=(4 * INCH_TO_CM, 4 * INCH_TO_CM),
             )
             + p9.labs(x="model_name", y=metric)
         )
-        fig.save(os.path.join(output_dir, f"{dataset_name}.{metric}.svg"))
+        fig.save(os.path.join(output_dir, f"{dataset_name}/{metric}.svg"))
 
 # %%
 cell_lines = ["A549", "MCF7", "K562"]
@@ -111,17 +105,15 @@ method_names = ["scviv2", "scviv2_nonlinear"]
 # Per dataset plots
 for method_name in method_names:
     for cl in cell_lines:
-        normalized_dists_path = f"sciplex_{cl}_significant_all_phases.{method_name}.normalized_distance_matrices.nc"
-        check_if_in_results(normalized_dists_path)
-        normalized_dists = xr.open_dataset(normalized_dists_path)
-        dists_path = (
-            f"sciplex_{cl}_significant_all_phases.{method_name}.distance_matrices.nc"
+        dataset_name = f"sciplex_{cl}_significant_all_phases"
+        normalized_dists_path = (
+            f"{dataset_name}.{method_name}.normalized_distance_matrices.nc"
         )
-        check_if_in_results(dists_path)
+        normalized_dists = xr.open_dataset(normalized_dists_path)
+        dists_path = f"{dataset_name}.{method_name}.distance_matrices.nc"
         dists = xr.open_dataset(dists_path)
 
-        adata_path = f"sciplex_{cl}_significant_all_phases.{method_name}.h5ad"
-        check_if_in_results(adata_path)
+        adata_path = f"{dataset_name}.{method_name}.final.h5ad"
         adata = sc.read(adata_path)
 
         sample_to_pathway = (
@@ -173,7 +165,7 @@ for method_name in method_names:
             )
             plt.gca().add_artist(product_legend)
             save_figures(
-                f"sciplex_{cl}_significant_phase_{phase}.{method_name}.distance_matrices_heatmap",
+                f"{phase}.{method_name}.distance_matrices_heatmap", dataset_name
             )
             plt.clf()
 
@@ -217,7 +209,8 @@ for method_name in method_names:
             )
             plt.gca().add_artist(product_legend)
             save_figures(
-                f"sciplex_{cl}_significant_phase_{phase}.{method_name}.normalized_distance_matrices_heatmap",
+                f"{phase}.{method_name}.normalized_distance_matrices_heatmap",
+                dataset_name,
             )
             plt.clf()
 
@@ -257,8 +250,7 @@ for method_name in method_names:
             )
             plt.gca().add_artist(product_legend)
             save_figures(
-                f"sciplex_{cl}_significant_phase_{phase}.{method_name}.clipped_normalized_distance_matrices_heatmap",
+                f"{phase}.{method_name}.clipped_normalized_distance_matrices_heatmap",
+                dataset_name,
             )
             plt.clf()
-
-# %%

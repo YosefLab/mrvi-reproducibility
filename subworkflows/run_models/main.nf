@@ -51,7 +51,7 @@ workflow run_models {
         )
         adatas = adatas.concat(
             // get_latent_mrvi.out,
-            // c_pca_outs.adata,
+            c_pca_outs.adata,
             c_scvi_outs.adata
         )
 

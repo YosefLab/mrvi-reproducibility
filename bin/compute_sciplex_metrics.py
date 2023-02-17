@@ -9,7 +9,12 @@ import xarray as xr
 from scipy.cluster.hierarchy import linkage, to_tree
 from scipy.linalg import issymmetric
 from scipy.spatial.distance import squareform
-from utils import determine_if_file_empty, load_config, make_parents, wrap_kwargs
+from utils import (
+    determine_if_file_empty,
+    load_config,
+    make_parents,
+    wrap_kwargs,
+)
 
 
 def linkage_to_ete(linkage_obj):
@@ -58,7 +63,6 @@ def hierarchical_clustering(dist_mtx, method="ward"):
 @wrap_kwargs
 def compute_sciplex_metrics(
     *,
-    adata_in,
     distance_matrices_in,
     gt_matrices_in,
     config_in,
@@ -68,8 +72,6 @@ def compute_sciplex_metrics(
 
     Parameters
     ----------
-    adata_in :
-        path to anndata file containing cell-type specific distance matrices
     distance_matrices_in:
         path to inferred distance matrices
     gt_matrices_in:
@@ -82,10 +84,16 @@ def compute_sciplex_metrics(
     basename = os.path.basename(distance_matrices_in)
     cell_line = basename.split("_")[1]
     model_name = basename.split(".")[1]
+    distance_type = basename.split(".")[2]
     config = load_config(config_in)
     celltype_key = config["labels_key"]
     dim_name = f"{celltype_key}_name"
 
+    try:
+        inferred_mats = xr.open_dataarray(distance_matrices_in)
+    except ValueError:
+        inferred_mats = xr.open_dataset(distance_matrices_in)[celltype_key]
+    inferred_mats = inferred_mats.rename("distance")
     phases = inferred_mats[dim_name].data
 
     # Linkage method to use for hierarchical clustering
@@ -95,12 +103,12 @@ def compute_sciplex_metrics(
     metrics_dict = {}
 
     gt_mat = None
+    gt_matrices_in = gt_matrices_in.split(",")
     for gt_matrix_in in gt_matrices_in:
         gt_cell_line = os.path.basename(gt_matrix_in).split("_")[0]
         if gt_cell_line == cell_line:
             if determine_if_file_empty(gt_matrix_in):
-                Path(table_out).touch()
-                return
+                break
 
             gt_mat = xr.DataArray(
                 data=pd.read_csv(gt_matrix_in, index_col=0),
@@ -108,19 +116,14 @@ def compute_sciplex_metrics(
             )
             # Assign them all at 10000 nM dose
             new_sample_coord = [prod + "_10000" for prod in list(gt_mat.sample_x.data)]
-            gt_mat.assign_coords(
+            gt_mat = gt_mat.assign_coords(
                 {"sample_x": new_sample_coord, "sample_y": new_sample_coord}
             )
             break
     if gt_mat is None:
         Path(table_out).touch()
 
-    if gt_mat:
-        try:
-            inferred_mats = xr.open_dataarray(distance_matrices_in)
-        except ValueError:
-            inferred_mats = xr.open_dataset(distance_matrices_in)[celltype_key]
-        inferred_mats = inferred_mats.rename("distance")
+    if gt_mat is not None:
         rf_dists = []
 
         for phase in phases:
@@ -128,7 +131,7 @@ def compute_sciplex_metrics(
             dist_gt = distance_gt.values
             z_gt = hierarchical_clustering(dist_gt, method=clustering_method)
             dist_inferred = (
-                inferred_mats.distance.loc[phase]
+                inferred_mats.loc[phase]
                 .sel(sample_x=distance_gt.sample_x, sample_y=distance_gt.sample_y)
                 .values
             )
@@ -143,7 +146,7 @@ def compute_sciplex_metrics(
 
     all_products = set()
     all_doses = set()
-    for sample_name in inferred_mats.distance.sample_x.data:
+    for sample_name in inferred_mats.sample_x.data:
         product_name, dose = sample_name.split("_")
         if product_name != "Vehicle":
             all_products.add(product_name)
@@ -155,7 +158,7 @@ def compute_sciplex_metrics(
     in_product_top_2_dist_ratio = []
     top_two_doses = ["1000", "10000"]
     for phase in phases:
-        phase_dists = inferred_mats.distance.sel(phase_name=phase).phase
+        phase_dists = inferred_mats.sel(phase_name=phase)
         phase_dists_arr = phase_dists.data
         non_diag_mask = (
             np.ones(shape=phase_dists_arr.shape) - np.identity(phase_dists_arr.shape[0])
@@ -170,14 +173,18 @@ def compute_sciplex_metrics(
                         continue
                     dosex_idx = np.where(
                         phase_dists.sample_x.data == f"{product_name}_{dosex}"
-                    )[0][0]
+                    )[0]
+                    if len(dosex_idx) == 0:
+                        continue
                     dosey_idx = np.where(
                         phase_dists.sample_y.data == f"{product_name}_{dosey}"
-                    )[0][0]
-                    in_prod_mask[dosex_idx, dosey_idx] = True
+                    )[0]
+                    if len(dosey_idx) == 0:
+                        continue
+                    in_prod_mask[dosex_idx[0], dosey_idx[0]] = True
 
                     if dosex in top_two_doses and dosey in top_two_doses:
-                        in_prod_top_two_mask[dosex_idx, dosey_idx] = True
+                        in_prod_top_two_mask[dosex_idx[0], dosey_idx[0]] = True
         in_prod_dist_avg = phase_dists_arr[in_prod_mask].mean()
         in_prod_top_two_dist_avg = phase_dists_arr[in_prod_top_two_mask].mean()
         ratio = in_prod_dist_avg / off_diag_dist_avg
@@ -188,7 +195,7 @@ def compute_sciplex_metrics(
     metrics_dict["in_product_all_dist_ratio"] = in_product_all_dist_ratio
     metrics_dict["in_product_top_2_dist_ratio"] = in_product_top_2_dist_ratio
 
-    metrics = pd.DataFrame({"phase": phases, **metrics_dict}).assign(
+    metrics = pd.DataFrame({"distance_type": distance_type,"phase": phases, **metrics_dict}).assign(
         model_name=model_name
     )
     metrics.to_csv(table_out, index=False)
