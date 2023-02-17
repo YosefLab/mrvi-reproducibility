@@ -59,7 +59,8 @@ class CompositionBaseline:
         self.clustering_on = self.model_kwargs.pop(
             "clustering_on", "leiden"
         )  # one of leiden, cluster_key
-        self.cluster_key = self.model_kwargs.pop("cluster_key", None)
+        self.cluster_key = model_kwargs.pop("cluster_key", None)
+        self.subcluster_key = "leiden_subcluster"
 
     def preprocess_data(self):
         if self.rep == "PCA":
@@ -99,7 +100,7 @@ class CompositionBaseline:
             sc.pp.neighbors(self.adata, n_neighbors=30, use_rep=self.rep_key)
             sc.tl.leiden(self.adata, resolution=1.0, key_added="leiden_1.0")
             self.cluster_key = "leiden_1.0"
-        elif self.clustering_on == "cluster_key" and self.cluster_key is None:
+        elif (self.clustering_on == "cluster_key") and (self.cluster_key is not None):
             pass
         else:
             raise ValueError(
@@ -114,30 +115,30 @@ class CompositionBaseline:
 
             # Step 1: subcluster
             sc.pp.neighbors(subann, n_neighbors=30, use_rep=self.rep_key)
-            sc.tl.leiden(subann, resolution=1.0, key_added=self.cluster_key)
+            sc.tl.leiden(subann, resolution=1.0, key_added=self.subcluster_key)
 
             # Step 2: compute number of cells per subcluster-sample pair
             szs = (
-                subann.obs.groupby([self.cluster_key, self.sample_key])
+                subann.obs.groupby([self.subcluster_key, self.sample_key])
                 .size()
                 .to_frame("n_cells")
                 .reset_index()
             )
             # Step 3: compute total number of cells per sample
             szs_total = (
-                szs.groupby(self.sample_key)
+                szs.groupby(self.subcluster_key)
                 .sum()
                 .rename(columns={"n_cells": "n_cells_total"})
             )
             # Step 4: compute frequency of each subcluster per sample
-            comps = szs.merge(szs_total, on=self.sample_key).assign(
+            comps = szs.merge(szs_total, on=self.subcluster_key).assign(
                 freqs=lambda x: x.n_cells / x.n_cells_total
             )
             # Step 5: compute representation of each sample as the vector
             # of frequencies in each subcluster
             freqs = (
-                comps.loc[:, [self.sample_key, self.cluster_key, "freqs"]]
-                .set_index([self.sample_key, self.cluster_key])
+                comps.loc[:, [self.sample_key, self.subcluster_key, "freqs"]]
+                .set_index([self.sample_key, self.subcluster_key])
                 .squeeze()
                 .unstack()
             )
@@ -167,10 +168,9 @@ class CompositionBaseline:
 
         for cluster, freqs in freqs_all.items():
             cell_is_selected = self.adata.obs[self.cluster_key] == cluster
-            ordered_freqs = freqs.reindex(sample_order).fillna(1.)
+            ordered_freqs = freqs.reindex(sample_order).fillna(1.0)
             cluster_reps = ordered_freqs.values
             cluster_dists = pairwise_distances(cluster_reps, metric="euclidean")
             local_dists[cell_is_selected] = cluster_dists
 
         return local_dists
-        
