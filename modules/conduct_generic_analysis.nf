@@ -1,5 +1,4 @@
 process conduct_generic_analysis {
-    cache false
     input:
     path results_paths
 

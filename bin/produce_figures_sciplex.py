@@ -41,7 +41,10 @@ else:
     results_paths = set(glob.glob("../results/sciplex_pipeline/*/*.csv"))
 # %%
 def save_figures(filename, dataset_name):
-    plt.savefig(os.path.join(output_dir, dataset_name, filename + ".svg"))
+    dataset_dir = os.path.join(output_dir, dataset_name)
+    if not os.path.exists(dataset_dir):
+        os.makedirs(dataset_dir, exist_ok=True)
+    plt.savefig(os.path.join(dataset_dir, filename + ".svg"))
 
 
 # %%
@@ -96,7 +99,10 @@ for dataset_name in sciplex_metrics_df["dataset_name"].unique():
             )
             + p9.labs(x="model_name", y=metric)
         )
-        fig.save(os.path.join(output_dir, f"{dataset_name}/{metric}.svg"))
+        dataset_dir = os.path.join(output_dir, dataset_name)
+        if not os.path.exists(dataset_dir):
+            os.makedirs(dataset_dir, exist_ok=True)
+        fig.save(os.path.join(dataset_dir, f"{metric}.svg"))
 
 # %%
 cell_lines = ["A549", "MCF7", "K562"]
