@@ -2,12 +2,11 @@
 import argparse
 import glob
 import os
-import re
 
-import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
+import numpy as np
 import plotnine as p9
+import seaborn as sns
 import xarray as xr
 from utils import INCH_TO_CM, load_results
 

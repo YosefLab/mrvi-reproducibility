@@ -19,7 +19,7 @@ process get_latent_scviv2 {
         --adata_out ${adata_out} \\
         --cell_representations_out ${cell_representations_out} \\
         --distance_matrices_out ${distance_matrices_out} \\
-        --normalized_distance_matrices_out ${normalized_distance_matrices_out} 
+        --normalized_distance_matrices_out ${normalized_distance_matrices_out}
     """
 
     output:

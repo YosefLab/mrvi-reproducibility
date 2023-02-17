@@ -1,13 +1,13 @@
 # %%
 import os
 
+import matplotlib.pyplot as plt
 import numpy as np
-import xarray as xr
-import seaborn as sns
 import scanpy as sc
 import scvi
 import scvi_v2
-import matplotlib.pyplot as plt
+import seaborn as sns
+import xarray as xr
 from matplotlib.patches import Patch
 from scipy.stats import norm
 

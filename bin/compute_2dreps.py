@@ -1,16 +1,15 @@
 import pymde
 import scanpy as sc
 from anndata import AnnData
-
 from utils import write_h5ad, wrap_kwargs
 
-mde_kwargs = dict(
-    embedding_dim=2,
-    constraint=pymde.Standardized(),
-    repulsive_fraction=0.7,
-    device="cuda",
-    n_neighbors=15,
-)
+mde_kwargs = {
+    "embedding_dim": 2,
+    "constraint": pymde.Standardized(),
+    "repulsive_fraction": 0.7,
+    "device": "cuda",
+    "n_neighbors": 15,
+}
 
 
 @wrap_kwargs
@@ -24,9 +23,9 @@ def compute_2dreps(
 
     Iterates over keys in `.uns["latent_keys"]` and computes the following:
 
-    * :meth:`~pymde.pca` with `embedding_dim=2`
-    * :meth:`~tsnecuda.TSNE.fit_transform` with `perplexity=30`
-    * :meth:`~pymde.preserve_neighbors` with `mde_kwargs`
+    * :func:`~pymde.pca` with `embedding_dim=2`
+    * :func:`~tsnecuda.TSNE.fit_transform` with `perplexity=30`
+    * :func:`~pymde.preserve_neighbors` with `mde_kwargs`
 
     Parameters
     ----------
@@ -46,7 +45,7 @@ def compute_2dreps(
     """
     adata = sc.read_h5ad(adata_in)
     latent_keys = adata.uns.get("latent_keys", None)
-    
+
     if latent_keys is None:
         adata.write_h5ad(adata_out)
 

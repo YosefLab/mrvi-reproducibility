@@ -1,6 +1,5 @@
-import scvi_v2
 import scanpy as sc
-
+import scvi_v2
 from utils import load_config, make_parents, wrap_kwargs
 
 

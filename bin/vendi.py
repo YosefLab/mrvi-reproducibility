@@ -1,10 +1,8 @@
-import pandas as pd
-import scanpy as sc
-from vendi_score import vendi
-import xarray as xr
 import numpy as np
-
+import pandas as pd
+import xarray as xr
 from utils import load_config, make_parents, wrap_kwargs
+from vendi_score import vendi
 
 
 @wrap_kwargs

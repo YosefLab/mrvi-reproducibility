@@ -6,21 +6,28 @@ import ete3
 import numpy as np
 import pandas as pd
 import xarray as xr
-from scipy.cluster.hierarchy import linkage, to_tree
+from scipy.cluster.hierarchy import ClusterNode, linkage, to_tree
 from scipy.linalg import issymmetric
 from scipy.spatial.distance import squareform
-
-from utils import (
-    determine_if_file_empty, 
-    load_config, 
-    make_parents,
-    wrap_kwargs,
-)
+from utils import (determine_if_file_empty, load_config, make_parents,
+                   wrap_kwargs)
 
 
-def linkage_to_ete(linkage_obj):
-    """Converts to ete3 tree representation."""
-    R = to_tree(linkage_obj)
+def linkage_to_ete(linkage_obj: np.ndarray) -> ete3.Tree:
+    """
+    Converts a linkage matrix to an :class:`~ete3.Tree` object.
+
+    Parameters
+    ----------
+    linkage_obj
+        A linkage matrix.
+
+    Returns
+    -------
+    :class:`~ete3.Tree`
+        Tree representation of `linkage_obj`.
+    """
+    R: ClusterNode = to_tree(linkage_obj)
     root = ete3.Tree()
     root.dist = 0
     root.name = "root"
@@ -44,18 +51,39 @@ def linkage_to_ete(linkage_obj):
                 item2node[node.get_id()].add_child(ch)
                 item2node[ch_node_id] = ch
                 to_visit.append(ch_node)
+
     return root
 
 
-def hierarchical_clustering(dist_mtx, method="ward"):
-    """Perform hierarchical clustering on squared distance matrix."""
+def hierarchical_clustering(dist_mtx: np.ndarray, method: str = "ward"):
+    """
+    Perform hierarchical clustering on a squared distance matrix.
+
+    Parameters
+    ----------
+    dist_mtx
+        Squared distance matrix.
+    method
+        Method to use for hierarchical clustering. See :func:`~scipy.cluster.hierarchy.linkage`.
+
+    Returns
+    -------
+    :class:`~ete3.Tree`
+        Tree representation of the hierarchical clustering.
+    """
     assert dist_mtx.shape[0] == dist_mtx.shape[1]
+
     is_symmetric = issymmetric(dist_mtx)
     has_zero_diag = (dist_mtx.diagonal() == 0).all()
     if not (is_symmetric and has_zero_diag):
-        warnings.warn("Distance matrix may be invalid.")
+        warnings.warn(
+            "`dist_mtx` is not symmetric and has a non-zero diagonal. "
+            "The matrix will be symmetrized and the diagonal will be set to zero.",
+            stacklevel=2,
+        )
         dist_mtx = dist_mtx - np.diag(dist_mtx.diagonal())
         dist_mtx = (dist_mtx + dist_mtx.T) / 2.0
+
     red_mtx = squareform(dist_mtx)
     z = linkage(red_mtx, method=method)
     return linkage_to_ete(z)
@@ -77,7 +105,7 @@ def compute_rf(
     distance_matrices
         Path to the distance matrices.
     distance_matrices_gt
-
+        Path to the ground truth distance matrices.
     config_in
         Path to the configuration file corresponding to `adata_in`.
     table_out
@@ -123,6 +151,7 @@ def compute_rf(
         model_name=model_name
     )
     dists.to_csv(table_out, index=False)
+    return dists
 
 
 if __name__ == "__main__":

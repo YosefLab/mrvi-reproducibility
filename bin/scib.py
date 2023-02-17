@@ -5,11 +5,11 @@ import pandas as pd
 import scanpy as sc
 import scib_metrics as metrics
 from anndata import AnnData
-
 from utils import load_config, make_parents, wrap_kwargs
 
 
 def categorical_obs(adata: AnnData, key: Optional[str]) -> Optional[np.ndarray]:
+    """Get categorical observation as an array."""
     if key is None:
         return
     return np.array(adata.obs[key].astype("category").cat.codes).ravel()
@@ -51,7 +51,7 @@ def compute_scib(
         isolated_label_score = None
         if labels is not None and batch is not None:
             isolated_label_score = metrics.isolated_labels(X_latent, labels, batch)
-        
+
         silhouette_label_score = None
         if labels is not None:
             silhouette_label_score = metrics.silhouette_label(
@@ -62,7 +62,7 @@ def compute_scib(
         if sample is not None:
             silhouette_sample_score = metrics.silhouette_label(
                 X_latent, sample, rescale=True
-        )
+            )
         # (
         #     nmi_kmeans_label_score,
         #     ari_kmeans_label_score,
@@ -126,7 +126,9 @@ def compute_scib(
         all_metrics.update(latent_metrics)
 
     df = pd.DataFrame.from_dict(
-        all_metrics, orient="index", columns=["latent_key", "metric_name", "metric_value"]
+        all_metrics,
+        orient="index",
+        columns=["latent_key", "metric_name", "metric_value"],
     )
     make_parents(table_out)
     df.to_csv(table_out)

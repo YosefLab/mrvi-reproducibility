@@ -22,7 +22,7 @@ class CompositionBaseline:
     rep
         Representation to compute distances on. One of the following:
 
-        * `"PCA"`: :meth:`~scanpy.pp.pca`
+        * `"PCA"`: :func:`~scanpy.pp.pca`
         * `"SCVI"`: :class:`~scvi.model.SCVI`
     model_kwargs
         Keyword arguments to pass into :class:`~scvi.model.SCVI`. Also contains the
@@ -30,11 +30,11 @@ class CompositionBaseline:
 
         * `"n_dim"`: Number of components to use for PCA
         * `"clustering_on"`: One of `"leiden"` or `"cluster_key"`. If `"leiden"`,
-            clusters are computed using :meth:`~scanpy.tl.leiden`. If `"cluster_key"`,
+            clusters are computed using :func:`~scanpy.tl.leiden`. If `"cluster_key"`,
             clusters correspond to values in `adata.obs[cluster_key]`.
         * `"cluster_key"`: Key in `adata.obs` corresponding to cluster information.
     train_kwargs
-        Keyword arguments to pass into :meth:`~scvi.model.SCVI.train`.
+        Keyword arguments to pass into :func:`~scvi.model.SCVI.train`.
     """
 
     def __init__(
@@ -50,8 +50,8 @@ class CompositionBaseline:
         self.adata = adata.copy()
         self.batch_key = batch_key
         self.sample_key = sample_key
-        self.model_kwargs = model_kwargs if model_kwargs is not None else dict()
-        self.train_kwargs = train_kwargs if train_kwargs is not None else dict()
+        self.model_kwargs = model_kwargs if model_kwargs is not None else {}
+        self.train_kwargs = train_kwargs if train_kwargs is not None else {}
 
         self.rep = rep
         self.rep_key = "X_rep"
@@ -63,12 +63,14 @@ class CompositionBaseline:
         self.subcluster_key = "leiden_subcluster"
 
     def preprocess_data(self):
+        """Preprocess data for PCA or SCVI."""
         if self.rep == "PCA":
             sc.pp.normalize_total(self.adata, target_sum=1e4)
             sc.pp.log1p(self.adata)
-        # TODO: snakemake workflow had hvg selection, should we add it here too? 
+        # TODO: snakemake workflow had hvg selection, should we add it here too?
 
     def fit(self):
+        """Fit PCA or SCVI."""
         self.preprocess_data()
         if self.rep == "PCA":
             sc.pp.pca(self.adata, n_comps=self.n_dim)  # saves "X_pca" in obsm
@@ -80,6 +82,7 @@ class CompositionBaseline:
             self.adata.obsm[self.rep_key] = scvi_model.get_latent_representation()
 
     def get_cell_representation(self):
+        """Get cell representations."""
         return self.adata.obsm[self.rep_key]
 
     def get_local_sample_representation(self):
@@ -91,7 +94,7 @@ class CompositionBaseline:
         Returns
         -------
         Dictionary
-            Keys are unique labels in `adata.obs[self.cluster_key]`. 
+            Keys are unique labels in `adata.obs[self.cluster_key]`.
             Values are :class:`pandas.DataFrame` with rows corresponding to samples
             within that cluster and columns corresponding to the frequency of each
             sample within each subcluster.
@@ -108,7 +111,7 @@ class CompositionBaseline:
                 "If clustering_on is cluster_key, cluster_key must be provided."
             )
 
-        freqs_all = dict()
+        freqs_all = {}
         for unique_cluster in self.adata.obs[self.cluster_key].unique():
             cell_is_selected = self.adata.obs[self.cluster_key] == unique_cluster
             subann = self.adata[cell_is_selected].copy()

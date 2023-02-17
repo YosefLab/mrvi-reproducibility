@@ -24,17 +24,17 @@ for (cell_line in names(sciPlex_cds.list)) {
       Var1 ~ Var2,
       value.var = "Freq"
     )
-  
+
   weighted.mat = product_cluster_mat.list[[cell_line]]
   ntc.counts = product_cluster_mat.list[[cell_line]]["Vehicle_0", ]
-  
+
   cluster.enrichment.df[[cell_line]] = do.call(rbind, lapply(rownames(weighted.mat), function(product_dose) {
     do.call(rbind, lapply(1:ncol(weighted.mat), function(Cluster) {
       test = fisher.test(cbind(c(weighted.mat[product_dose, Cluster], sum(
         weighted.mat[product_dose,-Cluster]
       )),
       c(ntc.counts[Cluster], sum(ntc.counts[-Cluster]))))
-      
+
       data.frame(
         product_dose = product_dose,
         Cluster = Cluster,
@@ -43,22 +43,22 @@ for (cell_line in names(sciPlex_cds.list)) {
       )
     }))
   }))
-  
+
   cluster.enrichment.df[[cell_line]]$q.value = p.adjust(cluster.enrichment.df[[cell_line]]$p.value, "BH")
-  
+
   cluster.enrichment.df[[cell_line]]$log2.odds = with(cluster.enrichment.df[[cell_line]],
                                                       ifelse(odds.ratio == 0,-5, round(log2(odds.ratio), 2)))
-  
+
   cluster.enrichment.df[[cell_line]]$product_name <-
     sapply(cluster.enrichment.df[[cell_line]]$product_dose, function(x) {
       stringr::str_split(x, pattern = "_")[[1]][1]
     })
-  
+
   cluster.enrichment.df[[cell_line]]$dose <-
     sapply(cluster.enrichment.df[[cell_line]]$product_dose, function(x) {
       stringr::str_split(x, pattern = "_")[[1]][2]
     })
-  
+
 }
 
 
@@ -73,9 +73,9 @@ for (cell_line in names(sciPlex_cds.list)) {
                  log2.odds > 2.5) %>%
         distinct(product_dose)
     )$product_dose
-  
+
   print(length(significant_product_dose_combinations.list[[cell_line]]))
-  
+
 }
 
 # Save to CSV
