@@ -9,6 +9,7 @@ from typing import Callable
 import click
 import pandas as pd
 import scanpy as sc
+from anndata import AnnData
 from remote_pdb import RemotePdb
 
 INCH_TO_CM = 1 / 2.54
@@ -18,6 +19,13 @@ def make_parents(*paths) -> None:
     """Make parent directories of a file path if they do not exist."""
     for p in paths:
         pathlib.Path(p).parent.mkdir(parents=True, exist_ok=True)
+
+
+def write_h5ad(adata: AnnData, path: str) -> AnnData:
+    """Write an AnnData object to an HDF5 file."""
+    make_parents(path)
+    adata.write_h5ad(path)
+    return adata
 
 
 def wrap_kwargs(fn: Callable) -> Callable:

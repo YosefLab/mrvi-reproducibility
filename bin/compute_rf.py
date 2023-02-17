@@ -6,8 +6,13 @@ import pandas as pd
 import xarray as xr
 from scipy.cluster.hierarchy import linkage, to_tree
 from scipy.spatial.distance import squareform
-from utils import (determine_if_file_empty, load_config, make_parents,
-                   wrap_kwargs)
+
+from utils import (
+    determine_if_file_empty, 
+    load_config, 
+    make_parents,
+    wrap_kwargs,
+)
 
 
 def linkage_to_ete(linkage_obj):
@@ -50,21 +55,24 @@ def hierarchical_clustering(dist_mtx, method="ward"):
 @wrap_kwargs
 def compute_rf(
     *,
-    distance_matrices,
-    distance_matrices_gt,
-    config_in,
-    table_out,
+    distance_matrices: str,
+    distance_matrices_gt: str,
+    config_in: str,
+    table_out: str,
 ):
-    """Main fn for computing RF distance.
+    """
+    Computes the Robinson-Foulds distance between two hierarchical clusterings.
 
     Parameters
     ----------
-    adata_in :
-        path to anndata file containing cell-type specific distance matrices
-    config_in :
-        path to config file
-    table_out :
-        desired output table file
+    distance_matrices
+        Path to the distance matrices.
+    distance_matrices_gt
+
+    config_in
+        Path to the configuration file corresponding to `adata_in`.
+    table_out
+        Path to save the output table.
     """
     basename = os.path.basename(distance_matrices)
     model_name = basename.split(".")[1]
