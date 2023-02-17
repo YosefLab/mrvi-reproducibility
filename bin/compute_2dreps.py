@@ -1,10 +1,8 @@
 import pymde
 import scanpy as sc
 from anndata import AnnData
-from tsnecuda import TSNE
 
 from utils import write_h5ad, wrap_kwargs
-
 
 mde_kwargs = dict(
     embedding_dim=2,
@@ -53,7 +51,6 @@ def compute_2dreps(
         adata.write_h5ad(adata_out)
 
     latent_pca_keys = []
-    latent_tsne_keys = []
     latent_mde_keys = []
     for latent_key in latent_keys:
         latent = adata.obsm[latent_key]
@@ -63,18 +60,12 @@ def compute_2dreps(
         adata.obsm[latent_pca_key] = latent_pca
         latent_pca_keys.append(latent_pca_key)
 
-        latent_tsne = TSNE(perplexity=30).fit_transform(latent)
-        latent_tsne_key = f"{latent_key}_tsne"
-        adata.obsm[latent_tsne_key] = latent_tsne
-        latent_tsne_keys.append(latent_tsne_key)
-
         latent_mde = pymde.preserve_neighbors(latent, **mde_kwargs).embed().cpu().numpy()
         latent_mde_key = f"{latent_key}_mde"
         adata.obsm[latent_mde_key] = latent_mde
         latent_mde_keys.append(latent_mde_key)
 
     adata.uns["latent_pca_keys"] = latent_pca_keys
-    adata.uns["latent_tsne_keys"] = latent_tsne_keys
     adata.uns["latent_mde_keys"] = latent_mde_keys
 
     return write_h5ad(adata, adata_out)
