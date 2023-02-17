@@ -1,0 +1,15 @@
+{
+    "batch_key": "pool_number",
+    "labels_key": "cell_type",
+    "sample_key": "donor_id_harmonized",
+    "mrvi_train_kwargs": {
+        "max_epochs": 300
+    },
+    "scviv2_train_kwargs": {
+        "max_epochs": 300
+    },
+    "composition_scvi_train_kwargs": {
+        "max_epochs": 300
+    },
+    "clustering_method": "ward"
+}
