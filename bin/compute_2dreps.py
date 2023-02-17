@@ -1,7 +1,7 @@
 import pymde
 import scanpy as sc
 from anndata import AnnData
-from utils import write_h5ad, wrap_kwargs
+from utils import wrap_kwargs, write_h5ad
 
 mde_kwargs = {
     "embedding_dim": 2,
@@ -59,7 +59,9 @@ def compute_2dreps(
         adata.obsm[latent_pca_key] = latent_pca
         latent_pca_keys.append(latent_pca_key)
 
-        latent_mde = pymde.preserve_neighbors(latent, **mde_kwargs).embed().cpu().numpy()
+        latent_mde = (
+            pymde.preserve_neighbors(latent, **mde_kwargs).embed().cpu().numpy()
+        )
         latent_mde_key = f"{latent_key}_mde"
         adata.obsm[latent_mde_key] = latent_mde
         latent_mde_keys.append(latent_mde_key)
