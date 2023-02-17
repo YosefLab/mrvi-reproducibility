@@ -14,7 +14,6 @@ dependencies:
     - dask=2022.12.1
     - netcdf4=1.6.2
     - pymde=0.1.18
-    - tsnecuda
     - pip
     - pip:
           - click
