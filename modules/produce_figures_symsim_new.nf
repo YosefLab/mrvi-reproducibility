@@ -12,5 +12,5 @@ process produce_figures_symsim_new {
     """
 
     output:
-    path "${params.outputs.figures}/*.svg"
+    path "${params.outputs.figures}/*"
 }
