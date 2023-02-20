@@ -46,9 +46,7 @@ for _, row in plate_meta.iterrows():
         & (adata.obs["replicate"] == replicate)
     )
     plate_oligo[match_idxs] = plate
-print(plate_oligo)
 adata.obs["plate_oligo"] = plate_oligo
-print(adata.obs["plate_oligo"].value_counts())
 
 
 # %%
@@ -65,6 +63,7 @@ cell_cycle_genes = [x for x in cell_cycle_genes if x in adata.var_names]
 cell_lines = list(adata.obs["cell_type"].cat.categories)
 cell_lines
 # %%
+# Requires running sciplex_get_sginificant_product_dose.R first
 all_sig_prods = set()
 per_cell_line_prods = {}
 for cl in cell_lines:
@@ -81,9 +80,6 @@ print(len(all_sig_prods))
 # %%
 # filter to all significant products across all cell lines
 filtered_adata = adata[adata.obs["product_name"].isin(all_sig_prods)].copy()
-
-# Filter out lowest doses (for mem reasons)
-filtered_adata = filtered_adata[filtered_adata.obs["dose"] >= 1000]
 
 # Add back control
 filtered_adata = filtered_adata.concatenate(

@@ -2,9 +2,17 @@ import json
 import os
 import pathlib
 import pickle
+import gc
 from inspect import signature
 from pathlib import Path
+import warnings
 from typing import Callable
+
+import ete3
+import numpy as np
+from scipy.cluster.hierarchy import linkage, to_tree
+from scipy.linalg import issymmetric
+from scipy.spatial.distance import squareform
 
 import click
 import pandas as pd
@@ -60,7 +68,9 @@ def load_results(results_paths):
         List of paths to results files.
     """
 
-    def append_representations(adata, uns_latent_key, representation_name):
+    def append_representations(
+        adata, uns_latent_key, representation_name, dataset_name
+    ):
         """
         Retrieve latent representations from some adata.
 
@@ -72,6 +82,8 @@ def load_results(results_paths):
             Key in adata.uns containing the list of cell representations to extract.
         representation_name :
             Name of the representation type.
+        dataset_name :
+            Name of the dataset.
         """
         if uns_latent_key in adata.uns.keys():
             obs = pd.DataFrame()
@@ -80,18 +92,20 @@ def load_results(results_paths):
                 obs_.loc[:, ["x", "y"]] = adata.obsm[latent_key]
                 obs_.loc[:, "representation_name"] = latent_key
                 obs_.loc[:, "representation_type"] = representation_name
+                obs_.loc[:, "dataset_name"] = dataset_name
                 obs = obs.append(obs_)
             return obs
         return None
 
     all_results = {
-        "vendi_metrics": pd.DataFrame(),
-        "scib_metrics": pd.DataFrame(),
-        "rf_metrics": pd.DataFrame(),
-        "losses_metrics": pd.DataFrame(),
-        "umaps_metrics": pd.DataFrame(),
-        "distances_metrics": pd.DataFrame(),
-        "representations": pd.DataFrame(),
+        "vendi_metrics": [],
+        "scib_metrics": [],
+        "rf_metrics": [],
+        "losses_metrics": [],
+        "umaps_metrics": [],
+        "distances_metrics": [],
+        "representations": [],
+        "sciplex_metrics": [],
     }
     for file in results_paths:
         if determine_if_file_empty(file):
@@ -99,34 +113,42 @@ def load_results(results_paths):
         if file.endswith(".nc"):
             continue
         basename = os.path.basename(file)
+        dataset_name = basename.split(".")[0]
         model_name = basename.split(".")[1]
         if file.endswith("csv"):
             df = pd.read_csv(file)
+            df.loc[:, "dataset_name"] = dataset_name
             df.loc[:, "model_name"] = model_name
             if file.endswith(".distance_matrices.vendi.csv"):
-                all_results["vendi_metrics"] = all_results["vendi_metrics"].append(df)
+                all_results["vendi_metrics"].append(df)
             elif file.endswith(".scib.csv"):
-                all_results["scib_metrics"] = all_results["scib_metrics"].append(df)
+                all_results["scib_metrics"].append(df)
             elif file.endswith(".distance_matrices.rf.csv"):
-                all_results["rf_metrics"] = all_results["rf_metrics"].append(df)
+                all_results["rf_metrics"].append(df)
             elif file.endswith("losses.csv"):
-                all_results["losses_metrics"] = all_results["losses_metrics"].append(df)
+                all_results["losses_metrics"].append(df)
             elif file.endswith("umap.csv"):
-                all_results["umaps_metrics"] = all_results["umaps_metrics"].append(df)
+                all_results["umaps_metrics"].append(df)
             elif file.endswith("distances.csv"):
-                all_results["distances_metrics"] = all_results[
-                    "distances_metrics"
-                ].append(df)
+                all_results["distances_metrics"].append(df)
+            elif file.endswith("sciplex_metrics.csv"):
+                all_results["sciplex_metrics"].append(df)
+            pass
         elif file.endswith(".h5ad"):
-            adata = sc.read_h5ad(file)
-            mde_reps = append_representations(adata, "latent_mde_keys", "MDE")
-            pca_reps = append_representations(adata, "latent_pca_keys", "PCA")
-            umaps_reps = append_representations(adata, "latent_umap_keys", "UMAP")
-            for rep in [mde_reps, pca_reps, umaps_reps]:
-                if rep is not None:
-                    all_results["representations"] = all_results[
-                        "representations"
-                    ].append(rep)
+            adata = sc.read_h5ad(file, backed="r")
+            for rep_type in ["MDE", "PCA", "UMAP"]:
+                uns_key = f"latent_{rep_type.lower()}_keys"
+                if uns_key in adata.uns.keys():
+                    all_results["representations"].append(
+                        append_representations(adata, uns_key, rep_type, dataset_name)
+                    )
+            del adata
+            gc.collect()  # Adata uns creates weak reference that must be manually gc.
+    for key in all_results.keys():
+        if len(all_results[key]) > 0:
+            all_results[key] = pd.concat(all_results[key])
+        else:
+            all_results[key] = pd.DataFrame()
     return all_results
 
 
@@ -161,3 +183,46 @@ def save_figures(fig, output_dir, filename, save_svg=True):
     fig.save(basename + ".png", dpi=300)
     if save_svg:
         fig.save(basename + ".svg")
+
+# Robinson-Foulds Utility Functions
+def linkage_to_ete(linkage_obj):
+    """Converts to ete3 tree representation."""
+    R = to_tree(linkage_obj)
+    root = ete3.Tree()
+    root.dist = 0
+    root.name = "root"
+    item2node = {R.get_id(): root}
+    to_visit = [R]
+
+    while to_visit:
+        node = to_visit.pop()
+        cl_dist = node.dist / 2.0
+
+        for ch_node in [node.get_left(), node.get_right()]:
+            if ch_node:
+                ch_node_id = ch_node.get_id()
+                ch_node_name = (
+                    f"t{int(ch_node_id) + 1}" if ch_node.is_leaf() else str(ch_node_id)
+                )
+                ch = ete3.Tree()
+                ch.dist = cl_dist
+                ch.name = ch_node_name
+
+                item2node[node.get_id()].add_child(ch)
+                item2node[ch_node_id] = ch
+                to_visit.append(ch_node)
+    return root
+
+
+def hierarchical_clustering(dist_mtx, method="ward"):
+    """Perform hierarchical clustering on squared distance matrix."""
+    assert dist_mtx.shape[0] == dist_mtx.shape[1]
+    is_symmetric = issymmetric(dist_mtx)
+    has_zero_diag = (dist_mtx.diagonal() == 0).all()
+    if not (is_symmetric and has_zero_diag):
+        warnings.warn("Distance matrix may be invalid.")
+        dist_mtx = dist_mtx - np.diag(dist_mtx.diagonal())
+        dist_mtx = (dist_mtx + dist_mtx.T) / 2.0
+    red_mtx = squareform(dist_mtx)
+    z = linkage(red_mtx, method=method)
+    return linkage_to_ete(z)

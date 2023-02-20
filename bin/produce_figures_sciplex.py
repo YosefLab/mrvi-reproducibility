@@ -1,22 +1,51 @@
 # %%
+import argparse
 import os
+import glob
 
+import matplotlib.pyplot as plt
+import pandas as pd
 import numpy as np
 import xarray as xr
 import seaborn as sns
 import scanpy as sc
-import scvi
-import scvi_v2
-import matplotlib.pyplot as plt
+import plotnine as p9
 from matplotlib.patches import Patch
-from scipy.stats import norm
+from utils import load_results, INCH_TO_CM
+
+# Change to False if you want to run this script directly
+RUN_WITH_PARSER = True
+plt.rcParams["svg.fonttype"] = "none"
 
 # %%
-results_path = "../results/simple_pipeline/"
-figures_path = os.path.join(results_path, "figures")
-cell_lines = ["A549", "K562", "MCF7"]
-if not os.path.exists(figures_path):
-    os.mkdir(figures_path)
+def parser():
+    """Parse paths to results files (used by nextflow)"""
+    parser = argparse.ArgumentParser(description="Analyze results of symsim_new")
+    parser.add_argument("--results_paths", "--list", nargs="+")
+    parser.add_argument("--output_dir", type=str)
+    return parser.parse_args()
+
+
+# %%
+if RUN_WITH_PARSER:
+    args = parser()
+    results_paths = args.results_paths
+    output_dir = args.output_dir
+    os.makedirs(output_dir, exist_ok=True)
+
+    pd.Series(results_paths).to_csv(
+        os.path.join(output_dir, "path_to_intermediary_files.txt"), index=False
+    )
+else:
+    output_dir = os.path.join("../results/sciplex_pipeline/figures")
+    results_paths = set(glob.glob("../results/sciplex_pipeline/*/*.csv"))
+# %%
+def save_figures(filename, dataset_name):
+    dataset_dir = os.path.join(output_dir, dataset_name)
+    if not os.path.exists(dataset_dir):
+        os.makedirs(dataset_dir, exist_ok=True)
+    plt.savefig(os.path.join(dataset_dir, filename + ".svg"))
+
 
 # %%
 pathway_color_map = {
@@ -40,26 +69,57 @@ pathway_color_map = {
 }
 
 # %%
+# Cross method comparison plots
+all_results = load_results(results_paths)
+sciplex_metrics_df = all_results["sciplex_metrics"]
+
+for dataset_name in sciplex_metrics_df["dataset_name"].unique():
+    plot_df = sciplex_metrics_df[
+        (sciplex_metrics_df["dataset_name"] == dataset_name)
+        & (
+            sciplex_metrics_df["distance_type"] == "distance_matrices"
+        )  # Exclude normalized matrices
+    ]
+    for metric in sciplex_metrics_df.columns:
+        if metric in ["model_name", "dataset_name", "phase", "distance_type"]:
+            continue
+        if plot_df[metric].isna().any():
+            continue
+        fig = (
+            p9.ggplot(
+                plot_df,
+                p9.aes(x="model_name", y=metric, fill="model_name", color="phase"),
+            )
+            + p9.geom_boxplot()
+            + p9.theme_classic()
+            + p9.coord_flip()
+            + p9.theme(
+                legend_position="top",
+                figure_size=(4 * INCH_TO_CM, 4 * INCH_TO_CM),
+            )
+            + p9.labs(x="model_name", y=metric)
+        )
+        dataset_dir = os.path.join(output_dir, dataset_name)
+        if not os.path.exists(dataset_dir):
+            os.makedirs(dataset_dir, exist_ok=True)
+        fig.save(os.path.join(dataset_dir, f"{metric}.svg"))
+
+# %%
+cell_lines = ["A549", "MCF7", "K562"]
 method_names = ["scviv2", "scviv2_nonlinear"]
 
-# Same figures for all phases
+# Per dataset plots
 for method_name in method_names:
     for cl in cell_lines:
-        normalized_dists_path = os.path.join(
-            results_path,
-            f"distance_matrices/sciplex_{cl}_significant_all_phases.{method_name}.normalized_distance_matrices.nc",
+        dataset_name = f"sciplex_{cl}_significant_all_phases"
+        normalized_dists_path = (
+            f"{dataset_name}.{method_name}.normalized_distance_matrices.nc"
         )
         normalized_dists = xr.open_dataset(normalized_dists_path)
-
-        dists_path = os.path.join(
-            results_path,
-            f"distance_matrices/sciplex_{cl}_significant_all_phases.{method_name}.distance_matrices.nc",
-        )
+        dists_path = f"{dataset_name}.{method_name}.distance_matrices.nc"
         dists = xr.open_dataset(dists_path)
 
-        adata_path = os.path.join(
-            results_path, f"data/sciplex_{cl}_significant_all_phases.{method_name}.h5ad"
-        )
+        adata_path = f"{dataset_name}.{method_name}.final.h5ad"
         adata = sc.read(adata_path)
 
         sample_to_pathway = (
@@ -105,18 +165,13 @@ for method_name in method_names:
                 handles,
                 pathway_color_map,
                 title="Product Name",
-                bbox_to_anchor=(1.3, 0.9),
+                bbox_to_anchor=(1, 0.9),
                 bbox_transform=plt.gcf().transFigure,
                 loc="upper right",
             )
             plt.gca().add_artist(product_legend)
-            plt.savefig(
-                os.path.join(
-                    figures_path,
-                    f"sciplex_{cl}_significant_phase_{phase}.{method_name}.distance_matrices_heatmap.png",
-                ),
-                bbox_inches="tight",
-                dpi=300,
+            save_figures(
+                f"{phase}.{method_name}.distance_matrices_heatmap", dataset_name
             )
             plt.clf()
 
@@ -154,18 +209,14 @@ for method_name in method_names:
                 handles,
                 pathway_color_map,
                 title="Product Name",
-                bbox_to_anchor=(1.3, 0.9),
+                bbox_to_anchor=(1, 0.9),
                 bbox_transform=plt.gcf().transFigure,
                 loc="upper right",
             )
             plt.gca().add_artist(product_legend)
-            plt.savefig(
-                os.path.join(
-                    figures_path,
-                    f"sciplex_{cl}_significant_phase_{phase}.{method_name}.normalized_distance_matrices_heatmap.png",
-                ),
-                bbox_inches="tight",
-                dpi=300,
+            save_figures(
+                f"{phase}.{method_name}.normalized_distance_matrices_heatmap",
+                dataset_name,
             )
             plt.clf()
 
@@ -199,103 +250,13 @@ for method_name in method_names:
                 handles,
                 pathway_color_map,
                 title="Product Name",
-                bbox_to_anchor=(1.3, 0.9),
+                bbox_to_anchor=(1, 0.9),
                 bbox_transform=plt.gcf().transFigure,
                 loc="upper right",
             )
             plt.gca().add_artist(product_legend)
-            plt.savefig(
-                os.path.join(
-                    figures_path,
-                    f"sciplex_{cl}_significant_phase_{phase}.{method_name}.clipped_normalized_distance_matrices_heatmap.png",
-                ),
-                bbox_inches="tight",
-                dpi=300,
+            save_figures(
+                f"{phase}.{method_name}.clipped_normalized_distance_matrices_heatmap",
+                dataset_name,
             )
             plt.clf()
-
-        # Histograms showing before and after normalization dists
-        model_dir_path = os.path.join(
-            results_path, f"models/sciplex_{cl}_significant_all_phases.{method_name}"
-        )
-
-        model_input_adata = sc.read(
-            os.path.join(
-                results_path,
-                f"data/sciplex_{cl}_significant_all_phases.preprocessed.h5ad",
-            )
-        )
-        model = scvi_v2.MrVI.load(model_dir_path, adata=model_input_adata)
-        baseline_means, baseline_vars = model._compute_local_baseline_dists(None)
-        avg_baseline_mean = np.mean(baseline_means)
-        avg_baseline_var = np.mean(baseline_vars)
-
-        vmax = max(
-            np.percentile(dists.phase.data, 95),
-            np.percentile(normalized_dists.phase.data, 95),
-        )
-        binwidth = 0.1
-        bins = np.arange(0, vmax + binwidth, binwidth)
-        dists_hist = plt.hist(
-            dists.phase.data.flatten(), bins=bins, alpha=0.5, label="distances"
-        )
-        plt.hist(
-            normalized_dists.phase.data.flatten(),
-            bins=bins,
-            alpha=0.5,
-            label="normalized distances",
-        )
-        x = np.linspace(-0.5, vmax + 0.5, 100)
-        p = np.max(dists_hist[0]) * norm.pdf(
-            x, avg_baseline_mean, avg_baseline_var**0.5
-        )
-
-        plt.plot(x, p, "k", linewidth=2)
-
-        plt.xlim(-0.5, vmax + 0.5)
-        plt.legend()
-        plt.savefig(
-            os.path.join(
-                figures_path,
-                f"sciplex_{cl}_significant_all_phases.{method_name}.distance_matrix_hist_compare.png",
-            ),
-            bbox_inches="tight",
-            dpi=300,
-        )
-        plt.clf()
-
-        # u and z UMAPs for each cell line
-        adata.obsm["mrvi_u_mde"] = scvi.model.utils.mde(
-            adata.obsm["X_mrvi_u"], repulsive_fraction=1.3
-        )
-        adata.obsm["mrvi_z_mde"] = scvi.model.utils.mde(
-            adata.obsm["X_mrvi_z"], repulsive_fraction=1.3
-        )
-
-        sc.pl.embedding(
-            adata, "mrvi_u_mde", color=["pathway", "phase"], ncols=1, show=False
-        )
-        plt.savefig(
-            os.path.join(
-                figures_path,
-                f"sciplex_{cl}_significant_all_phases.{method_name}.u_latent_mde.png",
-            ),
-            bbox_inches="tight",
-            dpi=300,
-        )
-        plt.clf()
-
-        sc.pl.embedding(
-            adata, "mrvi_z_mde", color=["pathway", "phase"], ncols=1, show=False
-        )
-        plt.savefig(
-            os.path.join(
-                figures_path,
-                f"sciplex_{cl}_significant_all_phases.{method_name}.z_latent_mde.png",
-            ),
-            bbox_inches="tight",
-            dpi=300,
-        )
-        plt.clf()
-
-# %%
