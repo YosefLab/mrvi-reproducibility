@@ -1,3 +1,10 @@
+"""
+Script for processing signatures from L1000 bulk data into a reference similarity matrix between chemical compounds.
+
+Takes signatures for chemical perturbations found in the Sciplex dataset and produces a similarity matrix
+using the Jaccard similarity between DEGs of the perturbations. This similarity matrix can then be used to
+assess how well a model can recapitulate the similarity between perturbations.
+"""
 # %%
 import scanpy as sc
 import pandas as pd
