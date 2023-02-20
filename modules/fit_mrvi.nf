@@ -1,6 +1,4 @@
 process fit_mrvi {
-    maxForks 1
-
     input:
     path adata_in
 

@@ -1,6 +1,4 @@
 process fit_and_get_latent_composition_pca {
-    maxForks 1
-
     input:
     path adata_in
 
