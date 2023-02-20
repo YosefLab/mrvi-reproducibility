@@ -4,12 +4,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import xarray as xr
+from tree_utils import hierarchical_clustering
 from utils import (
     determine_if_file_empty,
     load_config,
     make_parents,
     wrap_kwargs,
-    hierarchical_clustering,
 )
 
 
