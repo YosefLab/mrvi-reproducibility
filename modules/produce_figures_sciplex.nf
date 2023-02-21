@@ -12,5 +12,5 @@ process produce_figures_sciplex {
     """
 
     output:
-    path "${params.outputs.figures}/*.svg"
+    path "${params.outputs.figures}/**/*.svg"
 }
