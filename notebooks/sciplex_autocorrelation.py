@@ -1,22 +1,19 @@
+"""
+Exploratory notebook computing the autocorrelation of distances to Vehicle in the sciplex dataset.
+"""
 # %%
-import argparse
 import os
-import glob
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-import xarray as xr
-import seaborn as sns
 import scanpy as sc
-import plotnine as p9
 import faiss
 from tqdm import tqdm
 
 import scvi_v2
 import scvi
 import scanpy as sc
-import scipy
 
 # %%
 method_name = "scviv2"
@@ -95,10 +92,15 @@ def compute_autocorrelation(features_df, nn_indices, nn_dists, variant="binary")
         x = features_df.values[:, i : i + 1]
         autocorrelation = (W * (x @ x.T)).sum()
         autocorrelations[i] = autocorrelation
-    return pd.Series(autocorrelations, index=features_df.columns, name="autocorrelation")
+    return pd.Series(
+        autocorrelations, index=features_df.columns, name="autocorrelation"
+    )
+
 
 # %%
-autocorr_df = compute_autocorrelation(dists_from_vehicle_df, nn_indices, nn_dists, variant="binary")
+autocorr_df = compute_autocorrelation(
+    dists_from_vehicle_df, nn_indices, nn_dists, variant="binary"
+)
 # %%
 # Get top two and bottom two autocorrelated products
 top_k = autocorr_df.nlargest(5)
@@ -112,7 +114,7 @@ U_mde = scvi.model.utils.mde(latent_u)
 
 # %%
 prods = top_k.index.tolist() + bot_k.index.tolist()
-autocorr_vals  = top_k.values.tolist() + bot_k.values.tolist()
+autocorr_vals = top_k.values.tolist() + bot_k.values.tolist()
 
 adata.obsm["U_mde"] = U_mde
 
@@ -120,6 +122,8 @@ for prod, autocorr in zip(prods, autocorr_vals):
     adata.obs[f"{prod}_dist_to_vehicle"] = dists_from_vehicle_df[prod]
     sc.pl.embedding(adata, "U_mde", color=f"{prod}_dist_to_vehicle", show=False)
     plt.title(f"{prod} Distance to Vehicle, Autocorrelation: {autocorr}")
-    plt.savefig(os.path.join(base_dir_path, f"notebooks/figures/{prod}_dist_to_vehicle.png"))
+    plt.savefig(
+        os.path.join(base_dir_path, f"notebooks/figures/{prod}_dist_to_vehicle.png")
+    )
     plt.clf()
 # %%
