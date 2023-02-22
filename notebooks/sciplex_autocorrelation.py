@@ -101,24 +101,25 @@ def compute_autocorrelation(features_df, nn_indices, nn_dists, variant="binary")
 autocorr_df = compute_autocorrelation(dists_from_vehicle_df, nn_indices, nn_dists, variant="binary")
 # %%
 # Get top two and bottom two autocorrelated products
-top_2 = autocorr_df.nlargest(2)
-bot_2 = autocorr_df.nsmallest(2)
-print(top_2)
-print(bot_2)
+top_k = autocorr_df.nlargest(5)
+bot_k = autocorr_df.nsmallest(5)
+print(top_k)
+print(bot_k)
 
 # %%
 # Color MDE by distance to vehicle for these 4 products
 U_mde = scvi.model.utils.mde(latent_u)
 
 # %%
-prods = top_2.index.tolist() + bot_2.index.tolist()
+prods = top_k.index.tolist() + bot_k.index.tolist()
+autocorr_vals  = top_k.values.tolist() + bot_k.values.tolist()
 
 adata.obsm["U_mde"] = U_mde
 
-for prod in prods:
+for prod, autocorr in zip(prods, autocorr_vals):
     adata.obs[f"{prod}_dist_to_vehicle"] = dists_from_vehicle_df[prod]
-    sc.pl.embedding(adata, "U_mde", color=f"{prod}_dist_to_vehicle")
-    plt.title(f"{prod} Distance to Vehicle")
-    plt.savefig(os.path.join(base_dir_path, "notebooks/figures/{prod}_dist_to_vehicle.png"))
+    sc.pl.embedding(adata, "U_mde", color=f"{prod}_dist_to_vehicle", show=False)
+    plt.title(f"{prod} Distance to Vehicle, Autocorrelation: {autocorr}")
+    plt.savefig(os.path.join(base_dir_path, f"notebooks/figures/{prod}_dist_to_vehicle.png"))
     plt.clf()
 # %%
