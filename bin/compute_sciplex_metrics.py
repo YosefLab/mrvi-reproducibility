@@ -3,6 +3,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import scipy
 import xarray as xr
 from tree_utils import hierarchical_clustering
 from utils import (
@@ -107,8 +108,8 @@ def compute_sciplex_metrics(
             all_doses.add(dose)
 
     # Compute product dose metrics
-    in_product_all_dist_ratio = []
-    in_product_top_2_dist_ratio = []
+    in_product_all_dist_avg_percentile = []
+    in_product_top_2_dist_avg_percentile = []
     top_two_doses = ["1000", "10000"]
     for phase in phases:
         phase_dists = inferred_mats.sel(phase_name=phase)
@@ -138,15 +139,25 @@ def compute_sciplex_metrics(
 
                     if dosex in top_two_doses and dosey in top_two_doses:
                         in_prod_top_two_mask[dosex_idx[0], dosey_idx[0]] = True
-        in_prod_dist_avg = phase_dists_arr[in_prod_mask].mean()
-        in_prod_top_two_dist_avg = phase_dists_arr[in_prod_top_two_mask].mean()
-        ratio = in_prod_dist_avg / off_diag_dist_avg
-        in_product_all_dist_ratio.append(ratio)
-
-        top_two_ratio = in_prod_top_two_dist_avg / off_diag_dist_avg
-        in_product_top_2_dist_ratio.append(top_two_ratio)
-    metrics_dict["in_product_all_dist_ratio"] = in_product_all_dist_ratio
-    metrics_dict["in_product_top_2_dist_ratio"] = in_product_top_2_dist_ratio
+        # Get
+        adjusted_ranks = (
+            scipy.stats.rankdata(phase_dists_arr).reshape(phase_dists_arr.shape)
+            - phase_dists_arr.shape[0]
+        )
+        in_prod_all_dist_avg_percentile = (
+            adjusted_ranks[in_prod_mask].mean() / non_diag_mask.sum()
+        )
+        in_prod_top_two_dist_avg_percentile = (
+            adjusted_ranks[in_prod_top_two_mask].mean() / non_diag_mask.sum()
+        )
+        in_product_all_dist_avg_percentile.append(in_prod_all_dist_avg_percentile)
+        in_product_top_2_dist_avg_percentile.append(in_prod_top_two_dist_avg_percentile)
+    metrics_dict[
+        "in_product_all_dist_avg_percentile"
+    ] = in_product_all_dist_avg_percentile
+    metrics_dict[
+        "in_product_top_2_dist_avg_percentile"
+    ] = in_product_top_2_dist_avg_percentile
 
     metrics = pd.DataFrame(
         {"distance_type": distance_type, "phase": phases, **metrics_dict}
