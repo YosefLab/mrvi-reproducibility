@@ -40,9 +40,10 @@ def get_latent_scviv2(
     model = scvi_v2.MrVI.load(model_in, adata=adata)
 
     _adata = AnnData(obs=adata.obs, uns=adata.uns)
-    _adata.uns["model_name"] = "scVIV2"
-    u_latent_key = "X_mrvi_u"
-    z_latent_key = "X_mrvi_z"
+    model_name = model_in.split(".")[-1]
+    _adata.uns["model_name"] = model_name
+    u_latent_key = f"X_{model_name}_u"
+    z_latent_key = f"X_{model_name}_z"
     _adata.obsm[u_latent_key] = model.get_latent_representation(adata, give_z=False)
     _adata.obsm[z_latent_key] = model.get_latent_representation(adata, give_z=True)
     _adata.uns["latent_keys"] = [u_latent_key, z_latent_key]
