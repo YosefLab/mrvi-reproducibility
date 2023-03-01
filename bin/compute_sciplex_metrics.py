@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import scipy
+from sklearn.metrics import silhouette_samples
 import xarray as xr
 from utils import (
     determine_if_file_empty,
@@ -62,7 +63,7 @@ def compute_sciplex_metrics(
             if determine_if_file_empty(gt_clusters_in_path):
                 break
 
-            gt_cluster_labels_df = pd.read_csv(gt_clusters_in_path, index_col=0),
+            gt_cluster_labels_df = (pd.read_csv(gt_clusters_in_path, index_col=0),)
             # Assign them all at 10000 nM dose
             new_sample_idx = [prod + "_10000" for prod in list(gt_mat.index)]
             gt_cluster_labels_df.index = new_sample_idx
@@ -75,9 +76,21 @@ def compute_sciplex_metrics(
         gt_silhouette_scores = []
 
         for phase in phases:
-            pass
+            dist_inferred = (
+                inferred_mats.loc[phase]
+                .sel(
+                    sample_x=gt_cluster_labels_df.index,
+                    sample_y=gt_cluster_labels_df.index,
+                )
+                .values
+            )
+            asw = silhouette_samples(
+                dist_inferred.values, gt_cluster_labels_df.values, metric="precomputed"
+            )
+            asw = (asw + 1) / 2
+            gt_silhouette_scores.append(asw)
 
-        metrics_dict["gt_silhouette_score"] = None
+        metrics_dict["gt_silhouette_score"] = gt_silhouette_scores
 
     # Compute product dose metrics
     all_products = set()
@@ -98,7 +111,6 @@ def compute_sciplex_metrics(
         non_diag_mask = (
             np.ones(shape=phase_dists_arr.shape) - np.identity(phase_dists_arr.shape[0])
         ).astype(bool)
-        off_diag_dist_avg = phase_dists_arr[non_diag_mask].mean()
         in_prod_mask = np.zeros(shape=phase_dists_arr.shape, dtype=bool)
         in_prod_top_two_mask = np.zeros(shape=phase_dists_arr.shape, dtype=bool)
         for product_name in all_products:
