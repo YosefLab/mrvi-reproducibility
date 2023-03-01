@@ -33,6 +33,10 @@ model_path = os.path.join(
 )
 
 # %%
+
+sns.clustermap()
+
+# %%
 adata = sc.read_h5ad(adata_path)
 model = scvi_v2.MrVI.load(model_path, adata=adata)
 

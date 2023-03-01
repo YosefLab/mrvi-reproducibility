@@ -1,7 +1,7 @@
 process compute_sciplex_metrics {
     input:
     path distance_matrices_in
-    path gt_matrices_in
+    path gt_clusters_in
 
     script:
     adata_name = distance_matrices_in.getSimpleName()
@@ -11,7 +11,7 @@ process compute_sciplex_metrics {
     """
     python3 ${params.bin.compute_sciplex_metrics} \\
         --distance_matrices_in ${distance_matrices_in} \\
-        --gt_matrices_in ${gt_matrices_in.join(',')} \\
+        --gt_clusters_in ${gt_clusters_in.join(',')} \\
         --config_in ${config_in} \\
         --table_out ${table_out}
     """

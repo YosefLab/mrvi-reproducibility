@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import scipy
 import xarray as xr
-from tree_utils import hierarchical_clustering
 from utils import (
     determine_if_file_empty,
     load_config,
@@ -18,7 +17,7 @@ from utils import (
 def compute_sciplex_metrics(
     *,
     distance_matrices_in,
-    gt_matrices_in,
+    gt_clusters_in,
     config_in,
     table_out,
 ):
@@ -28,8 +27,8 @@ def compute_sciplex_metrics(
     ----------
     distance_matrices_in:
         path to inferred distance matrices
-    gt_matrices_in:
-        paths to approximate ground truth similarity matrices retrieved from bulk data
+    gt_clusters_in:
+        paths to approximate ground truth clusters retrieved from bulk data
     config_in :
         path to config file
     table_out :
@@ -51,53 +50,36 @@ def compute_sciplex_metrics(
     phases = inferred_mats[dim_name].data
 
     # Linkage method to use for hierarchical clustering
-    clustering_method = config["clustering_method"]
     make_parents(table_out)
 
     metrics_dict = {}
 
-    gt_mat = None
-    gt_matrices_in = gt_matrices_in.split(",")
-    for gt_matrix_in in gt_matrices_in:
-        gt_cell_line = os.path.basename(gt_matrix_in).split("_")[0]
+    gt_cluster_labels_df = None
+    gt_clusters_in = gt_clusters_in.split(",")
+    for gt_clusters_in_path in gt_clusters_in:
+        gt_cell_line = os.path.basename(gt_clusters_in_path).split("_")[0]
         if gt_cell_line == cell_line:
-            if determine_if_file_empty(gt_matrix_in):
+            if determine_if_file_empty(gt_clusters_in_path):
                 break
 
-            gt_mat = xr.DataArray(
-                data=pd.read_csv(gt_matrix_in, index_col=0),
-                dims=["sample_x", "sample_y"],
-            )
+            gt_cluster_labels_df = pd.read_csv(gt_clusters_in_path, index_col=0),
             # Assign them all at 10000 nM dose
-            new_sample_coord = [prod + "_10000" for prod in list(gt_mat.sample_x.data)]
-            gt_mat = gt_mat.assign_coords(
-                {"sample_x": new_sample_coord, "sample_y": new_sample_coord}
-            )
+            new_sample_idx = [prod + "_10000" for prod in list(gt_mat.index)]
+            gt_cluster_labels_df.index = new_sample_idx
             break
-    if gt_mat is None:
+
+    if gt_cluster_labels_df is None:
         Path(table_out).touch()
 
-    if gt_mat is not None:
-        rf_dists = []
+    if gt_cluster_labels_df is not None:
+        gt_silhouette_scores = []
 
         for phase in phases:
-            distance_gt = 1 - gt_mat
-            dist_gt = distance_gt.values
-            z_gt = hierarchical_clustering(dist_gt, method=clustering_method)
-            dist_inferred = (
-                inferred_mats.loc[phase]
-                .sel(sample_x=distance_gt.sample_x, sample_y=distance_gt.sample_y)
-                .values
-            )
-            z_inferred = hierarchical_clustering(
-                dist_inferred, method=clustering_method
-            )
+            pass
 
-            rf_dist = z_gt.robinson_foulds(z_inferred)
-            norm_rf = rf_dist[0] / rf_dist[1]
-            rf_dists.append(norm_rf)
-        metrics_dict["rf_dists"] = rf_dists
+        metrics_dict["gt_silhouette_score"] = None
 
+    # Compute product dose metrics
     all_products = set()
     all_doses = set()
     for sample_name in inferred_mats.sample_x.data:
@@ -107,7 +89,6 @@ def compute_sciplex_metrics(
         if dose != "0":
             all_doses.add(dose)
 
-    # Compute product dose metrics
     in_product_all_dist_avg_percentile = []
     in_product_top_2_dist_avg_percentile = []
     top_two_doses = ["1000", "10000"]
