@@ -109,15 +109,18 @@ print(deg_vehicle_sim_prods)
 print(f"Intersection: {leiden_vehicle_sim_prods.intersection(deg_vehicle_sim_prods)}")
 print(f"Intersection fraction of leiden {len(leiden_vehicle_sim_prods.intersection(deg_vehicle_sim_prods)) / len(leiden_vehicle_sim_prods)}")
 print(f"Intersection fraction of deg {len(leiden_vehicle_sim_prods.intersection(deg_vehicle_sim_prods)) / len(deg_vehicle_sim_prods)}")
-print(f"Fraction of all products: {len(leiden_vehicle_sim_prods) / len(adata.obs['product_name'].unique())}")
+print(f"Leiden Fraction of all products: {len(leiden_vehicle_sim_prods) / len(adata.obs['product_name'].unique())}")
+print(f"DEG Fraction of all products: {len(deg_vehicle_sim_prods) / len(adata.obs['product_name'].unique())}")
+print(f"Union fraction of all products: {len(leiden_vehicle_sim_prods.union(deg_vehicle_sim_prods)) / len(adata.obs['product_name'].unique())}")
 
 # %%
-# Save leiden vehicle sim prods
-leiden_vehicle_sim_prods_path = os.path.join(
+# Save remaining prods not in union
+vehicle_nonsim_prods = set(adata.obs['product_name'].unique()).difference(leiden_vehicle_sim_prods.union(deg_vehicle_sim_prods))
+vehicle_nonsim_prods_path = os.path.join(
     base_dir_path,
-    "notebooks/output/leiden_vehicle_sim_prods.txt",
+    "notebooks/output/vehicle_nonsim_prods.txt",
 )
-with open(leiden_vehicle_sim_prods_path, "w") as f:
-    for prod in leiden_vehicle_sim_prods:
+with open(vehicle_nonsim_prods_path, "w") as f:
+    for prod in vehicle_nonsim_prods:
         f.write(f"{prod}\n")
 # %%

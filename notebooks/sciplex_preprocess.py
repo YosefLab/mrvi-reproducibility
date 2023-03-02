@@ -63,13 +63,13 @@ cell_cycle_genes = [x for x in cell_cycle_genes if x in adata.var_names]
 cell_lines = list(adata.obs["cell_type"].cat.categories)
 cell_lines
 # %%
-use_leiden_filter = True
-if use_leiden_filter:
+use_sciplex_filter = True
+if use_sciplex_filter:
     # filter with vehicle similar products from sciplex_filter.py
-    leiden_vehicle_sim_prods_path = "output/leiden_vehicle_sim_prods.txt"
-    with open(leiden_vehicle_sim_prods_path, "r") as f:
-        leiden_vehicle_sim_prods = f.read().splitlines()    
-    filtered_adata = adata[adata.obs["product_name"].isin(leiden_vehicle_sim_prods)].copy()
+    vehicle_nonsim_prods_path = "output/vehicle_nonsim_prods.txt"
+    with open(vehicle_nonsim_prods_path, "r") as f:
+        vehicle_nonsim_prods = f.read().splitlines()    
+    filtered_adata = adata[adata.obs["product_name"].isin(vehicle_nonsim_prods)].copy()
 else:
     # Requires running sciplex_get_significant_product_dose.R first
     all_sig_prods = set()
@@ -106,7 +106,7 @@ hvgs = sc.pp.highly_variable_genes(
 for cl in cell_lines:
     sub_adata = filtered_adata[filtered_adata.obs["cell_type"] == cl].copy()
 
-    if not use_leiden_filter:
+    if not use_sciplex_filter:
         # Indicate which are significant products for this cell line
         sub_adata.obs["sig_prod_cell_line"] = sub_adata.obs["product_name"].isin(
             per_cell_line_prods[cl]
@@ -138,7 +138,7 @@ for cl in cell_lines:
     sub_adata.obs_names = sub_adata.obs_names.values
 
     print(sub_adata)
-    if use_leiden_filter:
+    if use_sciplex_filter:
         sub_adata.write(f"../data/sciplex_{cl}_significant_filtered_all_phases.h5ad")
     else:
         sub_adata.write(f"../data/sciplex_{cl}_significant_all_phases.h5ad")
