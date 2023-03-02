@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import scipy
-from sklearn.metrics import silhouette_samples
+from sklearn.metrics import silhouette_score
 import xarray as xr
 from utils import (
     determine_if_file_empty,
@@ -50,7 +50,6 @@ def compute_sciplex_metrics(
     inferred_mats = inferred_mats.rename("distance")
     phases = inferred_mats[dim_name].data
 
-    # Linkage method to use for hierarchical clustering
     make_parents(table_out)
 
     metrics_dict = {}
@@ -63,10 +62,12 @@ def compute_sciplex_metrics(
             if determine_if_file_empty(gt_clusters_in_path):
                 break
 
-            gt_cluster_labels_df = (pd.read_csv(gt_clusters_in_path, index_col=0),)
+            gt_cluster_labels_df = pd.read_csv(gt_clusters_in_path, index_col=0)
             # Assign them all at 10000 nM dose
-            new_sample_idx = [prod + "_10000" for prod in list(gt_mat.index)]
+            new_sample_idx = [prod + "_10000" for prod in list(gt_cluster_labels_df.index)]
             gt_cluster_labels_df.index = new_sample_idx
+            # Filter on samples in the distance matrix
+            gt_cluster_labels_df = gt_cluster_labels_df.loc[np.intersect1d(inferred_mats.coords["sample_x"].data, gt_cluster_labels_df.index.array)]
             break
 
     if gt_cluster_labels_df is None:
@@ -84,8 +85,9 @@ def compute_sciplex_metrics(
                 )
                 .values
             )
-            asw = silhouette_samples(
-                dist_inferred.values, gt_cluster_labels_df.values, metric="precomputed"
+            np.fill_diagonal(dist_inferred, 0)
+            asw = silhouette_score(
+                dist_inferred, gt_cluster_labels_df.values, metric="precomputed"
             )
             asw = (asw + 1) / 2
             gt_silhouette_scores.append(asw)

@@ -63,24 +63,33 @@ cell_cycle_genes = [x for x in cell_cycle_genes if x in adata.var_names]
 cell_lines = list(adata.obs["cell_type"].cat.categories)
 cell_lines
 # %%
-# Requires running sciplex_get_sginificant_product_dose.R first
-all_sig_prods = set()
-per_cell_line_prods = {}
-for cl in cell_lines:
-    sig_prod_doses = pd.read_csv(f"output/{cl}.csv", header=None)
-    sig_prod_doses.columns = ["product_dose"]
-    sig_prod_doses["product"] = sig_prod_doses["product_dose"].apply(
-        lambda x: x.split("_")[0]
-    )
-    all_sig_prods = all_sig_prods.union(sig_prod_doses["product"].unique())
-    per_cell_line_prods[cl] = set(sig_prod_doses["product"].unique())
-    print(f"{cl}: {len(per_cell_line_prods[cl])}")
-print(len(all_sig_prods))
+use_leiden_filter = True
+if use_leiden_filter:
+    # filter with vehicle similar products from sciplex_filter.py
+    leiden_vehicle_sim_prods_path = "output/leiden_vehicle_sim_prods.txt"
+    with open(leiden_vehicle_sim_prods_path, "r") as f:
+        leiden_vehicle_sim_prods = f.read().splitlines()    
+    filtered_adata = adata[adata.obs["product_name"].isin(leiden_vehicle_sim_prods)].copy()
+else:
+    # Requires running sciplex_get_significant_product_dose.R first
+    all_sig_prods = set()
+    per_cell_line_prods = {}
+    for cl in cell_lines:
+        sig_prod_doses = pd.read_csv(f"output/{cl}.csv", header=None)
+        sig_prod_doses.columns = ["product_dose"]
+        sig_prod_doses["product"] = sig_prod_doses["product_dose"].apply(
+            lambda x: x.split("_")[0]
+        )
+        all_sig_prods = all_sig_prods.union(sig_prod_doses["product"].unique())
+        per_cell_line_prods[cl] = set(sig_prod_doses["product"].unique())
+        print(f"{cl}: {len(per_cell_line_prods[cl])}")
+    print(len(all_sig_prods))
+
+    # filter to all significant products across all cell lines
+    filtered_adata = adata[adata.obs["product_name"].isin(all_sig_prods)].copy()
+
 
 # %%
-# filter to all significant products across all cell lines
-filtered_adata = adata[adata.obs["product_name"].isin(all_sig_prods)].copy()
-
 # Add back control
 filtered_adata = filtered_adata.concatenate(
     adata[adata.obs["product_name"] == "Vehicle"]
@@ -97,17 +106,18 @@ hvgs = sc.pp.highly_variable_genes(
 for cl in cell_lines:
     sub_adata = filtered_adata[filtered_adata.obs["cell_type"] == cl].copy()
 
-    # Indicate which are significant products for this cell line
-    sub_adata.obs["sig_prod_cell_line"] = sub_adata.obs["product_name"].isin(
-        per_cell_line_prods[cl]
-    )
+    if not use_leiden_filter:
+        # Indicate which are significant products for this cell line
+        sub_adata.obs["sig_prod_cell_line"] = sub_adata.obs["product_name"].isin(
+            per_cell_line_prods[cl]
+        )
 
-    # indicate which doses are significant for this cell line
-    sig_prod_doses = pd.read_csv(f"output/{cl}.csv", header=None)
-    sig_prod_doses.columns = ["product_dose"]
-    sub_adata.obs["sig_prod_dose_cell_line"] = sub_adata.obs["product_dose"].isin(
-        sig_prod_doses["product_dose"].values
-    )
+        # indicate which doses are significant for this cell line
+        sig_prod_doses = pd.read_csv(f"output/{cl}.csv", header=None)
+        sig_prod_doses.columns = ["product_dose"]
+        sub_adata.obs["sig_prod_dose_cell_line"] = sub_adata.obs["product_dose"].isin(
+            sig_prod_doses["product_dose"].values
+        )
 
     # label phases (Too much mem to do this before filtering doses)
     sub_adata.layers["counts"] = sub_adata.X.copy()
@@ -119,7 +129,7 @@ for cl in cell_lines:
     sc.tl.score_genes_cell_cycle(sub_adata, s_genes=s_genes, g2m_genes=g2m_genes)
 
     # Subsample cells
-    sc.pp.subsample(sub_adata, n_obs=min(25000, sub_adata.shape[0]))
+    # sc.pp.subsample(sub_adata, n_obs=min(25000, sub_adata.shape[0]))
 
     # Revert counts to X
     sub_adata.X = sub_adata.layers["counts"]
@@ -128,7 +138,10 @@ for cl in cell_lines:
     sub_adata.obs_names = sub_adata.obs_names.values
 
     print(sub_adata)
-    sub_adata.write(f"../data/sciplex_{cl}_significant_all_phases.h5ad")
+    if use_leiden_filter:
+        sub_adata.write(f"../data/sciplex_{cl}_significant_filtered_all_phases.h5ad")
+    else:
+        sub_adata.write(f"../data/sciplex_{cl}_significant_all_phases.h5ad")
     del sub_adata
 
 # %%
