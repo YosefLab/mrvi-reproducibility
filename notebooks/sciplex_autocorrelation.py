@@ -215,8 +215,8 @@ plt.savefig(
 
 # %%
 # Plot select correlation drug plots over doses
-sel_prod = "TAK-901"
-# sel_prod = "CUDC-907"
+# sel_prod = "TAK-901"
+sel_prod = "Tanespimycin (17-AAG)"
 doses = ["10", "100", "1000", "10000"]
 fig, axes = plt.subplots(len(doses), 2, figsize=(10, len(doses) * 5))
 plt.title(f"{sel_prod}")
