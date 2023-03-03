@@ -11,6 +11,7 @@ def fit_scviv2(
     config_in: str,
     model_out: str,
     use_nonlinear: bool,
+    use_prior: bool
 ) -> scvi_v2.MrVI:
     """
     Train a MrVI model.
@@ -38,6 +39,9 @@ def fit_scviv2(
     )
     if use_nonlinear:
         model_kwargs["pz_kwargs"] = {"use_nonlinear": True}
+    if use_prior:
+        model_kwargs["pz_kwargs"] = {"use_dist": True}
+    model_kwargs["pz_kwargs"]["n_factorized_embed_dims"] = 3
     model = scvi_v2.MrVI(adata, **model_kwargs)
     model.train(**train_kwargs)
 

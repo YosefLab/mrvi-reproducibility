@@ -27,5 +27,5 @@ dependencies:
           - scikit-misc==0.1.4
           - scvi-tools==0.20.0
           - mrvi>=0.1.0
-          - git+ssh://git@github.com/YosefLab/scvi-v2.git@main
+          - git+ssh://git@github.com/YosefLab/scvi-v2.git@Amat_prior
           - remote-pdb==2.1.0
