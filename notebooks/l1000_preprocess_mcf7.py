@@ -16,6 +16,8 @@ from fuzzywuzzy import process
 
 from statsmodels.stats.multitest import multipletests
 from bioinfokit import visuz
+import leidenalg as la
+import igraph as ig
 
 # %%
 # Collected from http://www.ilincs.org/ilincs/signatures/search/MCF7
@@ -185,6 +187,16 @@ sns.heatmap(deg_sim_df, cmap="YlGnBu", ax=ax)
 plt.show()
 
 # %%
+# Save matrix
+deg_sim_df.to_csv(f"../data/l1000_signatures/MCF7_deg_sim.csv", sep=",")
+
+# %%
+# Load matrix
+deg_sim_df = pd.read_csv(
+    f"../data/l1000_signatures/MCF7_deg_sim.csv", sep=",", index_col=0
+)
+
+# %%
 # clustermap
 g = sns.clustermap(
     deg_sim_df, cmap="YlGnBu", xticklabels=True, yticklabels=True, row_cluster=False
@@ -202,7 +214,48 @@ g2 = sns.clustermap(
 plt.show()
 
 # %%
-# Save matrix
-deg_sim_df.to_csv(f"../data/l1000_signatures/MCF7_deg_sim.csv", sep=",")
+# Define the parameters for the Leiden algorithm
+clipped_deg_sim = deg_sim_df.values.copy()
+clipped_deg_sim[clipped_deg_sim < 0.1] = 0
 
+g_adj = ig.Graph.Weighted_Adjacency(clipped_deg_sim, mode="undirected")
+partition = la.RBConfigurationVertexPartition(g_adj, resolution_parameter=1)
+optimizer = la.Optimiser()
+optimizer.optimise_partition(partition)
+
+# Get the cluster labels
+cluster_labels = np.array(partition.membership)
+
+print(cluster_labels)
+
+# %%
+color_list = [
+    'red',
+    'blue',
+    'green',
+    'cyan',
+    'pink',
+    'orange',
+    'grey',
+    'yellow',
+    'white',
+    'black',
+    'purple'
+]
+ig.plot(g_adj, vertex_color=[color_list[k] for k in cluster_labels], vertex_label=deg_sim_df.index)
+
+# %%
+# Filter out clusters with only one element
+filtered_cluster_labels = []
+cluster_label_index = []
+keep_clusters = [cluster_label for cluster_label, ct in zip(*np.unique(cluster_labels, return_counts=True)) if ct > 1]
+for i, cluster_label in enumerate(cluster_labels):
+    if cluster_label in keep_clusters:
+        filtered_cluster_labels.append(cluster_label)
+        cluster_label_index.append(deg_sim_df.index[i])
+
+# %%
+# Save the cluster labels
+cluster_labels_df = pd.DataFrame(filtered_cluster_labels, index=cluster_label_index)
+cluster_labels_df.to_csv(f"../data/l1000_signatures/MCF7_cluster_labels.csv", sep=",")
 # %%

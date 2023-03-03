@@ -111,7 +111,7 @@ method_names = ["scviv2", "scviv2_nonlinear"]
 # Per dataset plots
 for method_name in method_names:
     for cl in cell_lines:
-        dataset_name = f"sciplex_{cl}_significant_all_phases"
+        dataset_name = f"sciplex_{cl}_significant_filtered_all_phases"
         normalized_dists_path = (
             f"{dataset_name}.{method_name}.normalized_distance_matrices.nc"
         )
@@ -258,5 +258,66 @@ for method_name in method_names:
             save_figures(
                 f"{phase}.{method_name}.clipped_normalized_distance_matrices_heatmap",
                 dataset_name,
+            )
+            plt.clf()
+
+# %%
+baseline_method_names = ["composition_pca", "composition_scvi"]
+
+# Per baseline dataset plots
+for method_name in baseline_method_names:
+    for cl in cell_lines:
+        dataset_name = f"sciplex_{cl}_significant_filtered_all_phases"
+        dists_path = f"{dataset_name}.{method_name}.distance_matrices.nc"
+        dists = xr.open_dataarray(dists_path)
+
+        adata_path = f"{dataset_name}.{method_name}.final.h5ad"
+        adata = sc.read(adata_path)
+
+        sample_to_pathway = (
+            adata.obs[["product_dose", "pathway_level_1"]]
+            .drop_duplicates()
+            .set_index("product_dose")["pathway_level_1"]
+            .to_dict()
+        )
+        sample_to_color_df = (
+            dists.sample_x.to_series().map(sample_to_pathway).map(pathway_color_map)
+        )
+
+        # Pathway annotated clustermap filtered down to the same product doses
+        for phase in dists.phase_name.values:
+            vmax = np.percentile(dists.values, 90)
+            g_dists = sns.clustermap(
+                dists.sel(
+                    phase_name=phase,
+                ).to_pandas(),
+                cmap="YlGnBu",
+                yticklabels=True,
+                xticklabels=True,
+                col_colors=sample_to_color_df,
+                vmin=0,
+                vmax=vmax,
+            )
+            g_dists.ax_heatmap.set_xticklabels(
+                g_dists.ax_heatmap.get_xmajorticklabels(), fontsize=2
+            )
+            g_dists.ax_heatmap.set_yticklabels(
+                g_dists.ax_heatmap.get_ymajorticklabels(), fontsize=2
+            )
+
+            handles = [
+                Patch(facecolor=pathway_color_map[name]) for name in pathway_color_map
+            ]
+            product_legend = plt.legend(
+                handles,
+                pathway_color_map,
+                title="Product Name",
+                bbox_to_anchor=(1, 0.9),
+                bbox_transform=plt.gcf().transFigure,
+                loc="upper right",
+            )
+            plt.gca().add_artist(product_legend)
+            save_figures(
+                f"{phase}.{method_name}.distance_matrices_heatmap", dataset_name
             )
             plt.clf()
