@@ -290,8 +290,6 @@ for method_name in baseline_method_names:
             g_dists = sns.clustermap(
                 dists.sel(
                     phase_name=phase,
-                    sample_x=dists.sample_x,
-                    sample_y=dists.sample_y,
                 ).to_pandas(),
                 cmap="YlGnBu",
                 yticklabels=True,

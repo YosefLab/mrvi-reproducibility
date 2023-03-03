@@ -64,16 +64,22 @@ def compute_sciplex_metrics(
 
             gt_cluster_labels_df = pd.read_csv(gt_clusters_in_path, index_col=0)
             # Assign them all at 10000 nM dose
-            new_sample_idx = [prod + "_10000" for prod in list(gt_cluster_labels_df.index)]
+            new_sample_idx = [
+                prod + "_10000" for prod in list(gt_cluster_labels_df.index)
+            ]
             gt_cluster_labels_df.index = new_sample_idx
             # Filter on samples in the distance matrix
-            gt_cluster_labels_df = gt_cluster_labels_df.loc[np.intersect1d(inferred_mats.coords["sample_x"].data, gt_cluster_labels_df.index.array)]
+            gt_cluster_labels_df = gt_cluster_labels_df.loc[
+                np.intersect1d(
+                    inferred_mats.coords["sample_x"].data,
+                    gt_cluster_labels_df.index.array,
+                )
+            ]
             break
 
     if gt_cluster_labels_df is None:
         Path(table_out).touch()
-
-    if gt_cluster_labels_df is not None:
+    else:
         gt_silhouette_scores = []
 
         for phase in phases:
