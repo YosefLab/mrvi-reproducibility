@@ -114,8 +114,8 @@ print(f"DEG Fraction of all products: {len(deg_vehicle_sim_prods) / len(adata.ob
 print(f"Union fraction of all products: {len(leiden_vehicle_sim_prods.union(deg_vehicle_sim_prods)) / len(adata.obs['product_name'].unique())}")
 
 # %%
-# Save remaining prods not in union
-vehicle_nonsim_prods = set(adata.obs['product_name'].unique()).difference(leiden_vehicle_sim_prods.union(deg_vehicle_sim_prods))
+# Save remaining prods not in DEG only
+vehicle_nonsim_prods = set(adata.obs['product_name'].unique()).difference(deg_vehicle_sim_prods)
 vehicle_nonsim_prods_path = os.path.join(
     base_dir_path,
     "notebooks/output/vehicle_nonsim_prods.txt",

@@ -68,7 +68,7 @@ if use_sciplex_filter:
     # filter with vehicle similar products from sciplex_filter.py
     vehicle_nonsim_prods_path = "output/vehicle_nonsim_prods.txt"
     with open(vehicle_nonsim_prods_path, "r") as f:
-        vehicle_nonsim_prods = f.read().splitlines()    
+        vehicle_nonsim_prods = f.read().splitlines()
     filtered_adata = adata[adata.obs["product_name"].isin(vehicle_nonsim_prods)].copy()
 else:
     # Requires running sciplex_get_significant_product_dose.R first

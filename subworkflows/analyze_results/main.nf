@@ -7,21 +7,15 @@ workflow analyze_results {
     inputs
 
     main:
-    symsim_results = inputs.filter( { it =~ /symsim_new.*/ } ).collect()
-    pbmcs_results = inputs.filter( { it =~ /scvi_pbmcs.*/ } ).collect()
-    nucleus_results = inputs.filter( { it =~ /nucleus.*/ } ).collect()
-    sciplex_results = inputs.filter( { it =~ /sciplex.*/ } ).collect()
-
-    all_results = symsim_results.concat(
-        pbmcs_results,
-        nucleus_results,
-        sciplex_results
-    )
+    all_results = inputs.map{ [it, it.getSimpleName()] }.groupTuple(by: 1).map { it[0] }
     all_results.view()
 
     conduct_generic_analysis(all_results)
 
     // Dataset-specific scripts can be added here
+    symsim_results = inputs.filter( { it =~ /symsim_new.*/ } ).collect()
+    sciplex_results = inputs.filter( { it =~ /sciplex.*/ } ).collect()
+
     if (symsim_results) {
         produce_figures_symsim_new(symsim_results)
     }
