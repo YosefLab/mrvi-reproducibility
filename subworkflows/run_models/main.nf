@@ -3,8 +3,12 @@ include { get_latent_mrvi } from params.modules.get_latent_mrvi
 include { get_outputs_mrvi } from params.modules.get_outputs_mrvi
 include { fit_scviv2; fit_scviv2 as fit_scviv2_nonlinear } from params.modules.fit_scviv2
 include { get_latent_scviv2; get_latent_scviv2 as get_latent_scviv2_nonlinear } from params.modules.get_latent_scviv2
-include { fit_and_get_latent_composition_scvi } from params.modules.fit_and_get_latent_composition_scvi
-include { fit_and_get_latent_composition_pca } from params.modules.fit_and_get_latent_composition_pca
+include {
+    fit_and_get_latent_composition_baseline as fit_and_get_latent_composition_scvi_clusterkey;
+    fit_and_get_latent_composition_baseline as fit_and_get_latent_composition_pca_clusterkey;
+    fit_and_get_latent_composition_baseline as fit_and_get_latent_composition_scvi_leiden;
+    fit_and_get_latent_composition_baseline as fit_and_get_latent_composition_pca_leiden;
+} from params.modules.fit_and_get_latent_composition_baseline
 include { compute_rf } from params.modules.compute_rf
 include { compute_2dreps } from params.modules.compute_2dreps
 
@@ -41,18 +45,24 @@ workflow run_models {
         // mrvi_adata = mrvi_outs.adata
 
         // Run compositional models
-        c_scvi_outs=fit_and_get_latent_composition_scvi(adatas_in)
-        c_pca_outs=fit_and_get_latent_composition_pca(adatas_in)
+        c_scvi_clusterkey_outs=fit_and_get_latent_composition_scvi_clusterkey(adatas_in, "SCVI_clusterkey_subleiden1")
+        c_pca_clusterkey_outs=fit_and_get_latent_composition_pca_clusterkey(adatas_in, "PCA_clusterkey_subleiden1")
+        c_scvi_leiden_outs=fit_and_get_latent_composition_scvi_leiden(adatas_in, "SCVI_leiden1_subleiden1")
+        c_pca_leiden_outs=fit_and_get_latent_composition_pca_leiden(adatas_in, "PCA_leiden1_subleiden1")
 
         distance_matrices = distance_matrices.concat(
             // mrvi_outs.distance_matrices,
-            c_pca_outs.distance_matrices,
-            c_scvi_outs.distance_matrices
+            c_pca_clusterkey_outs.distance_matrices,
+            c_scvi_clusterkey_outs.distance_matrices,
+            c_pca_leiden_outs.distance_matrices,
+            c_scvi_leiden_outs.distance_matrices
         )
         adatas = adatas.concat(
             // get_latent_mrvi.out,
-            c_pca_outs.adata,
-            c_scvi_outs.adata
+            c_pca_clusterkey_outs.adata,
+            c_scvi_clusterkey_outs.adata,
+            c_pca_leiden_outs.adata,
+            c_scvi_leiden_outs.adata
         )
 
     }
