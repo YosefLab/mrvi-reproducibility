@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import warnings
 
 import pandas as pd
 import xarray as xr
@@ -51,6 +52,14 @@ def compute_rf(
     except ValueError:
         inferred_mats = xr.open_dataset(distance_matrices)[celltype_key]
     inferred_mats = inferred_mats.rename("distance")
+    if inferred_mats.dims[0] != gt_mats.dims[0]:
+        warnings.warn(
+            "The inferred distance matrices do not have the same clustering as the ground truth distance matrices."
+            "Skipping computation of RF distance."
+        )
+        Path(table_out).touch()
+        return
+
     aligned_mats = xr.merge([gt_mats, inferred_mats], join="left")
     dists = []
     cts = []

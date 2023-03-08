@@ -100,7 +100,7 @@ def fit_and_get_latent_composition_baseline(
         dists.append(dist_)
     dists = np.concatenate(dists, axis=0)
 
-    dim_label_key = f"{label_key}_name"
+    dim_label_key = composition_baseline.cluster_key
     distances = xr.DataArray(
         dists,
         dims=[dim_label_key, "sample_x", "sample_y"],
