@@ -1,6 +1,5 @@
-import scvi_v2
 import scanpy as sc
-
+import scvi_v2
 from utils import load_config, make_parents, wrap_kwargs
 
 
@@ -40,8 +39,7 @@ def fit_scviv2(
     if use_nonlinear:
         model_kwargs["pz_kwargs"] = {"use_nonlinear": True}
     if use_prior:
-        model_kwargs["pz_kwargs"] = {"use_dist": True}
-    model_kwargs["pz_kwargs"]["n_factorized_embed_dims"] = 3
+        train_kwargs["plan_kwargs"] = {"laplace_scale": 1.0}
     model = scvi_v2.MrVI(adata, **model_kwargs)
     model.train(**train_kwargs)
 
