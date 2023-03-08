@@ -262,7 +262,7 @@ for method_name in method_names:
             plt.clf()
 
 # %%
-baseline_method_names = ["composition_pca", "composition_scvi"]
+baseline_method_names = ["composition_PCA_clusterkey_subleiden1", "composition_SCVI_clusterkey_subleiden1"]
 
 # Per baseline dataset plots
 for method_name in baseline_method_names:

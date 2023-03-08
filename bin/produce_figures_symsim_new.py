@@ -86,11 +86,11 @@ model_name = "scviv2"
 # model_name = "scviv2_nonlinear"
 # Distance matrix comparison
 scviv2_dists_path = os.path.join(
-    results_path_root, f"distance_matrices/symsim_new.{model_name}.distance_matrices.nc"
+    results_path_root, f"symsim_new.{model_name}.distance_matrices.nc"
 )
 scviv2_normalized_dists_path = os.path.join(
     results_path_root,
-    f"distance_matrices/symsim_new.{model_name}.normalized_distance_matrices.nc",
+    f"symsim_new.{model_name}.normalized_distance_matrices.nc",
 )
 dists = xr.open_dataset(scviv2_dists_path).celltype
 normalized_dists = xr.open_dataset(scviv2_normalized_dists_path).celltype

@@ -39,6 +39,7 @@ def linkage_to_ete(linkage_obj):
 def hierarchical_clustering(dist_mtx, method="ward"):
     """Perform hierarchical clustering on squared distance matrix."""
     assert dist_mtx.shape[0] == dist_mtx.shape[1]
+    dist_mtx = dist_mtx.astype(np.float32)  # May have numerical issues with float64
     is_symmetric = issymmetric(dist_mtx)
     has_zero_diag = (dist_mtx.diagonal() == 0).all()
     if not (is_symmetric and has_zero_diag):
