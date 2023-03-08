@@ -14,6 +14,9 @@ class CompositionBaseline:
         batch_key: Optional[str],
         sample_key: Optional[str],
         rep: Union[Literal["PCA"], Literal["SCVI"]],
+        clustering_on: Union[Literal["clusterkey"], Literal["leiden"]] = "leiden",
+        cluster_resolution: Optional[float] = None,
+        subcluster_resolution: Optional[float] = None,
         model_kwargs=None,
         train_kwargs=None,
     ):
@@ -27,11 +30,11 @@ class CompositionBaseline:
         self.rep = rep
         self.rep_key = "X_rep"
         self.n_dim = model_kwargs.pop("n_dim", 50)
-        self.clustering_on = model_kwargs.pop(
-            "clustering_on", "leiden"
-        )  # one of leiden, cluster_key
+        self.clustering_on = clustering_on  # one of leiden, cluster_key
+        self.cluster_resolution = cluster_resolution or 1.0
         self.cluster_key = model_kwargs.pop("cluster_key", None)
         self.subcluster_key = "leiden_subcluster"
+        self.subcluster_resolution = subcluster_resolution or 1.0
 
     def preprocess_data(self):
         if self.rep == "PCA":
@@ -55,10 +58,14 @@ class CompositionBaseline:
     def get_local_sample_representation(self):
 
         if self.clustering_on == "leiden":
+            self.cluster_key = f"leiden_{self.cluster_resolution}"
             sc.pp.neighbors(self.adata, n_neighbors=30, use_rep=self.rep_key)
-            sc.tl.leiden(self.adata, resolution=1.0, key_added="leiden_1.0")
-            self.cluster_key = "leiden_1.0"
-        elif (self.clustering_on == "cluster_key") and (self.cluster_key is not None):
+            sc.tl.leiden(
+                self.adata,
+                resolution=self.cluster_resolution,
+                key_added=self.cluster_key,
+            )
+        elif (self.clustering_on == "clusterkey") and (self.cluster_key is not None):
             pass
         else:
             raise ValueError(
@@ -73,7 +80,11 @@ class CompositionBaseline:
 
             # Step 1: subcluster
             sc.pp.neighbors(subann, n_neighbors=30, use_rep=self.rep_key)
-            sc.tl.leiden(subann, resolution=1.0, key_added=self.subcluster_key)
+            sc.tl.leiden(
+                subann,
+                resolution=self.subcluster_resolution,
+                key_added=self.subcluster_key,
+            )
 
             szs = (
                 subann.obs.groupby([self.subcluster_key, self.sample_key])
