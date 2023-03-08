@@ -44,7 +44,9 @@ def compute_vendi(
     vmax = np.percentile(distance_matrix.values, 95)
     local_sample_similarities = (vmax - distance_matrix) / vmax
 
-    clusters = local_sample_similarities.coords[f"{celltype_key}_name"].values
+    clusters = local_sample_similarities.coords[
+        local_sample_similarities.dims[0]
+    ].values
     vendi_scores = []
     for cluster in clusters:
         cluster_sims = local_sample_similarities.loc[cluster].values
