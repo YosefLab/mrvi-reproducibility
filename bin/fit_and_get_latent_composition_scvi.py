@@ -56,10 +56,6 @@ def fit_and_get_latent_composition_scvi(
     _adata.obsm[latent_key] = composition_scvi.get_cell_representation()
     _adata.uns["latent_keys"] = [latent_key]
 
-    # local_sample_dists_key = "composition_scvi_local_sample_dists"
-    # _adata.obsm[local_sample_dists_key] = composition_scvi.get_local_sample_distances()
-    # _adata.uns["local_sample_dists_key"] = local_sample_dists_key
-
     make_parents(distance_matrices_out)
     freqs_all = composition_scvi.get_local_sample_representation()
     unique_samples = list(adata.obs[sample_key].unique())
