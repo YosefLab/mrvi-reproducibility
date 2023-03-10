@@ -32,4 +32,5 @@ conf/aws_credentials.config
 condaenv*
 .nextflow.log*
 notebooks/figures
+notebooks/*figures
 notebooks/output

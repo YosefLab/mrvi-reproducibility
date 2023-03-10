@@ -1,4 +1,5 @@
 process produce_figures_sciplex {
+    cache false
     input:
     path results_paths
 

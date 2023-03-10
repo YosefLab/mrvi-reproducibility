@@ -145,3 +145,20 @@ for cl in cell_lines:
     del sub_adata
 
 # %%
+# Subsample the filtered datasets to 100 cells (filter out lower)
+subsample_size = 100
+for cl in cell_lines:
+    sub_adata = sc.read(f"../data/sciplex_{cl}_significant_filtered_all_phases.h5ad")
+    num_cells_per_sample = sub_adata.obs["product_dose"].value_counts()
+    keep_idxs = np.zeros(sub_adata.X.shape[0], dtype=bool)
+    for sample in num_cells_per_sample.index:
+        if num_cells_per_sample[sample] >= subsample_size:
+            sample_idxs = sub_adata.obs["product_dose"] == sample
+            idx = np.flatnonzero(sample_idxs)
+            r = np.random.choice(idx, 100, replace=False)
+            keep_idxs[r] = True
+    sub_adata = sub_adata[keep_idxs]
+    sub_adata.write(f"../data/sciplex_{cl}_significant_subsampled_all_phases.h5ad")
+    del sub_adata
+
+# %%

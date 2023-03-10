@@ -41,14 +41,14 @@ def compute_sciplex_metrics(
     distance_type = basename.split(".")[2]
     config = load_config(config_in)
     celltype_key = config["labels_key"]
-    dim_name = f"{celltype_key}_name"
 
     try:
         inferred_mats = xr.open_dataarray(distance_matrices_in)
     except ValueError:
         inferred_mats = xr.open_dataset(distance_matrices_in)[celltype_key]
     inferred_mats = inferred_mats.rename("distance")
-    phases = inferred_mats[dim_name].data
+    dim_name = inferred_mats.dims[0]
+    clusters = inferred_mats[dim_name].data
 
     make_parents(table_out)
 
@@ -82,9 +82,9 @@ def compute_sciplex_metrics(
     else:
         gt_silhouette_scores = []
 
-        for phase in phases:
+        for cluster in clusters:
             dist_inferred = (
-                inferred_mats.loc[phase]
+                inferred_mats.loc[cluster]
                 .sel(
                     sample_x=gt_cluster_labels_df.index,
                     sample_y=gt_cluster_labels_df.index,
@@ -113,26 +113,27 @@ def compute_sciplex_metrics(
     in_product_all_dist_avg_percentile = []
     in_product_top_2_dist_avg_percentile = []
     top_two_doses = ["1000", "10000"]
-    for phase in phases:
-        phase_dists = inferred_mats.sel(phase_name=phase)
-        phase_dists_arr = phase_dists.data
+    for cluster in clusters:
+        cluster_dists = inferred_mats.loc[cluster]
+        cluster_dists_arr = cluster_dists.data
         non_diag_mask = (
-            np.ones(shape=phase_dists_arr.shape) - np.identity(phase_dists_arr.shape[0])
+            np.ones(shape=cluster_dists_arr.shape)
+            - np.identity(cluster_dists_arr.shape[0])
         ).astype(bool)
-        in_prod_mask = np.zeros(shape=phase_dists_arr.shape, dtype=bool)
-        in_prod_top_two_mask = np.zeros(shape=phase_dists_arr.shape, dtype=bool)
+        in_prod_mask = np.zeros(shape=cluster_dists_arr.shape, dtype=bool)
+        in_prod_top_two_mask = np.zeros(shape=cluster_dists_arr.shape, dtype=bool)
         for product_name in all_products:
             for dosex in all_doses:
                 for dosey in all_doses:
                     if dosex == dosey:
                         continue
                     dosex_idx = np.where(
-                        phase_dists.sample_x.data == f"{product_name}_{dosex}"
+                        cluster_dists.sample_x.data == f"{product_name}_{dosex}"
                     )[0]
                     if len(dosex_idx) == 0:
                         continue
                     dosey_idx = np.where(
-                        phase_dists.sample_y.data == f"{product_name}_{dosey}"
+                        cluster_dists.sample_y.data == f"{product_name}_{dosey}"
                     )[0]
                     if len(dosey_idx) == 0:
                         continue
@@ -142,8 +143,8 @@ def compute_sciplex_metrics(
                         in_prod_top_two_mask[dosex_idx[0], dosey_idx[0]] = True
         # Get
         adjusted_ranks = (
-            scipy.stats.rankdata(phase_dists_arr).reshape(phase_dists_arr.shape)
-            - phase_dists_arr.shape[0]
+            scipy.stats.rankdata(cluster_dists_arr).reshape(cluster_dists_arr.shape)
+            - cluster_dists_arr.shape[0]
         )
         in_prod_all_dist_avg_percentile = (
             adjusted_ranks[in_prod_mask].mean() / non_diag_mask.sum()
@@ -161,7 +162,7 @@ def compute_sciplex_metrics(
     ] = in_product_top_2_dist_avg_percentile
 
     metrics = pd.DataFrame(
-        {"distance_type": distance_type, "phase": phases, **metrics_dict}
+        {"distance_type": distance_type, dim_name: clusters, **metrics_dict}
     ).assign(model_name=model_name)
     metrics.to_csv(table_out, index=False)
 

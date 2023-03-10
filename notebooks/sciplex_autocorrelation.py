@@ -22,15 +22,17 @@ import xarray as xr
 # %%
 method_name = "scviv2"
 cell_line = "A549"
+data_variant = "significant_subsampled"
 
 base_dir_path = "/home/justin/ghrepos/scvi-v2-reproducibility"
+results_dir_path = os.path.join(base_dir_path, "results/sciplex_pipeline")
 adata_path = os.path.join(
-    base_dir_path,
-    f"results/sciplex_pipeline/data/sciplex_{cell_line}_significant_all_phases.preprocessed.h5ad",
+    results_dir_path,
+    f"data/sciplex_{cell_line}_{data_variant}_all_phases.preprocessed.h5ad",
 )
 model_path = os.path.join(
-    base_dir_path,
-    f"results/sciplex_pipeline/models/sciplex_{cell_line}_significant_all_phases.{method_name}",
+    results_dir_path,
+    f"models/sciplex_{cell_line}_{data_variant}_all_phases.{method_name}",
 )
 
 
@@ -131,14 +133,14 @@ local_autocorr_df = compute_rank_autocorrelation(
 # Save results
 autocorr_df.to_csv(
     os.path.join(
-        base_dir_path,
-        f"results/sciplex_pipeline/metrics/sciplex_{cell_line}_significant_all_phases.{method_name}.autocorr.csv",
+        results_dir_path,
+        f"metrics/sciplex_{cell_line}_significant_all_phases.{method_name}.autocorr.csv",
     )
 )
 local_autocorr_df.to_csv(
     os.path.join(
-        base_dir_path,
-        f"results/sciplex_pipeline/metrics/sciplex_{cell_line}_significant_all_phases.{method_name}.local_autocorr.csv",
+        results_dir_path,
+        f"metrics/sciplex_{cell_line}_significant_all_phases.{method_name}.local_autocorr.csv",
     )
 )
 
@@ -146,15 +148,15 @@ local_autocorr_df.to_csv(
 # Load results
 autocorr_df = pd.read_csv(
     os.path.join(
-        base_dir_path,
-        f"results/sciplex_pipeline/metrics/sciplex_{cell_line}_significant_all_phases.{method_name}.autocorr.csv",
+        results_dir_path,
+        f"metrics/sciplex_{cell_line}_significant_all_phases.{method_name}.autocorr.csv",
     ),
     index_col=0,
 )["autocorrelation"]
 local_autocorr_df = pd.read_csv(
     os.path.join(
-        base_dir_path,
-        f"results/sciplex_pipeline/metrics/sciplex_{cell_line}_significant_all_phases.{method_name}.local_autocorr.csv",
+        results_dir_path,
+        f"metrics/sciplex_{cell_line}_significant_all_phases.{method_name}.local_autocorr.csv",
     ),
     index_col=0,
     header=0,
@@ -210,13 +212,15 @@ for prod, autocorr in zip(prods, autocorr_vals):
 fig, ax = plt.subplots(figsize=(5, 5))
 sc.pl.embedding(adata, "U_mde", color="phase", show=False, ax=ax)
 plt.savefig(
-    os.path.join(base_dir_path, f"notebooks/figures/{method_name}_phase_mde.png"), bbox_inches="tight"
+    os.path.join(base_dir_path, f"notebooks/figures/{method_name}_phase_mde.png"),
+    bbox_inches="tight",
 )
 
 # %%
 # Plot select correlation drug plots over doses
 # sel_prod = "TAK-901"
-sel_prod = "Tanespimycin (17-AAG)"
+# sel_prod = "Tanespimycin (17-AAG)"
+sel_prod = "Thalidomide"
 doses = ["10", "100", "1000", "10000"]
 fig, axes = plt.subplots(len(doses), 2, figsize=(10, len(doses) * 5))
 plt.title(f"{sel_prod}")
@@ -225,8 +229,13 @@ for i, dose in enumerate(doses):
     prod = sel_prod + "_" + dose
     adata.obs[f"{prod}_dist_to_vehicle"] = dists_from_vehicle_df[prod]
     sc.pl.embedding(
-        adata, "U_mde", color=f"{prod}_dist_to_vehicle", show=False, ax=ax_pair[0],
-        vmin=0, vmax=2
+        adata,
+        "U_mde",
+        color=f"{prod}_dist_to_vehicle",
+        show=False,
+        ax=ax_pair[0],
+        vmin=0,
+        vmax=1,
     )
 
     adata.obs[f"{prod}_local_rank_autocorr"] = local_autocorr_df.loc[prod]
@@ -257,26 +266,36 @@ for i, dose in enumerate(doses):
         show=False,
         ax=ax,
         vmin=0,
-        vmax=2,
+        vmax=3,
     )
-    ax.set_title(f"{prod} 200 NN, total cells: {(adata.obs[f'product_dose'] == prod).sum()}")
+    ax.set_title(
+        f"{prod} 200 NN, total cells: {(adata.obs[f'product_dose'] == prod).sum()}"
+    )
 plt.savefig(
     os.path.join(base_dir_path, f"notebooks/figures/{sel_prod}_full_nn.png"),
 )
 
 # %%
 # Threshold on distance to vehicle then cluster for DEG analysis
+dist_threshold = 0.6
 adata.layers["log1p"] = sc.pp.log1p(adata, copy=True).X
-adata.uns["log1p"] = {"base": None} # address bug in sc.tl.rank_genes_groups
+adata.uns["log1p"] = {"base": None}  # address bug in sc.tl.rank_genes_groups
 
 fig, axes = plt.subplots(len(doses), 3, figsize=(20, len(doses) * 5))
 for i, dose in enumerate(doses):
     ax_pair = axes[i, :]
     prod = sel_prod + "_" + dose
-    adata.obs[f"{prod}_thresh"] = (dists_from_vehicle_df[prod] >= 1.2).astype(int).astype("category")
+    adata.obs[f"{prod}_thresh"] = (
+        (dists_from_vehicle_df[prod] >= dist_threshold).astype(int).astype("category")
+    )
     sc.pl.embedding(
-        adata, "U_mde", color=f"{prod}_thresh", show=False, ax=ax_pair[0],
-        vmin=0, vmax=2
+        adata,
+        "U_mde",
+        color=f"{prod}_thresh",
+        show=False,
+        ax=ax_pair[0],
+        vmin=0,
+        vmax=2,
     )
 
     thresh_idxs = adata.obs[f"{prod}_thresh"] == 1
@@ -287,17 +306,23 @@ for i, dose in enumerate(doses):
     adata.obs.loc[thresh_idxs, f"{prod}_leiden"] = thresh_adata.obs[f"{prod}_leiden"]
     adata.obs[f"{prod}_leiden"] = adata.obs[f"{prod}_leiden"].astype("category")
     if "not clustered" in adata.obs[f"{prod}_leiden"].cat.categories:
-        adata.obs[f"{prod}_leiden"] = adata.obs[f"{prod}_leiden"].cat.reorder_categories(["not clustered"] + list(adata.obs[f"{prod}_leiden"].cat.categories[:-1]))
-    sc.pl.embedding(
-        adata, "U_mde", color=f"{prod}_leiden", show=False, ax=ax_pair[1]
-    )
+        adata.obs[f"{prod}_leiden"] = adata.obs[
+            f"{prod}_leiden"
+        ].cat.reorder_categories(
+            ["not clustered"] + list(adata.obs[f"{prod}_leiden"].cat.categories[:-1])
+        )
+    sc.pl.embedding(adata, "U_mde", color=f"{prod}_leiden", show=False, ax=ax_pair[1])
 
     vehicle_adata = adata[adata.obs["product_dose"] == "Vehicle_0"]
     # Filter out groups with < 10 cells
     for group in vehicle_adata.obs[f"{prod}_leiden"].cat.categories:
         if sum(vehicle_adata.obs[f"{prod}_leiden"] == group) < 10:
-            adata.obs.loc[adata.obs[f"{prod}_leiden"] == group, f"{prod}_leiden"] = "not clustered" 
-    adata.obs[f"{prod}_leiden"] = adata.obs[f"{prod}_leiden"].cat.remove_unused_categories()
+            adata.obs.loc[
+                adata.obs[f"{prod}_leiden"] == group, f"{prod}_leiden"
+            ] = "not clustered"
+    adata.obs[f"{prod}_leiden"] = adata.obs[
+        f"{prod}_leiden"
+    ].cat.remove_unused_categories()
     sc.tl.rank_genes_groups(
         vehicle_adata,
         f"{prod}_leiden",
@@ -307,7 +332,9 @@ for i, dose in enumerate(doses):
     sc.pl.rank_genes_groups_dotplot(
         vehicle_adata,
         n_genes=5,
-        groups=list(vehicle_adata.obs[f"{prod}_leiden"].cat.categories[1:]) if "not clustered" in adata.obs[f"{prod}_leiden"].cat.categories else list(vehicle_adata.obs[f"{prod}_leiden"].cat.categories),
+        groups=list(vehicle_adata.obs[f"{prod}_leiden"].cat.categories[1:])
+        if "not clustered" in adata.obs[f"{prod}_leiden"].cat.categories
+        else list(vehicle_adata.obs[f"{prod}_leiden"].cat.categories),
         values_to_plot="logfoldchanges",
         cmap="bwr",
         vmin=-4,
@@ -325,11 +352,17 @@ plt.savefig(
 
 # %%
 # Load composition scVI results
-baseline_method_name = "composition_scvi"
+baseline_method_name = "composition_SCVI_leiden1_subleiden1"
 baseline_dist_array = xr.load_dataarray(
     os.path.join(
-        base_dir_path,
-        f"results/sciplex_pipeline/distance_matrices/sciplex_{cell_line}_significant_all_phases.{baseline_method_name}.distance_matrices.nc",
+        results_dir_path,
+        f"distance_matrices/sciplex_{cell_line}_{data_variant}_all_phases.{baseline_method_name}.distance_matrices.nc",
+    )
+)
+baseline_adata = sc.read(
+    os.path.join(
+        results_dir_path,
+        f"data/sciplex_{cell_line}_{data_variant}_all_phases.{baseline_method_name}.h5ad",
     )
 )
 # %%
@@ -338,10 +371,15 @@ fig, axes = plt.subplots(len(doses) // 2, 2, figsize=(10, len(doses) // 2 * 5))
 for i, dose in enumerate(doses):
     ax = axes[i // 2, i % 2]
     prod = sel_prod + "_" + dose
-    phase_dists = baseline_dist_array.sel(sample_x="Vehicle_0", sample_y=prod)
+    baseline_vehicle_dists = baseline_dist_array.sel(
+        sample_x="Vehicle_0", sample_y=prod
+    )
+    cluster_dim_name = baseline_vehicle_dists.dims[0]
     dist_to_vehicle = np.zeros(adata.shape[0])
-    for phase in adata.obs["phase"].unique():
-        dist_to_vehicle[adata.obs["phase"] == phase] = phase_dists.sel(phase_name=phase).values
+    for cluster in baseline_vehicle_dists[cluster_dim_name].unique():
+        dist_to_vehicle[
+            adata.obs[adata.uns["cluster_key"]] == cluster
+        ] = baseline_vehicle_dists.loc[cluster].values
     adata.obs[f"{prod}_{baseline_method_name}_dist_to_vehicle"] = dist_to_vehicle
     sc.pl.embedding(
         adata,
@@ -349,10 +387,73 @@ for i, dose in enumerate(doses):
         color=f"{prod}_{baseline_method_name}_dist_to_vehicle",
         show=False,
         ax=ax,
-        vmin=0.1,
-        vmax=0.25,
+        vmin=0.3,
+        vmax=0.5,
     )
 plt.savefig(
-    os.path.join(base_dir_path, f"notebooks/figures/{sel_prod}_{baseline_method_name}_full_dist.png"),
+    os.path.join(
+        base_dir_path,
+        f"notebooks/figures/{sel_prod}_{baseline_method_name}_full_dist.png",
+    ),
 )
+# %%
+# Check relationship between abundance of cells per sample and distribution of dist to vehicle
+num_cells_per_sample = adata.obs["product_dose"].value_counts()
+mean_dist_to_vehicle = dists_from_vehicle_df.mean(axis=0)
+var_dist_to_vehicle = dists_from_vehicle_df.var(axis=0)
+
+# %%
+# Join these series then plot
+stats_per_sample_df = pd.DataFrame(
+    {
+        "num_cells_per_sample": num_cells_per_sample.loc[mean_dist_to_vehicle.index],
+        "mean_dist_to_vehicle": mean_dist_to_vehicle,
+        "var_dist_to_vehicle": var_dist_to_vehicle,
+    }
+)
+stats_per_sample_df["dose"] = stats_per_sample_df.index.map(lambda x: x.split("_")[-1])
+
+fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+sns.scatterplot(
+    stats_per_sample_df,
+    x="num_cells_per_sample",
+    y="mean_dist_to_vehicle",
+    hue="dose",
+    ax=axes[0],
+)
+sns.scatterplot(
+    stats_per_sample_df,
+    x="num_cells_per_sample",
+    y="var_dist_to_vehicle",
+    hue="dose",
+    ax=axes[1],
+)
+plt.savefig(
+    os.path.join(
+        base_dir_path, f"notebooks/figures/{method_name}_mean_var_by_cells.png"
+    ),
+)
+
+# %%
+# Violin plots separated by dose
+fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+sns.violinplot(
+    data=stats_per_sample_df,
+    x="dose",
+    y="mean_dist_to_vehicle",
+    ax=axes[0],
+)
+sns.violinplot(
+    data=stats_per_sample_df,
+    x="dose",
+    y="var_dist_to_vehicle",
+    ax=axes[1],
+)
+plt.savefig(
+    os.path.join(
+        base_dir_path, f"notebooks/figures/{method_name}_mean_var_by_dose.png"
+    ),
+)
+
+
 # %%

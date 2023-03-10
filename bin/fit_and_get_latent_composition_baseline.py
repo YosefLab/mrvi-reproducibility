@@ -85,6 +85,10 @@ def fit_and_get_latent_composition_baseline(
     latent_key = f"X_{method_name}"
     _adata.obsm[latent_key] = composition_baseline.get_cell_representation()
     _adata.uns["latent_keys"] = [latent_key]
+    _adata.uns["cluster_key"] = composition_baseline.cluster_key
+    _adata.obs["clustering"] = composition_baseline.adata.obs[
+        composition_baseline.cluster_key
+    ]
 
     make_parents(distance_matrices_out)
     freqs_all = composition_baseline.get_local_sample_representation()
@@ -93,10 +97,8 @@ def fit_and_get_latent_composition_baseline(
     celltypes = []
     for celltype, freqs in freqs_all.items():
         freqs_ = freqs.reindex(unique_samples, fill_value=0)
-        print(freqs_.shape)
         celltypes.append(celltype)
         dist_ = pairwise_distances(freqs_, metric="euclidean")[None]
-        print(dist_.shape)
         dists.append(dist_)
     dists = np.concatenate(dists, axis=0)
 
