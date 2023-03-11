@@ -1,7 +1,11 @@
 # %%
+import warnings
+from collections import defaultdict
+
 import pandas as pd
 import scanpy as sc
 import numpy as np
+import matplotlib.pyplot as plt
 
 # %%
 adata = sc.read(
@@ -63,8 +67,69 @@ cell_cycle_genes = [x for x in cell_cycle_genes if x in adata.var_names]
 cell_lines = list(adata.obs["cell_type"].cat.categories)
 cell_lines
 # %%
-use_sciplex_filter = True
-if use_sciplex_filter:
+use_simple_deg_filter = True
+use_sciplex_filter = False
+if use_simple_deg_filter:
+    warnings.filterwarnings("ignore")
+    adata.layers["log1p"] = sc.pp.log1p(adata, copy=True).X
+    adata.uns["log1p"] = {"base": None}
+    n_deg_cutoff = 2000
+    per_cl_deg_products = defaultdict(list)
+    for cl in cell_lines:
+        cl_adata = adata[adata.obs["cell_type"] == cl]
+        sc.tl.rank_genes_groups(
+            cl_adata,
+            "product_dose",
+            layer="log1p",
+            reference="Vehicle_0",
+            method="t-test",
+            corr_method="benjamini-hochberg",
+        )
+
+        n_deg_dict = defaultdict(dict)
+        for prod_dose in cl_adata.obs["product_dose"].cat.categories:
+            if prod_dose == "Vehicle_0":
+                continue
+            sig_idxs = cl_adata.uns["rank_genes_groups"]["pvals_adj"][prod_dose] <= 0.05
+            suff_lfc_idxs = (
+                np.abs(cl_adata.uns["rank_genes_groups"]["logfoldchanges"][prod_dose])
+                >= 0.5
+            )
+            product_name, dose = prod_dose.split("_")
+            n_deg_dict[product_name][dose] = np.sum(sig_idxs & suff_lfc_idxs)
+
+        n_deg_list = []
+        for prod in n_deg_dict:
+            for dose in n_deg_dict[prod]:
+                n_deg_list.append(n_deg_dict[prod][dose])
+
+        plt.hist(n_deg_list, bins=100)
+        plt.xlim(0, 10000)
+        plt.axvline(x=2800, color="r", linestyle="--")
+        plt.show()
+
+        # Keep products with at least one dose past the cutoff
+        for prod in n_deg_dict:
+            for dose in n_deg_dict[prod]:
+                if n_deg_dict[prod][dose] >= n_deg_cutoff:
+                    per_cl_deg_products[cl].append(prod)
+                    break
+    for cl in per_cl_deg_products:
+        print(cl, len(per_cl_deg_products[cl]))
+    # Len of union of cl deg products
+    union_deg_products = set.union(
+        *[set(per_cl_deg_products[cl]) for cl in per_cl_deg_products]
+    )
+    print(f"Union of all: {len(union_deg_products)}")
+    filtered_adata = adata[adata.obs["product_name"].isin(union_deg_products)].copy()
+    for cl in per_cl_deg_products:
+        filtered_adata.obs[f"{cl}_deg_product"] = filtered_adata.obs[
+            "product_name"
+        ].isin(per_cl_deg_products[cl])
+        filtered_adata.obs[f"{cl}_deg_product"] = (
+            filtered_adata.obs[f"{cl}_deg_product"].astype(str).astype("category")
+        )
+elif use_sciplex_filter:
     # filter with vehicle similar products from sciplex_filter.py
     vehicle_nonsim_prods_path = "output/vehicle_nonsim_prods.txt"
     with open(vehicle_nonsim_prods_path, "r") as f:
@@ -87,6 +152,18 @@ else:
 
     # filter to all significant products across all cell lines
     filtered_adata = adata[adata.obs["product_name"].isin(all_sig_prods)].copy()
+    for cl in cell_lines:
+        # Indicate which are significant products for this cell line
+        filtered_adata.obs[f"{cl}_sig_prod"] = filtered_adata.obs["product_name"].isin(
+            per_cell_line_prods[cl]
+        )
+
+        # indicate which doses are significant for this cell line
+        sig_prod_doses = pd.read_csv(f"output/{cl}.csv", header=None)
+        sig_prod_doses.columns = ["product_dose"]
+        filtered_adata.obs[f"{cl}_sig_prod_dose"] = filtered_adata.obs[
+            "product_dose"
+        ].isin(sig_prod_doses["product_dose"].values)
 
 
 # %%
@@ -98,26 +175,17 @@ filtered_adata = filtered_adata.concatenate(
 # %%
 # Top 10k HVGs
 hvgs = sc.pp.highly_variable_genes(
-    filtered_adata, flavor="seurat_v3", n_top_genes=10000, subset=True
+    filtered_adata,
+    flavor="seurat_v3",
+    batch_key="cell_type",
+    n_top_genes=10000,
+    subset=True,
 )
 
 # %%
 # For keeping all phases
 for cl in cell_lines:
     sub_adata = filtered_adata[filtered_adata.obs["cell_type"] == cl].copy()
-
-    if not use_sciplex_filter:
-        # Indicate which are significant products for this cell line
-        sub_adata.obs["sig_prod_cell_line"] = sub_adata.obs["product_name"].isin(
-            per_cell_line_prods[cl]
-        )
-
-        # indicate which doses are significant for this cell line
-        sig_prod_doses = pd.read_csv(f"output/{cl}.csv", header=None)
-        sig_prod_doses.columns = ["product_dose"]
-        sub_adata.obs["sig_prod_dose_cell_line"] = sub_adata.obs["product_dose"].isin(
-            sig_prod_doses["product_dose"].values
-        )
 
     # label phases (Too much mem to do this before filtering doses)
     sub_adata.layers["counts"] = sub_adata.X.copy()
@@ -138,7 +206,9 @@ for cl in cell_lines:
     sub_adata.obs_names = sub_adata.obs_names.values
 
     print(sub_adata)
-    if use_sciplex_filter:
+    if use_simple_deg_filter:
+        sub_adata.write(f"../data/sciplex_{cl}_simple_filtered_all_phases.h5ad")
+    elif use_sciplex_filter:
         sub_adata.write(f"../data/sciplex_{cl}_significant_filtered_all_phases.h5ad")
     else:
         sub_adata.write(f"../data/sciplex_{cl}_significant_all_phases.h5ad")
@@ -146,19 +216,19 @@ for cl in cell_lines:
 
 # %%
 # Subsample the filtered datasets to 100 cells (filter out lower)
-subsample_size = 100
-for cl in cell_lines:
-    sub_adata = sc.read(f"../data/sciplex_{cl}_significant_filtered_all_phases.h5ad")
-    num_cells_per_sample = sub_adata.obs["product_dose"].value_counts()
-    keep_idxs = np.zeros(sub_adata.X.shape[0], dtype=bool)
-    for sample in num_cells_per_sample.index:
-        if num_cells_per_sample[sample] >= subsample_size:
-            sample_idxs = sub_adata.obs["product_dose"] == sample
-            idx = np.flatnonzero(sample_idxs)
-            r = np.random.choice(idx, 100, replace=False)
-            keep_idxs[r] = True
-    sub_adata = sub_adata[keep_idxs]
-    sub_adata.write(f"../data/sciplex_{cl}_significant_subsampled_all_phases.h5ad")
-    del sub_adata
+# subsample_size = 100
+# for cl in cell_lines:
+#     sub_adata = sc.read(f"../data/sciplex_{cl}_significant_filtered_all_phases.h5ad")
+#     num_cells_per_sample = sub_adata.obs["product_dose"].value_counts()
+#     keep_idxs = np.zeros(sub_adata.X.shape[0], dtype=bool)
+#     for sample in num_cells_per_sample.index:
+#         if num_cells_per_sample[sample] >= subsample_size:
+#             sample_idxs = sub_adata.obs["product_dose"] == sample
+#             idx = np.flatnonzero(sample_idxs)
+#             r = np.random.choice(idx, 100, replace=False)
+#             keep_idxs[r] = True
+#     sub_adata = sub_adata[keep_idxs]
+#     sub_adata.write(f"../data/sciplex_{cl}_significant_subsampled_all_phases.h5ad")
+#     del sub_adata
 
 # %%
