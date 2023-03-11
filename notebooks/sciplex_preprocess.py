@@ -75,6 +75,7 @@ if use_simple_deg_filter:
     adata.uns["log1p"] = {"base": None}
     n_deg_cutoff = 2000
     per_cl_deg_products = defaultdict(list)
+    per_cl_deg_product_doses = defaultdict(list)
     for cl in cell_lines:
         cl_adata = adata[adata.obs["cell_type"] == cl]
         sc.tl.rank_genes_groups(
@@ -113,7 +114,8 @@ if use_simple_deg_filter:
             for dose in n_deg_dict[prod]:
                 if n_deg_dict[prod][dose] >= n_deg_cutoff:
                     per_cl_deg_products[cl].append(prod)
-                    break
+                    per_cl_deg_product_doses[cl].append(f"{prod}_{dose}")
+
     for cl in per_cl_deg_products:
         print(cl, len(per_cl_deg_products[cl]))
     # Len of union of cl deg products
@@ -121,6 +123,7 @@ if use_simple_deg_filter:
         *[set(per_cl_deg_products[cl]) for cl in per_cl_deg_products]
     )
     print(f"Union of all: {len(union_deg_products)}")
+
     filtered_adata = adata[adata.obs["product_name"].isin(union_deg_products)].copy()
     for cl in per_cl_deg_products:
         filtered_adata.obs[f"{cl}_deg_product"] = filtered_adata.obs[
@@ -129,8 +132,15 @@ if use_simple_deg_filter:
         filtered_adata.obs[f"{cl}_deg_product"] = (
             filtered_adata.obs[f"{cl}_deg_product"].astype(str).astype("category")
         )
+
+        filtered_adata.obs[f"{cl}_deg_product_dose"] = filtered_adata.obs[
+            "product_dose"
+        ].isin(per_cl_deg_product_doses[cl])
+        filtered_adata.obs[f"{cl}_deg_product_dose"] = (
+            filtered_adata.obs[f"{cl}_deg_product_dose"].astype(str).astype("category")
+        )
+
 elif use_sciplex_filter:
-    # filter with vehicle similar products from sciplex_filter.py
     vehicle_nonsim_prods_path = "output/vehicle_nonsim_prods.txt"
     with open(vehicle_nonsim_prods_path, "r") as f:
         vehicle_nonsim_prods = f.read().splitlines()

@@ -1,0 +1,15 @@
+{
+    "batch_key": "plate_oligo",
+    "sample_key": "product_dose",
+    "labels_key": "phase",
+    "mrvi_train_kwargs": {
+        "max_epochs": 400
+    },
+    "scviv2_train_kwargs": {
+        "max_epochs": 400
+    },
+    "composition_scvi_train_kwargs": {
+        "max_epochs": 400
+    },
+    "clustering_method": "ward"
+}
