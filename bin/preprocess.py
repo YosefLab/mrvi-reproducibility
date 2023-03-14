@@ -40,9 +40,21 @@ def preprocess(
     config = load_config(config_in)
     adata = sc.read(adata_in)
     hvg_kwargs = config.get("hvg_kwargs", None)
+    min_obs_per_sample = config.get("min_obs_per_sample", None)
 
+    cell_type_key = config.get("labels_key")
+    if cell_type_key not in adata.obs.keys():
+        adata.obs.loc[:, cell_type_key] = "0"
+        adata.obs.loc[:, cell_type_key] = adata.obs.loc[:, cell_type_key].astype("category")
     if hvg_kwargs is not None:
         adata = _hvg(adata, **hvg_kwargs)
+    if min_obs_per_sample is not None:
+        n_obs_per_sample = adata.obs.groupby(config["sample_key"]).size()
+        selected_samples = n_obs_per_sample[n_obs_per_sample >= min_obs_per_sample].index
+        adata = adata[adata.obs[config["sample_key"]].isin(selected_samples)].copy()
+        adata.obs.loc[:, config["sample_key"]] = pd.Categorical(
+            adata.obs.loc[:, config["sample_key"]]
+        )
     adata, distance_matrices = _run_dataset_specific_preprocessing(
         adata, adata_in, config
     )

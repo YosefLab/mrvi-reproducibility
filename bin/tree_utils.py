@@ -36,7 +36,7 @@ def linkage_to_ete(linkage_obj):
     return root
 
 
-def hierarchical_clustering(dist_mtx, method="ward"):
+def hierarchical_clustering(dist_mtx, method="ward", return_ete=True):
     """Perform hierarchical clustering on squared distance matrix."""
     assert dist_mtx.shape[0] == dist_mtx.shape[1]
     dist_mtx = dist_mtx.astype(np.float32)  # May have numerical issues with float64
@@ -48,4 +48,4 @@ def hierarchical_clustering(dist_mtx, method="ward"):
         dist_mtx = (dist_mtx + dist_mtx.T) / 2.0
     red_mtx = squareform(dist_mtx)
     z = linkage(red_mtx, method=method)
-    return linkage_to_ete(z)
+    return (linkage_to_ete(z) if return_ete else z)
