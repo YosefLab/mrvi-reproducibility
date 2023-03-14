@@ -1,9 +1,18 @@
 include { fit_mrvi } from params.modules.fit_mrvi
 include { get_latent_mrvi } from params.modules.get_latent_mrvi
 include { get_outputs_mrvi } from params.modules.get_outputs_mrvi
-include { fit_scviv2; fit_scviv2 as fit_scviv2_nonlinear } from params.modules.fit_scviv2
-include { fit_scviv2_prior } from params.modules.fit_scviv2_prior
-include { get_latent_scviv2; get_latent_scviv2 as get_latent_scviv2_nonlinear; get_latent_scviv2 as get_latent_scviv2_prior } from params.modules.get_latent_scviv2
+include {
+    fit_scviv2;
+    fit_scviv2 as fit_scviv2_nonlinear;
+    fit_scviv2 as fit_scviv2_prior;
+    fit_scviv2 as fit_scviv2_weighted;
+} from params.modules.fit_scviv2
+include {
+    get_latent_scviv2;
+    get_latent_scviv2 as get_latent_scviv2_nonlinear;
+    get_latent_scviv2 as get_latent_scviv2_prior;
+    get_latent_scviv2 as get_latent_scviv2_weighted;
+} from params.modules.get_latent_scviv2
 include {
     fit_and_get_latent_composition_baseline as fit_and_get_latent_composition_scvi_clusterkey;
     fit_and_get_latent_composition_baseline as fit_and_get_latent_composition_pca_clusterkey;
@@ -23,15 +32,18 @@ workflow run_models {
 
     // Step 1: Run models
     // Run scviv2, compute latents, distance matrices
-    scvi_outs = fit_scviv2(adatas_in, false) | get_latent_scviv2
+    scvi_outs = fit_scviv2(adatas_in, false, false, false) | get_latent_scviv2
     scvi_adata = scvi_outs.adata
 
     // Run scviv2 nonlinear
-    scvi_nonlinear_outs = fit_scviv2_nonlinear(adatas_in, true) | get_latent_scviv2_nonlinear
+    scvi_nonlinear_outs = fit_scviv2_nonlinear(adatas_in, true, false, false) | get_latent_scviv2_nonlinear
     scvi_nonlinear_adata = scvi_nonlinear_outs.adata
 
-    scvi_prior_outs = fit_scviv2_prior(adatas_in) | get_latent_scviv2_prior
+    scvi_prior_outs = fit_scviv2_prior(adatas_in, false, false, true) | get_latent_scviv2_prior
     scvi_prior_adata = scvi_prior_outs.adata
+
+    scvi_weighted_outs = fit_scviv2_weighted(adatas_in, false, true, false) | get_latent_scviv2_weighted
+    scvi_weighted_adata = scvi_weighted_outs.adata
 
     // Organize all outputs
     distance_matrices = scvi_outs.distance_matrices.concat(
@@ -39,10 +51,14 @@ workflow run_models {
         scvi_nonlinear_outs.distance_matrices,
         scvi_nonlinear_outs.normalized_distance_matrices,
         scvi_prior_outs.distance_matrices,
-        scvi_prior_outs.normalized_distance_matrices
+        scvi_prior_outs.normalized_distance_matrices,
+        scvi_weighted_outs.distance_matrices,
+        scvi_weighted_outs.normalized_distance_matrices,
     )
     adatas = scvi_adata.concat(
         scvi_nonlinear_adata,
+        scvi_prior_adata,
+        scvi_weighted_adata,
     )
 
     if ( params.runAllModels) {

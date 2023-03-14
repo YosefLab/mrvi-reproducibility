@@ -2,6 +2,8 @@ process fit_scviv2 {
     input:
     path adata_in
     val use_nonlinear
+    val use_weighted
+    val use_prior
 
     script:
     adata_name = adata_in.getSimpleName()
@@ -17,7 +19,9 @@ process fit_scviv2 {
         --adata_in ${adata_in} \\
         --config_in ${config_in} \\
         --model_out ${model_out} \\
-        --use_nonlinear ${use_nonlinear}
+        --use_nonlinear ${use_nonlinear} \\
+        --use_weighted ${use_weighted} \\
+        --use_prior ${use_prior}
     """
 
     output:

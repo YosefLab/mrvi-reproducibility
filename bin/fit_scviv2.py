@@ -10,6 +10,7 @@ def fit_scviv2(
     config_in: str,
     model_out: str,
     use_nonlinear: bool,
+    use_weights: bool,
     use_prior: bool
 ) -> scvi_v2.MrVI:
     """
@@ -37,9 +38,20 @@ def fit_scviv2(
         sample_key=sample_key,
     )
     if use_nonlinear:
-        model_kwargs["pz_kwargs"] = {"use_nonlinear": True}
+        model_kwargs.update(
+            {
+                "qz_nn_flavor": True,
+                "qz_kwargs": {"use_map": False, "stop_gradients": True},
+            }
+        )
     if use_prior:
         train_kwargs["plan_kwargs"] = {"laplace_scale": 1.0}
+    if use_weights:
+        model_kwargs.update(
+            {
+                "scale_observations": True,
+            }
+        )
     model = scvi_v2.MrVI(adata, **model_kwargs)
     model.train(**train_kwargs)
 
