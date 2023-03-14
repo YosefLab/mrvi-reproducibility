@@ -9,9 +9,9 @@ def fit_scviv2(
     adata_in: str,
     config_in: str,
     model_out: str,
-    use_nonlinear: bool,
-    use_weights: bool,
-    use_prior: bool
+    use_nonlinear: str = "false",
+    use_weighted: str = "false",
+    use_prior: str = "false",
 ) -> scvi_v2.MrVI:
     """
     Train a MrVI model.
@@ -25,6 +25,10 @@ def fit_scviv2(
     model_out
         Path to write the trained MrVI model.
     """
+    use_nonlinear = use_nonlinear.lower() == "true"
+    use_weighted = use_weighted.lower() == "true"
+    use_prior = use_prior.lower() == "true"
+
     config = load_config(config_in)
     batch_key = config.get("batch_key", None)
     sample_key = config.get("sample_key", None)
@@ -45,8 +49,8 @@ def fit_scviv2(
             }
         )
     if use_prior:
-        train_kwargs["plan_kwargs"] = {"laplace_scale": 1.0}
-    if use_weights:
+        model_kwargs.update({"laplace_scale": 1.0})
+    if use_weighted:
         model_kwargs.update(
             {
                 "scale_observations": True,

@@ -1,8 +1,8 @@
+import gc
 import json
 import os
 import pathlib
 import pickle
-import gc
 from inspect import signature
 from pathlib import Path
 from typing import Callable
@@ -126,7 +126,6 @@ def load_results(results_paths):
                 all_results["distances_metrics"].append(df)
             elif file.endswith("sciplex_metrics.csv"):
                 all_results["sciplex_metrics"].append(df)
-            pass
         elif file.endswith(".h5ad"):
             adata = sc.read_h5ad(file, backed="r")
             for rep_type in ["MDE", "PCA", "UMAP"]:

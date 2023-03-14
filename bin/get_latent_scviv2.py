@@ -1,7 +1,8 @@
+from pathlib import Path
+
 import scanpy as sc
 import scvi_v2
 from anndata import AnnData
-import numpy as np
 from utils import load_config, make_parents, wrap_kwargs
 
 
@@ -63,16 +64,19 @@ def get_latent_scviv2(
     cell_dists.to_netcdf(distance_matrices_out)
     del cell_dists
 
-    cell_normalized_dists = model.get_local_sample_distances(
-        adata,
-        use_mean=False,
-        normalize_distances=True,
-        keep_cell=False,
-        groupby=labels_key,
-    )
     make_parents(normalized_distance_matrices_out)
-    cell_normalized_dists.to_netcdf(normalized_distance_matrices_out)
-    del cell_normalized_dists
+    try:
+        cell_normalized_dists = model.get_local_sample_distances(
+            adata,
+            use_mean=False,
+            normalize_distances=True,
+            keep_cell=False,
+            groupby=labels_key,
+        )
+        cell_normalized_dists.to_netcdf(normalized_distance_matrices_out)
+        del cell_normalized_dists
+    except AttributeError:
+        Path(normalized_distance_matrices_out).touch()
 
     return (
         adata_out,

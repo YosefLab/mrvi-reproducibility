@@ -8,11 +8,22 @@ process fit_scviv2 {
     script:
     adata_name = adata_in.getSimpleName()
     config_in = "${params.conf.datasets}/${adata_name}.json"
+
     if (use_nonlinear) {
         method_name = "scviv2_nonlinear"
-    } else {
+    }
+    else if (use_weighted)
+     {
+        method_name = "scviv2_weighted"
+    }
+    else if (use_prior)
+     {
+        method_name = "scviv2_prior"
+    }
+    else {
         method_name = "scviv2"
     }
+
     model_out = "${params.outputs.models}/${adata_name}.${method_name}"
     """
     python3 ${params.bin.fit_scviv2} \\
