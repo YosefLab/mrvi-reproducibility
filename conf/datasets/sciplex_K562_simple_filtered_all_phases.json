@@ -3,13 +3,13 @@
     "sample_key": "product_dose",
     "labels_key": "phase",
     "mrvi_train_kwargs": {
-        "max_epochs": 400
+        "max_epochs": 200
     },
     "scviv2_train_kwargs": {
-        "max_epochs": 400
+        "max_epochs": 200
     },
     "composition_scvi_train_kwargs": {
-        "max_epochs": 400
+        "max_epochs": 200
     },
     "clustering_method": "ward"
 }

@@ -68,7 +68,6 @@ cell_lines = list(adata.obs["cell_type"].cat.categories)
 cell_lines
 # %%
 use_simple_deg_filter = True
-use_sciplex_filter = False
 if use_simple_deg_filter:
     warnings.filterwarnings("ignore")
     adata.layers["log1p"] = sc.pp.log1p(adata, copy=True).X
@@ -139,12 +138,6 @@ if use_simple_deg_filter:
         filtered_adata.obs[f"{cl}_deg_product_dose"] = (
             filtered_adata.obs[f"{cl}_deg_product_dose"].astype(str).astype("category")
         )
-
-elif use_sciplex_filter:
-    vehicle_nonsim_prods_path = "output/vehicle_nonsim_prods.txt"
-    with open(vehicle_nonsim_prods_path, "r") as f:
-        vehicle_nonsim_prods = f.read().splitlines()
-    filtered_adata = adata[adata.obs["product_name"].isin(vehicle_nonsim_prods)].copy()
 else:
     # Requires running sciplex_get_significant_product_dose.R first
     all_sig_prods = set()
@@ -218,27 +211,8 @@ for cl in cell_lines:
     print(sub_adata)
     if use_simple_deg_filter:
         sub_adata.write(f"../data/sciplex_{cl}_simple_filtered_all_phases.h5ad")
-    elif use_sciplex_filter:
-        sub_adata.write(f"../data/sciplex_{cl}_significant_filtered_all_phases.h5ad")
     else:
         sub_adata.write(f"../data/sciplex_{cl}_significant_all_phases.h5ad")
     del sub_adata
-
-# %%
-# Subsample the filtered datasets to 100 cells (filter out lower)
-# subsample_size = 100
-# for cl in cell_lines:
-#     sub_adata = sc.read(f"../data/sciplex_{cl}_significant_filtered_all_phases.h5ad")
-#     num_cells_per_sample = sub_adata.obs["product_dose"].value_counts()
-#     keep_idxs = np.zeros(sub_adata.X.shape[0], dtype=bool)
-#     for sample in num_cells_per_sample.index:
-#         if num_cells_per_sample[sample] >= subsample_size:
-#             sample_idxs = sub_adata.obs["product_dose"] == sample
-#             idx = np.flatnonzero(sample_idxs)
-#             r = np.random.choice(idx, 100, replace=False)
-#             keep_idxs[r] = True
-#     sub_adata = sub_adata[keep_idxs]
-#     sub_adata.write(f"../data/sciplex_{cl}_significant_subsampled_all_phases.h5ad")
-#     del sub_adata
 
 # %%
