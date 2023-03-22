@@ -86,6 +86,7 @@ if use_simple_deg_filter:
             corr_method="benjamini-hochberg",
         )
 
+        flat_n_deg_dict = {}
         n_deg_dict = defaultdict(dict)
         for prod_dose in cl_adata.obs["product_dose"].cat.categories:
             if prod_dose == "Vehicle_0":
@@ -97,6 +98,13 @@ if use_simple_deg_filter:
             )
             product_name, dose = prod_dose.split("_")
             n_deg_dict[product_name][dose] = np.sum(sig_idxs & suff_lfc_idxs)
+            flat_n_deg_dict[prod_dose] = np.sum(sig_idxs & suff_lfc_idxs)
+
+        # save flat_deg_dict to csv
+        flat_deg_df = pd.DataFrame.from_dict(flat_n_deg_dict, orient="index")
+        flat_deg_df.to_csv(
+            "output/{}_flat_deg_dict.csv".format(cl), index_label="product_dose"
+        )
 
         n_deg_list = []
         for prod in n_deg_dict:
@@ -116,7 +124,7 @@ if use_simple_deg_filter:
                     per_cl_deg_product_doses[cl].append(f"{prod}_{dose}")
 
     for cl in per_cl_deg_products:
-        print(cl, len(per_cl_deg_products[cl]))
+        print(cl, len(set(per_cl_deg_products[cl])))
     # Len of union of cl deg products
     union_deg_products = set.union(
         *[set(per_cl_deg_products[cl]) for cl in per_cl_deg_products]

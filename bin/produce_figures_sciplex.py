@@ -2,9 +2,9 @@
 import argparse
 import os
 import glob
-import re
 
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import pandas as pd
 import numpy as np
 import xarray as xr
@@ -64,9 +64,9 @@ pathway_color_map = {
     "PKC signaling": "plum",
     "Protein folding & Protein degradation": "indigo",
     "TGF/BMP signaling": "cyan",
-    "Tyrosine kinase signaling": "red",
+    "Tyrosine kinase signaling": "lightblue",
     "Other": "orchid",
-    "Vehicle": "lightblue",
+    "Vehicle": "red",
 }
 
 # %%
@@ -97,6 +97,9 @@ for dataset_name in sciplex_metrics_df["dataset_name"].unique():
             continue
         if plot_df[metric].isna().any():
             continue
+        plot_df.loc[plot_df["phase"].isna(), "phase"] = plot_df.loc[
+            plot_df["phase"].isna(), "phase_name"
+        ]
         plot_df.loc[plot_df["phase"].isna(), "phase"] = "leiden"
         fig = (
             p9.ggplot(
@@ -145,6 +148,36 @@ for method_name in method_names:
             .map(pathway_color_map)
         )
 
+        n_deg_dict = pd.read_csv(
+            f"../notebooks/output/{cl}_flat_deg_dict.csv", index_col=0
+        ).to_dict()["0"]
+        sample_to_n_deg_df = normalized_dists.sample_x.to_series().map(n_deg_dict)
+        sample_to_n_deg_df = sample_to_n_deg_df.map(
+            lambda x: cm.get_cmap("viridis", 256)(x / np.max(sample_to_n_deg_df))
+        )
+
+        sample_to_sig_prod_dose = (
+            adata.obs[["product_dose", f"{cl}_deg_product_dose"]]
+            .drop_duplicates()
+            .set_index("product_dose")[f"{cl}_deg_product_dose"]
+            .fillna("False")
+            .map({"True": "red", "False": "blue"})
+        )
+
+        full_col_colors_df = pd.concat(
+            [
+                sample_to_color_df,
+                sample_to_n_deg_df,
+                sample_to_sig_prod_dose,
+            ],
+            axis=1,
+        )
+        full_col_colors_df.columns = [
+            "pathway",
+            "n_degs",
+            "sig_prod_dose",
+        ]
+
         # Pathway annotated clustermap filtered down to the same product doses
         for cluster in dists[cluster_dim_name].values:
             # unnormalized version
@@ -159,7 +192,7 @@ for method_name in method_names:
                 cmap="YlGnBu",
                 yticklabels=True,
                 xticklabels=True,
-                col_colors=sample_to_color_df,
+                col_colors=full_col_colors_df,
                 vmin=0,
                 vmax=unnormalized_vmax,
             )
@@ -189,22 +222,17 @@ for method_name in method_names:
 
             # normalized with same order
             normalized_vmax = np.percentile(normalized_dists.values, 90)
-            dists_sample_order = g_dists.data.columns[
-                g_dists.dendrogram_col.reordered_ind
-            ]
             g = sns.clustermap(
                 normalized_dists.loc[cluster]
                 .sel(
-                    sample_x=dists_sample_order,
-                    sample_y=dists_sample_order,
+                    sample_x=normalized_dists.sample_x,
+                    sample_y=normalized_dists.sample_y,
                 )
                 .to_pandas(),
                 cmap="YlGnBu",
                 yticklabels=True,
                 xticklabels=True,
-                col_colors=sample_to_color_df,
-                row_cluster=False,
-                col_cluster=False,
+                col_colors=full_col_colors_df,
                 vmin=0,
                 vmax=normalized_vmax,
             )
@@ -233,24 +261,23 @@ for method_name in method_names:
             )
             plt.clf()
 
-            # normalized with clustered on clipped values
-            clipped_normalized_dists = (
+            sig_samples = adata.obs[
+                (adata.obs[f"{cl}_deg_product_dose"] == "True")
+                | (adata.obs["product_name"] == "Vehicle")
+            ]["product_dose"].unique()
+            g = sns.clustermap(
                 normalized_dists.loc[cluster]
                 .sel(
-                    sample_x=normalized_dists.sample_x,
-                    sample_y=normalized_dists.sample_y,
+                    sample_x=sig_samples,
+                    sample_y=sig_samples,
                 )
-                .to_pandas()
-            )
-            clipped_normalized_dists = clipped_normalized_dists.clip(lower=1, upper=4)
-            g = sns.clustermap(
-                clipped_normalized_dists,
+                .to_pandas(),
                 cmap="YlGnBu",
                 yticklabels=True,
                 xticklabels=True,
-                col_colors=sample_to_color_df,
-                vmin=1,
-                vmax=4,
+                col_colors=full_col_colors_df,
+                vmin=0,
+                vmax=normalized_vmax,
             )
             g.ax_heatmap.set_xticklabels(
                 g.ax_heatmap.get_xmajorticklabels(), fontsize=2
@@ -272,7 +299,7 @@ for method_name in method_names:
             )
             plt.gca().add_artist(product_legend)
             save_figures(
-                f"{cluster}.{method_name}.clipped_normalized_distance_matrices_heatmap",
+                f"{cluster}.{method_name}.sig_normalized_distance_matrices_heatmap",
                 dataset_name,
             )
             plt.clf()
@@ -287,6 +314,7 @@ baseline_method_names = [
 for method_name in baseline_method_names:
     for cl in cell_lines:
         dataset_name = f"sciplex_{cl}_simple_filtered_all_phases"
+
         dists_path = f"{dataset_name}.{method_name}.distance_matrices.nc"
         dists = xr.open_dataarray(dists_path)
         cluster_dim_name = dists.dims[0]
@@ -339,3 +367,47 @@ for method_name in baseline_method_names:
                 f"{cluster}.{method_name}.distance_matrices_heatmap", dataset_name
             )
             plt.clf()
+
+            sig_samples = adata.obs[
+                (adata.obs[f"{cl}_deg_product_dose"] == "True")
+                | (adata.obs["product_name"] == "Vehicle")
+            ]["product_dose"].unique()
+            g_dists = sns.clustermap(
+                dists.loc[cluster]
+                .sel(
+                    sample_x=sig_samples,
+                    sample_y=sig_samples,
+                )
+                .to_pandas(),
+                cmap="YlGnBu",
+                yticklabels=True,
+                xticklabels=True,
+                col_colors=sample_to_color_df,
+                vmin=0,
+                vmax=vmax,
+            )
+            g_dists.ax_heatmap.set_xticklabels(
+                g_dists.ax_heatmap.get_xmajorticklabels(), fontsize=2
+            )
+            g_dists.ax_heatmap.set_yticklabels(
+                g_dists.ax_heatmap.get_ymajorticklabels(), fontsize=2
+            )
+
+            handles = [
+                Patch(facecolor=pathway_color_map[name]) for name in pathway_color_map
+            ]
+            product_legend = plt.legend(
+                handles,
+                pathway_color_map,
+                title="Product Name",
+                bbox_to_anchor=(1, 0.9),
+                bbox_transform=plt.gcf().transFigure,
+                loc="upper right",
+            )
+            plt.gca().add_artist(product_legend)
+            save_figures(
+                f"{cluster}.{method_name}.sig_distance_matrices_heatmap", dataset_name
+            )
+            plt.clf()
+
+# %%
