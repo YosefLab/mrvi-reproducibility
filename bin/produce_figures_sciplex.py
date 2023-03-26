@@ -11,7 +11,7 @@ import seaborn as sns
 import scanpy as sc
 import plotnine as p9
 from matplotlib.patches import Patch
-from utils import load_results, INCH_TO_CM
+from utils import load_results, INCH_TO_CM, set_breakpoint
 
 # Change to False if you want to run this script directly
 RUN_WITH_PARSER = True
@@ -74,6 +74,10 @@ all_results = load_results(results_paths)
 sciplex_metrics_df = all_results["sciplex_metrics"]
 
 for dataset_name in sciplex_metrics_df["dataset_name"].unique():
+    dataset_dir = os.path.join(output_dir, dataset_name)
+    if not os.path.exists(dataset_dir):
+        os.makedirs(dataset_dir, exist_ok=True)
+
     plot_df = sciplex_metrics_df[
         (sciplex_metrics_df["dataset_name"] == dataset_name)
         & (
@@ -81,27 +85,32 @@ for dataset_name in sciplex_metrics_df["dataset_name"].unique():
         )  # Exclude normalized matrices
     ]
     for metric in sciplex_metrics_df.columns:
-        if metric in ["model_name", "dataset_name", "phase", "distance_type"]:
+        if metric in [
+            "model_name",
+            "dataset_name",
+            "distance_type",
+            "phase",
+            "phase_name",
+            "leiden_1.0",
+        ]:
             continue
         if plot_df[metric].isna().any():
             continue
+        plot_df.loc[plot_df["phase"].isna(), "phase"] = "leiden"
         fig = (
             p9.ggplot(
                 plot_df,
-                p9.aes(x="model_name", y=metric, fill="model_name", color="phase"),
+                p9.aes(x="model_name", y=metric, color="phase"),
             )
-            + p9.geom_boxplot()
+            + p9.geom_boxplot(width=0.15)
             + p9.theme_classic()
             + p9.coord_flip()
             + p9.theme(
                 legend_position="top",
-                figure_size=(4 * INCH_TO_CM, 4 * INCH_TO_CM),
+                figure_size=(4 * INCH_TO_CM, 6 * INCH_TO_CM),
             )
             + p9.labs(x="model_name", y=metric)
         )
-        dataset_dir = os.path.join(output_dir, dataset_name)
-        if not os.path.exists(dataset_dir):
-            os.makedirs(dataset_dir, exist_ok=True)
         fig.save(os.path.join(dataset_dir, f"{metric}.svg"))
 
 # %%
@@ -111,13 +120,14 @@ method_names = ["scviv2", "scviv2_nonlinear"]
 # Per dataset plots
 for method_name in method_names:
     for cl in cell_lines:
-        dataset_name = f"sciplex_{cl}_significant_filtered_all_phases"
+        dataset_name = f"sciplex_{cl}_significant_subsampled_all_phases"
         normalized_dists_path = (
             f"{dataset_name}.{method_name}.normalized_distance_matrices.nc"
         )
-        normalized_dists = xr.open_dataset(normalized_dists_path)
+        normalized_dists = xr.open_dataarray(normalized_dists_path)
         dists_path = f"{dataset_name}.{method_name}.distance_matrices.nc"
-        dists = xr.open_dataset(dists_path)
+        dists = xr.open_dataarray(dists_path)
+        cluster_dim_name = dists.dims[0]
 
         adata_path = f"{dataset_name}.{method_name}.final.h5ad"
         adata = sc.read(adata_path)
@@ -135,15 +145,16 @@ for method_name in method_names:
         )
 
         # Pathway annotated clustermap filtered down to the same product doses
-        for phase in dists.phase_name.values:
+        for cluster in dists[cluster_dim_name].values:
             # unnormalized version
-            unnormalized_vmax = np.percentile(dists.phase.values, 90)
+            unnormalized_vmax = np.percentile(dists.values, 90)
             g_dists = sns.clustermap(
-                dists.phase.sel(
-                    phase_name=phase,
+                dists.loc[cluster]
+                .sel(
                     sample_x=normalized_dists.sample_x,
                     sample_y=normalized_dists.sample_y,
-                ).to_pandas(),
+                )
+                .to_pandas(),
                 cmap="YlGnBu",
                 yticklabels=True,
                 xticklabels=True,
@@ -171,21 +182,22 @@ for method_name in method_names:
             )
             plt.gca().add_artist(product_legend)
             save_figures(
-                f"{phase}.{method_name}.distance_matrices_heatmap", dataset_name
+                f"{cluster}.{method_name}.distance_matrices_heatmap", dataset_name
             )
             plt.clf()
 
             # normalized with same order
-            normalized_vmax = np.percentile(normalized_dists.phase.values, 90)
+            normalized_vmax = np.percentile(normalized_dists.values, 90)
             dists_sample_order = g_dists.data.columns[
                 g_dists.dendrogram_col.reordered_ind
             ]
             g = sns.clustermap(
-                normalized_dists.phase.sel(
-                    phase_name=phase,
+                normalized_dists.loc[cluster]
+                .sel(
                     sample_x=dists_sample_order,
                     sample_y=dists_sample_order,
-                ).to_pandas(),
+                )
+                .to_pandas(),
                 cmap="YlGnBu",
                 yticklabels=True,
                 xticklabels=True,
@@ -215,17 +227,20 @@ for method_name in method_names:
             )
             plt.gca().add_artist(product_legend)
             save_figures(
-                f"{phase}.{method_name}.normalized_distance_matrices_heatmap",
+                f"{cluster}.{method_name}.normalized_distance_matrices_heatmap",
                 dataset_name,
             )
             plt.clf()
 
             # normalized with clustered on clipped values
-            clipped_normalized_dists = normalized_dists.phase.sel(
-                phase_name=phase,
-                sample_x=normalized_dists.sample_x,
-                sample_y=normalized_dists.sample_y,
-            ).to_pandas()
+            clipped_normalized_dists = (
+                normalized_dists.loc[cluster]
+                .sel(
+                    sample_x=normalized_dists.sample_x,
+                    sample_y=normalized_dists.sample_y,
+                )
+                .to_pandas()
+            )
             clipped_normalized_dists = clipped_normalized_dists.clip(lower=1, upper=4)
             g = sns.clustermap(
                 clipped_normalized_dists,
@@ -256,20 +271,24 @@ for method_name in method_names:
             )
             plt.gca().add_artist(product_legend)
             save_figures(
-                f"{phase}.{method_name}.clipped_normalized_distance_matrices_heatmap",
+                f"{cluster}.{method_name}.clipped_normalized_distance_matrices_heatmap",
                 dataset_name,
             )
             plt.clf()
 
 # %%
-baseline_method_names = ["composition_PCA_clusterkey_subleiden1", "composition_SCVI_clusterkey_subleiden1"]
+baseline_method_names = [
+    "composition_PCA_clusterkey_subleiden1",
+    "composition_SCVI_clusterkey_subleiden1",
+]
 
 # Per baseline dataset plots
 for method_name in baseline_method_names:
     for cl in cell_lines:
-        dataset_name = f"sciplex_{cl}_significant_filtered_all_phases"
+        dataset_name = f"sciplex_{cl}_significant_subsampled_all_phases"
         dists_path = f"{dataset_name}.{method_name}.distance_matrices.nc"
         dists = xr.open_dataarray(dists_path)
+        cluster_dim_name = dists.dims[0]
 
         adata_path = f"{dataset_name}.{method_name}.final.h5ad"
         adata = sc.read(adata_path)
@@ -285,12 +304,10 @@ for method_name in baseline_method_names:
         )
 
         # Pathway annotated clustermap filtered down to the same product doses
-        for phase in dists.phase_name.values:
+        for cluster in dists[cluster_dim_name].values:
             vmax = np.percentile(dists.values, 90)
             g_dists = sns.clustermap(
-                dists.sel(
-                    phase_name=phase,
-                ).to_pandas(),
+                dists.loc[cluster].to_pandas(),
                 cmap="YlGnBu",
                 yticklabels=True,
                 xticklabels=True,
@@ -318,6 +335,6 @@ for method_name in baseline_method_names:
             )
             plt.gca().add_artist(product_legend)
             save_figures(
-                f"{phase}.{method_name}.distance_matrices_heatmap", dataset_name
+                f"{cluster}.{method_name}.distance_matrices_heatmap", dataset_name
             )
             plt.clf()
