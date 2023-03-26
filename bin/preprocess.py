@@ -43,6 +43,7 @@ def preprocess(
     min_obs_per_sample = config.get("min_obs_per_sample", None)
 
     cell_type_key = config.get("labels_key")
+    adata.obs.index.name = None  # ensuring that index is not named, which could cause problem when resetting index
     if cell_type_key not in adata.obs.keys():
         adata.obs.loc[:, cell_type_key] = "0"
         adata.obs.loc[:, cell_type_key] = adata.obs.loc[:, cell_type_key].astype("category")
