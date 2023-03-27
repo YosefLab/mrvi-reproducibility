@@ -12,10 +12,10 @@ import seaborn as sns
 import scanpy as sc
 import plotnine as p9
 from matplotlib.patches import Patch
-from utils import load_results, INCH_TO_CM, set_breakpoint
+from utils import load_results, INCH_TO_CM
 
 # Change to False if you want to run this script directly
-RUN_WITH_PARSER = False
+RUN_WITH_PARSER = True
 plt.rcParams["svg.fonttype"] = "none"
 
 # %%
@@ -125,18 +125,15 @@ method_names = ["scviv2", "scviv2_nonlinear"]
 for method_name in method_names:
     for cl in cell_lines:
         dataset_name = f"sciplex_{cl}_simple_filtered_all_phases"
-        adata_base_path = "../results/sciplex_pipeline/data"
-        dists_base_path = "../results/sciplex_pipeline/distance_matrices"
-        normalized_dists_path = f"{dataset_name}.{method_name}.normalized_distance_matrices.nc"
-        normalized_dists_path = os.path.join(dists_base_path, normalized_dists_path)
+        normalized_dists_path = (
+            f"{dataset_name}.{method_name}.normalized_distance_matrices.nc"
+        )
         normalized_dists = xr.open_dataarray(normalized_dists_path)
         dists_path = f"{dataset_name}.{method_name}.distance_matrices.nc"
-        dists_path = os.path.join(dists_base_path, dists_path)
         dists = xr.open_dataarray(dists_path)
         cluster_dim_name = dists.dims[0]
 
         adata_path = f"{dataset_name}.{method_name}.final.h5ad"
-        adata_path = os.path.join(adata_base_path, adata_path)
         adata = sc.read(adata_path)
 
         sample_to_pathway = (
@@ -146,7 +143,9 @@ for method_name in method_names:
             .to_dict()
         )
         sample_to_color_df = (
-            normalized_dists.sample_x.to_series().map(sample_to_pathway).map(pathway_color_map)
+            normalized_dists.sample_x.to_series()
+            .map(sample_to_pathway)
+            .map(pathway_color_map)
         )
 
         n_deg_dict = pd.read_csv(
@@ -164,7 +163,6 @@ for method_name in method_names:
             .fillna("False")
             .map({"True": "red", "False": "blue"})
         )
-
 
         full_col_colors_df = pd.concat(
             [
@@ -205,7 +203,9 @@ for method_name in method_names:
                 g_dists.ax_heatmap.get_ymajorticklabels(), fontsize=2
             )
 
-            handles = [Patch(facecolor=pathway_color_map[name]) for name in pathway_color_map]
+            handles = [
+                Patch(facecolor=pathway_color_map[name]) for name in pathway_color_map
+            ]
             product_legend = plt.legend(
                 handles,
                 pathway_color_map,
@@ -236,10 +236,16 @@ for method_name in method_names:
                 vmin=0,
                 vmax=normalized_vmax,
             )
-            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xmajorticklabels(), fontsize=2)
-            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_ymajorticklabels(), fontsize=2)
+            g.ax_heatmap.set_xticklabels(
+                g.ax_heatmap.get_xmajorticklabels(), fontsize=2
+            )
+            g.ax_heatmap.set_yticklabels(
+                g.ax_heatmap.get_ymajorticklabels(), fontsize=2
+            )
 
-            handles = [Patch(facecolor=pathway_color_map[name]) for name in pathway_color_map]
+            handles = [
+                Patch(facecolor=pathway_color_map[name]) for name in pathway_color_map
+            ]
             product_legend = plt.legend(
                 handles,
                 pathway_color_map,
@@ -255,9 +261,10 @@ for method_name in method_names:
             )
             plt.clf()
 
-            sig_samples = adata.obs[(adata.obs[f"{cl}_deg_product_dose"] == "True") | (adata.obs["product_name"] == "Vehicle")][
-                "product_dose"
-            ].unique()
+            sig_samples = adata.obs[
+                (adata.obs[f"{cl}_deg_product_dose"] == "True")
+                | (adata.obs["product_name"] == "Vehicle")
+            ]["product_dose"].unique()
             g = sns.clustermap(
                 normalized_dists.loc[cluster]
                 .sel(
@@ -272,10 +279,16 @@ for method_name in method_names:
                 vmin=0,
                 vmax=normalized_vmax,
             )
-            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xmajorticklabels(), fontsize=2)
-            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_ymajorticklabels(), fontsize=2)
+            g.ax_heatmap.set_xticklabels(
+                g.ax_heatmap.get_xmajorticklabels(), fontsize=2
+            )
+            g.ax_heatmap.set_yticklabels(
+                g.ax_heatmap.get_ymajorticklabels(), fontsize=2
+            )
 
-            handles = [Patch(facecolor=pathway_color_map[name]) for name in pathway_color_map]
+            handles = [
+                Patch(facecolor=pathway_color_map[name]) for name in pathway_color_map
+            ]
             product_legend = plt.legend(
                 handles,
                 pathway_color_map,
@@ -300,21 +313,13 @@ baseline_method_names = [
 # Per baseline dataset plots
 for method_name in baseline_method_names:
     for cl in cell_lines:
-        adata_base_path = "../results/sciplex_pipeline/data"
-        dists_base_path = "../results/sciplex_pipeline/distance_matrices"
         dataset_name = f"sciplex_{cl}_simple_filtered_all_phases"
 
         dists_path = f"{dataset_name}.{method_name}.distance_matrices.nc"
-        dists_path = os.path.join(
-            dists_base_path, dists_path
-        )
         dists = xr.open_dataarray(dists_path)
         cluster_dim_name = dists.dims[0]
 
         adata_path = f"{dataset_name}.{method_name}.final.h5ad"
-        adata_path = os.path.join(
-            adata_base_path, adata_path
-        )
         adata = sc.read(adata_path)
 
         sample_to_pathway = (
@@ -363,14 +368,17 @@ for method_name in baseline_method_names:
             )
             plt.clf()
 
-            sig_samples = adata.obs[(adata.obs[f"{cl}_deg_product_dose"] == "True") | (adata.obs["product_name"] == "Vehicle")][
-                "product_dose"
-            ].unique()
+            sig_samples = adata.obs[
+                (adata.obs[f"{cl}_deg_product_dose"] == "True")
+                | (adata.obs["product_name"] == "Vehicle")
+            ]["product_dose"].unique()
             g_dists = sns.clustermap(
-                dists.loc[cluster].sel(
+                dists.loc[cluster]
+                .sel(
                     sample_x=sig_samples,
                     sample_y=sig_samples,
-                ).to_pandas(),
+                )
+                .to_pandas(),
                 cmap="YlGnBu",
                 yticklabels=True,
                 xticklabels=True,
