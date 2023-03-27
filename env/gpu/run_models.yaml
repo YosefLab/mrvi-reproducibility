@@ -27,5 +27,5 @@ dependencies:
           - scikit-misc==0.1.4
           - scvi-tools==0.20.2
           - mrvi>=0.1.0
-          - git+ssh://git@github.com/YosefLab/scvi-v2.git@jhong/meannorm
+          - git+ssh://git@github.com/YosefLab/scvi-v2.git@main
           - remote-pdb==2.1.0
