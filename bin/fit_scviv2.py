@@ -37,7 +37,13 @@ def fit_scviv2(
         sample_key=sample_key,
     )
     if use_nonlinear:
-        model_kwargs["pz_kwargs"] = {"use_nonlinear": True}
+        # model_kwargs["pz_kwargs"] = {"use_nonlinear": True}
+        model_kwargs.update(
+            {
+                "qz_nn_flavor": True,
+                "qz_kwargs": {"use_map": False, "stop_gradients": True},
+            }
+        )
     model = scvi_v2.MrVI(adata, **model_kwargs)
     model.train(**train_kwargs)
 
