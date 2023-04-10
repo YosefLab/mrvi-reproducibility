@@ -5,8 +5,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import scanpy as sc
+import scipy.cluster.hierarchy as sch
 import xarray as xr
 from anndata import AnnData
+from scipy.spatial.distance import squareform
+from scvi.model import SCVI
+from sklearn.metrics import pairwise_distances
+from tqdm import tqdm
+from tree_utils import linkage_to_ete
 from utils import load_config, make_parents, wrap_kwargs
 
 
@@ -46,12 +52,16 @@ def preprocess(
     adata.obs.index.name = None  # ensuring that index is not named, which could cause problem when resetting index
     if cell_type_key not in adata.obs.keys():
         adata.obs.loc[:, cell_type_key] = "0"
-        adata.obs.loc[:, cell_type_key] = adata.obs.loc[:, cell_type_key].astype("category")
+        adata.obs.loc[:, cell_type_key] = adata.obs.loc[:, cell_type_key].astype(
+            "category"
+        )
     if hvg_kwargs is not None:
         adata = _hvg(adata, **hvg_kwargs)
     if min_obs_per_sample is not None:
         n_obs_per_sample = adata.obs.groupby(config["sample_key"]).size()
-        selected_samples = n_obs_per_sample[n_obs_per_sample >= min_obs_per_sample].index
+        selected_samples = n_obs_per_sample[
+            n_obs_per_sample >= min_obs_per_sample
+        ].index
         adata = adata[adata.obs[config["sample_key"]].isin(selected_samples)].copy()
         adata.obs.loc[:, config["sample_key"]] = pd.Categorical(
             adata.obs.loc[:, config["sample_key"]]
@@ -90,6 +100,16 @@ def _run_dataset_specific_preprocessing(
         )
     if adata_in == "nucleus.h5ad":
         adata = _process_snrna(adata, config)
+    if adata_in == "pbmcs68k.h5ad":
+        adata = _process_semisynth2(
+            adata,
+            resolution=0.1,
+            min_cells_per_cluster=1000,
+            n_subclusters=4,
+            n_replicates_per_subcluster=8,
+        )
+    if adata_in == "haniffasubset.h5ad":
+        adata = _subset_haniffa(adata, config)
     return adata, distance_matrices
 
 
@@ -352,6 +372,156 @@ def _process_snrna(adata, config):
     libraries.loc[mask_split] = libraries.loc[mask_split] + "_split"
     assert libraries.unique().shape[0] == 9
     adata.obs.loc[:, sample_key] = libraries.astype("category")
+    return adata
+
+
+def _process_semisynth2(
+    adata,
+    resolution=0.1,
+    min_cells_per_cluster=1000,
+    n_subclusters=8,
+    n_replicates_per_subcluster=2,
+):
+    # use SCVI to obtain latent space
+    SCVI.setup_anndata(
+        adata,
+    )
+    scvi = SCVI(adata)
+    scvi.train(
+        max_epochs=400,
+        batch_size=1024,
+        early_stopping=True,
+        early_stopping_patience=20,
+        early_stopping_monitor="reconstruction_loss_validation",
+    )
+    latent = scvi.get_latent_representation()
+    adata.obsm["X_scvi"] = latent
+    sc.pp.neighbors(adata, use_rep="X_scvi")
+    sc.tl.leiden(adata, resolution=resolution, key_added="leiden")
+
+    sample_assignments = pd.DataFrame()
+    for unique_cluster in tqdm(adata.obs["leiden"].unique()):
+        adata_ = adata[adata.obs["leiden"] == unique_cluster].copy()
+        latent_reps = adata_.obsm["X_scvi"]
+        if unique_cluster != "0":
+            sample_names = 1 + np.arange(n_subclusters * n_replicates_per_subcluster)
+            sample_assignments_ = np.random.choice(
+                sample_names, size=adata_.shape[0], replace=True
+            )
+            sample_assignments_ = (
+                pd.Series(sample_assignments_)
+                .to_frame("sample_assignment")
+                .assign(cell_index=adata_.obs_names, subcluster_assignments="NA")
+            )
+            sample_assignments = pd.concat([sample_assignments, sample_assignments_])
+            continue
+        res_ = construct_sample_stratifications_from_subcelltypes(
+            latent_reps,
+            n_subclusters,
+            n_replicates_per_subcluster,
+        )
+        adata.uns[f"cluster{unique_cluster}_tree_gt"] = res_["tree_gt"].write()
+        sample_assignments = pd.concat(
+            [
+                sample_assignments,
+                res_["cluster_info"].assign(cell_index=adata_.obs_names),
+            ]
+        )
+    adata.obs.loc[:, "sample_assignment"] = (
+        sample_assignments.set_index("cell_index")
+        .loc[adata.obs_names, "sample_assignments"]
+        .values
+    )
+    adata.obs.loc[:, "subcluster_assignment"] = (
+        sample_assignments.set_index("cell_index")
+        .loc[adata.obs_names, "subcluster_assignments"]
+        .values
+    )
+    adata.obs.loc[:, "sample_assignment"] = adata.obs["sample_assignment"].astype(str)
+    adata.obs.loc[:, "subcluster_assignment"] = adata.obs[
+        "subcluster_assignment"
+    ].astype(str)
+    adata.obs.loc[:, "Site"] = "1"
+    return adata
+
+
+def construct_sample_stratifications_from_subcelltypes(
+    latent_reps, n_subclusters, n_replicates_per_subcluster
+):
+    """Construct semisynthetic dataset"""
+    dmat = pairwise_distances(latent_reps)
+    dmat = squareform(dmat)
+    Z = sch.linkage(dmat, method="complete")
+    subclusters = sch.fcluster(Z, n_subclusters, criterion="maxclust")
+
+    # get names of internal nodes associated with each cluster
+    L, M = sch.leaders(Z, subclusters)
+    cluster_mapper = pd.DataFrame({"nodeid": L, "clusterid": M})
+
+    tree = linkage_to_ete(Z)
+    # trim tree to clusters
+    for leader in L:
+        node = tree.search_nodes(name=str(leader))[0]
+        children = node.get_children()
+        for child in children:
+            child.detach()
+
+    # rename leaves to cluster ids
+    renamed_tree = tree.copy()
+    for leaf in renamed_tree.get_leaves():
+        clusterid = cluster_mapper[cluster_mapper["nodeid"] == int(leaf.name)][
+            "clusterid"
+        ].values[0]
+        leaf.name = "cluster" + str(clusterid)
+
+    # add leaves for replicates
+    sampleid_to_clusterid = []
+    for clusterid in renamed_tree.get_leaf_names():
+        sampleid_to_clusterid += [clusterid] * n_replicates_per_subcluster
+    sampleid_to_clusterid = (
+        pd.Series(sampleid_to_clusterid)
+        .to_frame("clusterid")
+        .reset_index()
+        .rename(columns={"index": "sampleid"})
+        .assign(sampleid=lambda x: 1 + x.sampleid)
+    )
+    clusterid_to_sampleids = {}
+    for clusterid in sampleid_to_clusterid["clusterid"].unique():
+        associated_sampleids = sampleid_to_clusterid[
+            sampleid_to_clusterid["clusterid"] == clusterid
+        ]["sampleid"].values
+        clusterid_to_sampleids[clusterid] = associated_sampleids
+
+    tree_with_replicates = renamed_tree.copy()
+    for leaf in tree_with_replicates.get_leaves():
+        leaf_name = leaf.name
+        sampleids = sampleid_to_clusterid[
+            sampleid_to_clusterid["clusterid"] == leaf_name
+        ]["sampleid"].values
+        for sampleid in sampleids:
+            leaf.add_child(name=f"t{sampleid}")
+
+    # construct synthetic sample stratification
+    sample_assignments = []
+    for assigned_cluster in subclusters:
+        clustername = "cluster" + str(assigned_cluster)
+        assigned_sample = np.random.choice(clusterid_to_sampleids[clustername])
+        sample_assignments.append(assigned_sample)
+    cluster_info = pd.DataFrame(
+        {
+            "sample_assignments": sample_assignments,
+            "subcluster_assignments": subclusters,
+        }
+    )
+    return {
+        "tree_gt": tree_with_replicates,
+        "cluster_info": cluster_info,
+    }
+
+
+def _subset_haniffa(adata, config_in):
+    good_cells = adata.obs["initial_clustering"].isin(["CD4", "CD8"])
+    adata = adata[good_cells].copy()
     return adata
 
 
