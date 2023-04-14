@@ -69,7 +69,7 @@ def get_latent_scviv2(
     try:
         cell_normalized_dists = model.get_local_sample_distances(
             adata,
-            use_mean=False,
+            use_mean=True,
             normalize_distances=True,
             keep_cell=False,
             groupby=labels_key,
