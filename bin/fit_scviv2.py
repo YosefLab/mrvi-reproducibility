@@ -9,7 +9,8 @@ def fit_scviv2(
     adata_in: str,
     config_in: str,
     model_out: str,
-    use_nonlinear: str = "false",
+    use_mlp: str = "false",
+    use_attention: str = "false",
     use_weighted: str = "false",
     use_prior: str = "false",
 ) -> scvi_v2.MrVI:
@@ -25,7 +26,8 @@ def fit_scviv2(
     model_out
         Path to write the trained MrVI model.
     """
-    use_nonlinear = use_nonlinear.lower() == "true"
+    use_mlp = use_mlp.lower() == "true"
+    use_attention = use_attention.lower() == "true"
     use_weighted = use_weighted.lower() == "true"
     use_prior = use_prior.lower() == "true"
 
@@ -41,13 +43,21 @@ def fit_scviv2(
         batch_key=batch_key,
         sample_key=sample_key,
     )
-    if use_nonlinear:
+    if use_mlp:
         model_kwargs.update(
             {
-                "qz_nn_flavor": True,
+                "qz_nn_flavor": "mlp",
                 "qz_kwargs": {"use_map": False, "stop_gradients": True},
             }
         )
+    if use_attention:
+        model_kwargs.update(
+            {
+                "qz_nn_flavor": "attention",
+                "qz_kwargs": {"use_map": False},
+            }
+        )
+
     if use_prior:
         model_kwargs.update({"laplace_scale": 1.0})
     if use_weighted:

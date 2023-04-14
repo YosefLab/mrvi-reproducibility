@@ -410,7 +410,7 @@ def _process_semisynth2(
             )
             sample_assignments_ = (
                 pd.Series(sample_assignments_)
-                .to_frame("sample_assignment")
+                .to_frame("sample_assignments")
                 .assign(cell_index=adata_.obs_names, subcluster_assignments="NA")
             )
             sample_assignments = pd.concat([sample_assignments, sample_assignments_])

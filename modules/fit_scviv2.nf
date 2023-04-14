@@ -1,7 +1,8 @@
 process fit_scviv2 {
     input:
     path adata_in
-    val use_nonlinear
+    val use_mlp
+    val use_attention
     val use_weighted
     val use_prior
 
@@ -9,8 +10,11 @@ process fit_scviv2 {
     adata_name = adata_in.getSimpleName()
     config_in = "${params.conf.datasets}/${adata_name}.json"
 
-    if (use_nonlinear) {
-        method_name = "scviv2_nonlinear"
+    if (use_mlp) {
+        method_name = "scviv2_mlp"
+    }
+    else if (use_attention) {
+        method_name = "scviv2_attention"
     }
     else if (use_weighted)
      {
@@ -30,7 +34,8 @@ process fit_scviv2 {
         --adata_in ${adata_in} \\
         --config_in ${config_in} \\
         --model_out ${model_out} \\
-        --use_nonlinear ${use_nonlinear} \\
+        --use_mlp ${use_mlp} \\
+        --use_attention ${use_attention} \\
         --use_weighted ${use_weighted} \\
         --use_prior ${use_prior}
     """
