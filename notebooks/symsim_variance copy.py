@@ -45,7 +45,9 @@ dists = model.get_local_sample_distances(adata, normalize_distances=False)
 
 
 # %%
-scdl = model._make_data_loader(adata=adata, batch_size=1000, iter_ndarray=True, shuffle=False)
+scdl = model._make_data_loader(
+    adata=adata, batch_size=1000, iter_ndarray=True, shuffle=False
+)
 first_batch = next(iter(scdl), None)
 means, vars = model._compute_local_baseline_dists(first_batch)
 avg_mean, avg_var = np.mean(means), np.mean(vars)
@@ -71,7 +73,9 @@ pdf = (1 / np.sqrt(2 * np.pi * avg_var)) * np.exp(
 # Plot the PDF using a dotted line
 plt.plot(x, pdf, linestyle="--")
 
-g_x = np.linspace(g_avg_mean - 4 * np.sqrt(g_avg_var), g_avg_mean + 4 * np.sqrt(g_avg_var), 1000)
+g_x = np.linspace(
+    g_avg_mean - 4 * np.sqrt(g_avg_var), g_avg_mean + 4 * np.sqrt(g_avg_var), 1000
+)
 # Calculate the PDF values
 g_pdf = (1 / np.sqrt(2 * np.pi * g_avg_var)) * np.exp(
     -((g_x - g_avg_mean) ** 2) / (2 * g_avg_var)
