@@ -48,4 +48,4 @@ def hierarchical_clustering(dist_mtx, method="ward", return_ete=True):
         dist_mtx = (dist_mtx + dist_mtx.T) / 2.0
     red_mtx = squareform(dist_mtx)
     z = linkage(red_mtx, method=method)
-    return (linkage_to_ete(z) if return_ete else z)
+    return linkage_to_ete(z) if return_ete else z

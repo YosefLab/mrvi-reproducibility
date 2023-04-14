@@ -3,14 +3,13 @@ import json
 import os
 import pathlib
 import pickle
+import warnings
 from inspect import signature
 from pathlib import Path
 from typing import Callable
-import warnings
-import numpy as np
-import pandas as pd
 
 import click
+import numpy as np
 import pandas as pd
 import scanpy as sc
 from remote_pdb import RemotePdb
@@ -54,6 +53,7 @@ def determine_if_file_empty(file_path):
     """Determine if file is empty."""
     return Path(file_path).stat().st_size == 0
 
+
 def compute_n_degs(adata, group_key, ref_group):
     """Utility function to compute the number of DEGs per group compared to a fixed reference."""
     warnings.filterwarnings("ignore")
@@ -74,7 +74,9 @@ def compute_n_degs(adata, group_key, ref_group):
         if group == ref_group:
             continue
         sig_idxs = adata.uns["rank_genes_groups"]["pvals_adj"][group] <= 0.05
-        suff_lfc_idxs = np.abs(adata.uns["rank_genes_groups"]["logfoldchanges"][group]) >= 0.5
+        suff_lfc_idxs = (
+            np.abs(adata.uns["rank_genes_groups"]["logfoldchanges"][group]) >= 0.5
+        )
         n_deg_dict[group] = np.sum(sig_idxs & suff_lfc_idxs)
     return pd.Series(n_deg_dict)
 

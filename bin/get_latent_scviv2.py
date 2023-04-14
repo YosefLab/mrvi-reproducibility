@@ -36,6 +36,7 @@ def get_latent_scviv2(
 
     """
     config = load_config(config_in)
+    compute_local_representations = config.get("compute_local_representations", True)
     labels_key = config.get("labels_key", None)
     adata = sc.read_h5ad(adata_in)
     model = scvi_v2.MrVI.load(model_in, adata=adata)
@@ -52,11 +53,13 @@ def get_latent_scviv2(
     _adata.write(filename=adata_out)
     del _adata
 
-    # cell_reps = model.get_local_sample_representation(adata)
-    make_parents(cell_representations_out)
-    Path(cell_representations_out).touch()
-    # cell_reps.to_netcdf(cell_representations_out)
-    # del cell_reps
+    if compute_local_representations:
+        cell_reps = model.get_local_sample_representation(adata)
+        cell_reps.to_netcdf(cell_representations_out)
+        del cell_reps
+    else:
+        make_parents(cell_representations_out)
+        Path(cell_representations_out).touch()
 
     cell_dists = model.get_local_sample_distances(
         adata, keep_cell=False, groupby=labels_key

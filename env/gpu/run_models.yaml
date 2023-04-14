@@ -13,8 +13,8 @@ dependencies:
     - torchvision
     - torchaudio
     - cudatoolkit=11.6
-    - jax<=0.4.3
-    - jaxlib<=0.4.3
+    - jax<0.4.4
+    - jaxlib<0.4.4
     - cuda-nvcc
     - xarray=2022.12.0
     - dask=2022.12.1
@@ -27,5 +27,5 @@ dependencies:
           - scikit-misc==0.1.4
           - scvi-tools==0.20.0
           - mrvi>=0.1.0
-          - git+ssh://git@github.com/YosefLab/scvi-v2.git@regs
+          - git+ssh://git@github.com/YosefLab/scvi-v2.git@main
           - remote-pdb==2.1.0
