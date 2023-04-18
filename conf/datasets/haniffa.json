@@ -1,0 +1,23 @@
+{
+    "batch_key": "Site",
+    "labels_key": "initial_clustering",
+    "sample_key": "patient_id",
+    "mrvi_train_kwargs": {
+        "max_epochs": 400
+    },
+    "scviv2_train_kwargs": {
+        "max_epochs": 400,
+        "batch_size": 1024,
+        "early_stopping": true,
+        "early_stopping_patience": 15,
+        "check_val_every_n_epoch": 1,
+        "plan_kwargs": {
+            "n_epochs_kl_warmup": 25
+        }
+    },
+    "composition_scvi_train_kwargs": {
+        "max_epochs": 400
+    },
+    "clustering_method": "ward",
+    "compute_local_representations": true
+}
