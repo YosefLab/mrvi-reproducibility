@@ -22,5 +22,11 @@
     "composition_scvi_train_kwargs": {
         "max_epochs": 3
     },
-    "clustering_method": "ward"
+    "clustering_method": "ward",
+    "dataset_config": {
+        "resolution": 0.1,
+        "n_subclusters": 4,
+        "n_replicates_per_subcluster": 8,
+        "selected_cluster": 0
+    }
 }

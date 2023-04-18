@@ -103,10 +103,7 @@ def _run_dataset_specific_preprocessing(
     if adata_in == "pbmcs68k.h5ad":
         adata = _process_semisynth2(
             adata,
-            resolution=0.1,
-            min_cells_per_cluster=1000,
-            n_subclusters=4,
-            n_replicates_per_subcluster=8,
+            config,
         )
     if adata_in == "haniffasubset.h5ad":
         adata = _subset_haniffa(adata, config)
@@ -377,11 +374,27 @@ def _process_snrna(adata, config):
 
 def _process_semisynth2(
     adata,
-    resolution=0.1,
-    min_cells_per_cluster=1000,
-    n_subclusters=8,
-    n_replicates_per_subcluster=2,
+    config,
 ):
+    """Construct a semi-synthetic dataset from PBMCs.
+
+    This function first clusters the data. In one of the clusters, it then performs hierarchical clustering to identify subclusters.
+    Each of these subclusters is then used to construct
+    replicated pseudo-donors.
+    In the other clusters, pseudo-donors are assigned randomly.
+
+    This function assumes that the data config file contains a `dataset_config` key, with the following atttributes:
+    - `resolution`: base resolution to construct clusters.
+    - `n_subclusters`: number of subclusters to construct within the positive cluster.
+    - `n_replicates_per_subcluster`: number of replicates to construct for each subcluster.
+    - `selected_cluster`: cluster to select as the positive cluster.
+    """
+    semisynth_config = config["dataset_config"]
+    resolution = semisynth_config["resolution"]
+    n_subclusters = semisynth_config["n_subclusters"]
+    n_replicates_per_subcluster = semisynth_config["n_replicates_per_subcluster"]
+    selected_cluster = semisynth_config["selected_cluster"]
+
     # use SCVI to obtain latent space
     SCVI.setup_anndata(
         adata,
@@ -399,11 +412,26 @@ def _process_semisynth2(
     sc.pp.neighbors(adata, use_rep="X_scvi")
     sc.tl.leiden(adata, resolution=resolution, key_added="leiden")
 
+    cluster_to_sizes = adata.obs.leiden.value_counts().sort_values(ascending=False)
+    cluster_name = cluster_to_sizes.index[selected_cluster]
     sample_assignments = pd.DataFrame()
     for unique_cluster in tqdm(adata.obs["leiden"].unique()):
         adata_ = adata[adata.obs["leiden"] == unique_cluster].copy()
         latent_reps = adata_.obsm["X_scvi"]
-        if unique_cluster != "0":
+        if unique_cluster == cluster_name:
+            res_ = construct_sample_stratifications_from_subcelltypes(
+                latent_reps,
+                n_subclusters,
+                n_replicates_per_subcluster,
+            )
+            adata.uns[f"cluster{unique_cluster}_tree_gt"] = res_["tree_gt"].write()
+            sample_assignments = pd.concat(
+                [
+                    sample_assignments,
+                    res_["cluster_info"].assign(cell_index=adata_.obs_names),
+                ]
+            )
+        else:
             sample_names = 1 + np.arange(n_subclusters * n_replicates_per_subcluster)
             sample_assignments_ = np.random.choice(
                 sample_names, size=adata_.shape[0], replace=True
@@ -414,19 +442,6 @@ def _process_semisynth2(
                 .assign(cell_index=adata_.obs_names, subcluster_assignments="NA")
             )
             sample_assignments = pd.concat([sample_assignments, sample_assignments_])
-            continue
-        res_ = construct_sample_stratifications_from_subcelltypes(
-            latent_reps,
-            n_subclusters,
-            n_replicates_per_subcluster,
-        )
-        adata.uns[f"cluster{unique_cluster}_tree_gt"] = res_["tree_gt"].write()
-        sample_assignments = pd.concat(
-            [
-                sample_assignments,
-                res_["cluster_info"].assign(cell_index=adata_.obs_names),
-            ]
-        )
     adata.obs.loc[:, "sample_assignment"] = (
         sample_assignments.set_index("cell_index")
         .loc[adata.obs_names, "sample_assignments"]
