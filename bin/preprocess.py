@@ -47,6 +47,7 @@ def preprocess(
     adata = sc.read(adata_in)
     hvg_kwargs = config.get("hvg_kwargs", None)
     min_obs_per_sample = config.get("min_obs_per_sample", None)
+    requires_subset = "subset_celltypes" in config
 
     cell_type_key = config.get("labels_key")
     adata.obs.index.name = None  # ensuring that index is not named, which could cause problem when resetting index
@@ -57,6 +58,8 @@ def preprocess(
         )
     if hvg_kwargs is not None:
         adata = _hvg(adata, **hvg_kwargs)
+    if requires_subset:
+        adata = _subset_celltypes(adata, config)
     if min_obs_per_sample is not None:
         n_obs_per_sample = adata.obs.groupby(config["sample_key"]).size()
         selected_samples = n_obs_per_sample[
@@ -105,8 +108,6 @@ def _run_dataset_specific_preprocessing(
             adata,
             config,
         )
-    if adata_in == "haniffasubset.h5ad":
-        adata = _subset_haniffa(adata, config)
     return adata, distance_matrices
 
 
@@ -534,8 +535,10 @@ def construct_sample_stratifications_from_subcelltypes(
     }
 
 
-def _subset_haniffa(adata, config_in):
-    good_cells = adata.obs["initial_clustering"].isin(["CD4", "CD8"])
+def _subset_celltypes(adata, config_in):
+    celltype_key = config_in["labels_key"]
+    celltypes_to_subset = config_in["subset_celltypes"]
+    good_cells = adata.obs[celltype_key].isin(celltypes_to_subset)
     adata = adata[good_cells].copy()
     return adata
 
