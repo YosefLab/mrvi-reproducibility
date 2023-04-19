@@ -53,12 +53,12 @@ def get_latent_scviv2(
     _adata.write(filename=adata_out)
     del _adata
 
+    make_parents(cell_representations_out)
     if compute_local_representations:
         cell_reps = model.get_local_sample_representation(adata)
         cell_reps.to_netcdf(cell_representations_out)
         del cell_reps
     else:
-        make_parents(cell_representations_out)
         Path(cell_representations_out).touch()
 
     cell_dists = model.get_local_sample_distances(
