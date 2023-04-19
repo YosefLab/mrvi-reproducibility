@@ -52,59 +52,57 @@ def get_qeps(
 
 
 # %%
-# full_adata = sc.read("../results/aws_pipeline/symsim_new.preprocessed.h5ad")
-full_adata = sc.read("../data/symsim_new.h5ad")
+full_adata = sc.read("../data/pbmcs68k.h5ad")
 
 # %%
-# Subsample sample donor_meta(0, 0, 0)_batch1_b for cell type 1
-# also subsample sample donor_meta(0,0,1)_batch1_b for cell type 1
-sample_1_ct_1_idxs = np.where(
-    (full_adata.obs.donor == "donor_meta(0, 0, 0)_batch1_b")
-    & (full_adata.obs.celltype == "CT1:1")
-)[0]
-total_sample_1_ct_1_idxs = sum(sample_1_ct_1_idxs)
-subsample_pct = 0.6
-idxs_to_remove = np.random.choice(
-    sample_1_ct_1_idxs, int((1 - subsample_pct) * total_sample_1_ct_1_idxs)
+# leiden cluster cells in scVI space
+scvi.model.JaxSCVI.setup_anndata(
+    full_adata,
 )
-subsample_idxs = np.setdiff1d(np.arange(full_adata.n_obs), idxs_to_remove)
-adata = full_adata[subsample_idxs].copy()
+m = scvi.model.JaxSCVI(full_adata)
+m.train(
+    max_epochs=400,
+    batch_size=1024,
+    early_stopping=True,
+    early_stopping_patience=20,
+    early_stopping_monitor="reconstruction_loss_validation",
+)
+latent = m.get_latent_representation()
+full_adata.obsm["X_scvi"] = latent
+sc.pp.neighbors(full_adata, use_rep="X_scvi")
+sc.tl.leiden(full_adata, resolution=1, key_added="leiden")
 
-sample_3_ct_1_idxs = np.where(
-    (adata.obs.donor == "donor_meta(0, 0, 1)_batch1_b")
-    & (adata.obs.celltype == "CT1:1")
-)[0]
-total_sample_3_ct_1_idxs = sum(sample_3_ct_1_idxs)
-subsample_pct = 0.3
-idxs_to_remove = np.random.choice(
-    sample_3_ct_1_idxs, int((1 - subsample_pct) * total_sample_3_ct_1_idxs)
+# %%
+# generate uniform samples and subsample one cluster in one sample
+n_samples = 10
+subsample_fraction = 0.3
+full_adata.obs["donor"] = np.random.choice(
+    n_samples, size=full_adata.n_obs, replace=True
 )
-subsample_idxs = np.setdiff1d(np.arange(adata.n_obs), idxs_to_remove)
-adata = adata[subsample_idxs].copy()
+largest_cluster_idx = full_adata.obs["leiden"].value_counts().idxmax()
+to_subsample_idxs = np.where(
+    (full_adata.obs["leiden"] == largest_cluster_idx) & (full_adata.obs["donor"] == 0)
+)[0]
+subsample_remove_idxs = np.random.choice(
+    to_subsample_idxs,
+    size=int((1 - subsample_fraction) * len(to_subsample_idxs)),
+    replace=False,
+)
+subset_idxs = np.setdiff1d(np.arange(full_adata.n_obs), subsample_remove_idxs)
+adata = full_adata[subset_idxs, :].copy()
 
 # %%
 # Use run models env for this
 scvi_v2.MrVI.setup_anndata(adata, batch_key="batch", sample_key="donor")
 model_kwargs = {
-    "qz_nn_flavor": "mlp",
-    "qz_kwargs": {
-        # "use_map": False,
-        # "stop_gradients": True,
-        "n_layers": 2,
-        "n_hidden": 64,
-    },
+    "qz_nn_flavor": "attention",
+    "qz_kwargs": {},
     "z_u_prior_scale": 1.0,
 }
-model = scvi_v2.MrVI(adata, n_latent_u=20, **model_kwargs)
+model = scvi_v2.MrVI(adata, **model_kwargs)
 
 # %%
-model.train(200)
-
-# %%
-model.save("./models/symsim_variance_20_3")
-
-# %%
-model = scvi_v2.MrVI.load("./models/symsim_variance_20_3", adata=adata)
+model.train()
 
 # %%
 # Check loss curves
@@ -122,7 +120,7 @@ latent_z = model.get_latent_representation(give_z=True)
 latent_u = model.get_latent_representation(give_z=False)
 # %%
 mde_z = scvi.model.utils.mde(latent_z)
-mde_u = scvi.model.utils.mde(latent_u)
+mde_u = scvi.model.utils.mde(latent_u, repulsive_fraction=1.3)
 
 # %%
 # Plot MDE of U
@@ -145,34 +143,20 @@ sc.pl.embedding(
 )
 
 # %%
-# get qepses
-qeps_mean, qeps_scale = get_qeps(model, cf_sample="donor_meta(0, 0, 0)_batch1_a")
+# get qepses for subsampled
+qeps_mean, qeps_scale = get_qeps(model, cf_sample=0)
 # %%
 adata.obs["sample_0_qeps_mean_l2"] = np.linalg.norm(qeps_mean, axis=1)
 adata.obs["sample_0_qeps_scale_l2"] = np.linalg.norm(qeps_scale, axis=1)
-adata.obs["is_sample_0"] = (
-    (adata.obs.donor == "donor_meta(0, 0, 0)_batch1_a").astype(int).astype("category")
-)
+adata.obs["is_sample_0"] = (adata.obs.donor == 0).astype(int).astype("category")
 
 # %%
-# get qepses for replicate donor (which is subsampled for cell type 1)
-qeps_mean, qeps_scale = get_qeps(model, cf_sample="donor_meta(0, 0, 0)_batch1_b")
+# get qepses for replicate donor (which is not subsampled for cell type 1)
+qeps_mean, qeps_scale = get_qeps(model, cf_sample=1)
 # %%
 adata.obs["sample_1_qeps_mean_l2"] = np.linalg.norm(qeps_mean, axis=1)
 adata.obs["sample_1_qeps_scale_l2"] = np.linalg.norm(qeps_scale, axis=1)
-adata.obs["is_sample_1"] = (
-    (adata.obs.donor == "donor_meta(0, 0, 0)_batch1_b").astype(int).astype("category")
-)
-
-# %%
-# get qepses for diff donor
-qeps_mean, qeps_scale = get_qeps(model, cf_sample="donor_meta(0, 0, 1)_batch1_b")
-# %%
-adata.obs["sample_3_qeps_mean_l2"] = np.linalg.norm(qeps_mean, axis=1)
-adata.obs["sample_3_qeps_scale_l2"] = np.linalg.norm(qeps_scale, axis=1)
-adata.obs["is_sample_3"] = (
-    (adata.obs.donor == "donor_meta(0, 0, 1)_batch1_b").astype(int).astype("category")
-)
+adata.obs["is_sample_1"] = (adata.obs.donor == 1).astype(int).astype("category")
 
 # %%
 shuffled_idxs = np.random.permutation(adata.obs.index)
@@ -184,8 +168,6 @@ sc.pl.embedding(
         "sample_0_qeps_scale_l2",
         "sample_1_qeps_mean_l2",
         "sample_1_qeps_scale_l2",
-        "sample_3_qeps_mean_l2",
-        "sample_3_qeps_scale_l2",
         "is_sample_0",
         "is_sample_1",
     ],
@@ -194,9 +176,8 @@ sc.pl.embedding(
 
 # %%
 # plot overlaying histograms of scales from each sample
-plt.hist(adata.obs["sample_0_qeps_scale_l2"], bins=50, label="Sample 0", alpha=0.5)
-plt.hist(adata.obs["sample_1_qeps_scale_l2"], bins=50, label="Sample 1", alpha=0.5)
-plt.hist(adata.obs["sample_3_qeps_scale_l2"], bins=50, label="Sample 3", alpha=0.5)
+plt.hist(adata.obs["sample_0_qeps_scale_l2"], bins=50, label="Sample 0")
+plt.hist(adata.obs["sample_1_qeps_scale_l2"], bins=50, label="Sample 1")
 plt.legend()
 
 # %%
