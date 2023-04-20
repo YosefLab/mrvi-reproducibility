@@ -9,8 +9,9 @@ workflow compute_metrics {
 
     main:
     scib(adatas)
-    vendi(distance_matrices)
+    // vendi(distance_matrices)
 
     emit:
-    scib.out.concat(vendi.out)
+    // scib.out.concat(vendi.out)
+    scib.out
 }

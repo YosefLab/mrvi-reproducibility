@@ -54,7 +54,9 @@ workflow run_models {
     distance_matrices = scvi_outs.distance_matrices.concat(
         scvi_outs.normalized_distance_matrices,
         scvi_mlp_outs.distance_matrices,
+        scvi_mlp_outs.normalized_distance_matrices,
         scvi_attention_outs.distance_matrices,
+        scvi_attention_outs.normalized_distance_matrices,
         scvi_prior_outs.distance_matrices,
         scvi_prior_outs.normalized_distance_matrices,
         scvi_weighted_outs.distance_matrices,
