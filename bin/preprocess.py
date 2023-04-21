@@ -48,7 +48,6 @@ def preprocess(
     hvg_kwargs = config.get("hvg_kwargs", None)
     min_obs_per_sample = config.get("min_obs_per_sample", None)
     requires_celltype_subset = "subset_celltypes" in config
-    requires_sample_subset = "min_cells_per_sample" in config
 
     cell_type_key = config.get("labels_key")
     adata.obs.index.name = None  # ensuring that index is not named, which could cause problem when resetting index
@@ -59,19 +58,10 @@ def preprocess(
         )
     if requires_celltype_subset:
         adata = _subset_celltypes(adata, config)
-    if requires_sample_subset:
+    if min_obs_per_sample is not None:
         adata = _subset_samples(adata, config)
     if hvg_kwargs is not None:
         adata = _hvg(adata, **hvg_kwargs)
-    if min_obs_per_sample is not None:
-        n_obs_per_sample = adata.obs.groupby(config["sample_key"]).size()
-        selected_samples = n_obs_per_sample[
-            n_obs_per_sample >= min_obs_per_sample
-        ].index
-        adata = adata[adata.obs[config["sample_key"]].isin(selected_samples)].copy()
-        adata.obs.loc[:, config["sample_key"]] = pd.Categorical(
-            adata.obs.loc[:, config["sample_key"]]
-        )
     adata, distance_matrices = _run_dataset_specific_preprocessing(
         adata, adata_in, config
     )
@@ -547,12 +537,16 @@ def _subset_celltypes(adata, config_in):
 
 
 def _subset_samples(adata, config_in):
-    min_cells_per_sample = config_in["min_cells_per_sample"]
-    sample_key = config_in["sample_key"]
-    sample_counts = adata.obs[sample_key].value_counts()
-    selected_samples = sample_counts[sample_counts >= min_cells_per_sample].index
-    return selected_samples
-
+    min_obs_per_sample = config_in["min_obs_per_sample"]
+    n_obs_per_sample = adata.obs.groupby(config_in["sample_key"]).size()
+    selected_samples = n_obs_per_sample[
+        n_obs_per_sample >= min_obs_per_sample
+    ].index
+    adata = adata[adata.obs[config_in["sample_key"]].isin(selected_samples)].copy()
+    adata.obs.loc[:, config_in["sample_key"]] = pd.Categorical(
+        adata.obs.loc[:, config_in["sample_key"]]
+    )
+    return adata
 
 if __name__ == "__main__":
     preprocess()
