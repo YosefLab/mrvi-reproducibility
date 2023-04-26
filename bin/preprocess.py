@@ -101,6 +101,8 @@ def _run_dataset_specific_preprocessing(
             adata,
             config,
         )
+    if (adata_in == "haniffa.h5ad") or (adata_in == "haniffasubsample.h5ad"):
+        adata = _process_haniffa(adata, config)
     return adata, distance_matrices
 
 
@@ -528,6 +530,14 @@ def construct_sample_stratifications_from_subcelltypes(
     }
 
 
+def _process_haniffa(adata, config_in):
+    adata = adata[:, ~adata.var_names.str.startswith("AB")]
+    adata.obs.loc[:, "age_int"] = adata.obs.Age_interval.apply(
+        lambda x: x.split(",")[0][1:]
+    ).astype(int)
+    return adata.copy()
+
+
 def _subset_celltypes(adata, config_in):
     celltype_key = config_in["labels_key"]
     celltypes_to_subset = config_in["subset_celltypes"]
@@ -539,14 +549,13 @@ def _subset_celltypes(adata, config_in):
 def _subset_samples(adata, config_in):
     min_obs_per_sample = config_in["min_obs_per_sample"]
     n_obs_per_sample = adata.obs.groupby(config_in["sample_key"]).size()
-    selected_samples = n_obs_per_sample[
-        n_obs_per_sample >= min_obs_per_sample
-    ].index
+    selected_samples = n_obs_per_sample[n_obs_per_sample >= min_obs_per_sample].index
     adata = adata[adata.obs[config_in["sample_key"]].isin(selected_samples)].copy()
     adata.obs.loc[:, config_in["sample_key"]] = pd.Categorical(
         adata.obs.loc[:, config_in["sample_key"]]
     )
     return adata
+
 
 if __name__ == "__main__":
     preprocess()

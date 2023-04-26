@@ -1,14 +1,17 @@
 {
     "batch_key": "batch",
-    "labels_key": "cell_type",
+    "labels_key": "louvain",
     "sample_key": "TF",
     "min_obs_per_sample": 500,
     "mrvi_train_kwargs": {
         "max_epochs": 200
     },
     "scviv2_train_kwargs": {
-        "max_epochs": 200,
+        "max_epochs": 400,
         "batch_size": 2048,
+        "check_val_every_n_epoch": 1,
+        "early_stopping": true,
+        "early_stopping_patience": 15,
         "plan_kwargs": {
             "n_epochs_kl_warmup": 25
         }

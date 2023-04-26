@@ -20,7 +20,7 @@
         }
     },
     "composition_scvi_train_kwargs": {
-        "max_epochs": 3
+        "max_epochs": 400
     },
     "clustering_method": "ward",
     "dataset_config": {
