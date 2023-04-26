@@ -15,7 +15,7 @@ from matplotlib.patches import Patch
 from utils import load_results, INCH_TO_CM
 
 # Change to False if you want to run this script directly
-RUN_WITH_PARSER = False
+RUN_WITH_PARSER = True
 plt.rcParams["svg.fonttype"] = "none"
 
 # %%
@@ -122,7 +122,13 @@ for dataset_name in sciplex_metrics_df["dataset_name"].unique():
 
 # %%
 cell_lines = ["A549", "MCF7", "K562"]
-method_names = ["scviv2", "scviv2_attention", "scviv2_mlp", "scviv2_prior", "scviv2_weighted"]
+method_names = [
+    "scviv2",
+    "scviv2_attention",
+    "scviv2_mlp",
+    "scviv2_prior",
+    "scviv2_weighted",
+]
 
 # Per dataset plots
 for method_name in method_names:
@@ -131,15 +137,19 @@ for method_name in method_names:
         normalized_dists_path = (
             f"{dataset_name}.{method_name}.normalized_distance_matrices.nc"
         )
-        normalized_dists_path = os.path.join("../results/sciplex_pipeline/distance_matrices", normalized_dists_path)
+        # normalized_dists_path = os.path.join(
+        #     "../results/sciplex_pipeline/distance_matrices", normalized_dists_path
+        # )
         normalized_dists = xr.open_dataarray(normalized_dists_path)
         dists_path = f"{dataset_name}.{method_name}.distance_matrices.nc"
-        dists_path = os.path.join("../results/sciplex_pipeline/distance_matrices", dists_path)
+        # dists_path = os.path.join(
+        #     "../results/sciplex_pipeline/distance_matrices", dists_path
+        # )
         dists = xr.open_dataarray(dists_path)
         cluster_dim_name = dists.dims[0]
 
         adata_path = f"{dataset_name}.{method_name}.final.h5ad"
-        adata_path = os.path.join("../results/sciplex_pipeline/data", adata_path)
+        # adata_path = os.path.join("../results/sciplex_pipeline/data", adata_path)
         adata = sc.read(adata_path)
 
         sample_to_pathway = (
@@ -154,13 +164,13 @@ for method_name in method_names:
             .map(pathway_color_map)
         )
 
-        # n_deg_dict = pd.read_csv(
-        #     f"notebooks/output/{cl}_flat_deg_dict.csv", index_col=0
-        # ).to_dict()["0"]
-        # sample_to_n_deg_df = normalized_dists.sample_x.to_series().map(n_deg_dict)
-        # sample_to_n_deg_df = sample_to_n_deg_df.map(
-        #     lambda x: cm.get_cmap("viridis", 256)(x / np.max(sample_to_n_deg_df))
-        # )
+        n_deg_dict = pd.read_csv(
+            f"notebooks/output/{cl}_flat_deg_dict.csv", index_col=0
+        ).to_dict()["0"]
+        sample_to_n_deg_df = normalized_dists.sample_x.to_series().map(n_deg_dict)
+        sample_to_n_deg_df = sample_to_n_deg_df.map(
+            lambda x: cm.get_cmap("viridis", 256)(x / np.max(sample_to_n_deg_df))
+        )
 
         sample_to_sig_prod_dose = (
             adata.obs[["product_dose", f"{cl}_deg_product_dose"]]
@@ -173,14 +183,14 @@ for method_name in method_names:
         full_col_colors_df = pd.concat(
             [
                 sample_to_color_df,
-                # sample_to_n_deg_df,
+                sample_to_n_deg_df,
                 sample_to_sig_prod_dose,
             ],
             axis=1,
         )
         full_col_colors_df.columns = [
             "pathway",
-            # "n_degs",
+            "n_degs",
             "sig_prod_dose",
         ]
 

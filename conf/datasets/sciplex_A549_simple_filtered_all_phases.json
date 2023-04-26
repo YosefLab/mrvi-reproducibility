@@ -6,7 +6,19 @@
         "max_epochs": 200
     },
     "scviv2_train_kwargs": {
-        "max_epochs": 200
+        "max_epochs": 200,
+        "batch_size": 256,
+        "early_stopping": true,
+        "early_stopping_patience": 15,
+        "check_val_every_n_epoch": 1,
+        "train_size": 0.9,
+        "plan_kwargs": {
+                "lr": 2e-3,
+                "n_epochs_kl_warmup": 20,
+                "max_norm": 40,
+                "eps": 1e-8,
+                "weight_decay": 1e-8
+        }
     },
     "composition_scvi_train_kwargs": {
         "max_epochs": 200
