@@ -20,10 +20,12 @@ dependencies:
     - jupyterlab==3.5.3
     - pip
     - pip:
+          - --find-links https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+          - "jax[cuda11_pip]"
           - click
           - fastcluster
           - pymde
           - scib-metrics>=0.0.7
-          - scvi-tools==0.20.2
+          - scvi-tools
           - vendi-score==0.0.3
           - remote-pdb==2.1.0
