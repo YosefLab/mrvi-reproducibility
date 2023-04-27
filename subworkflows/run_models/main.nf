@@ -5,15 +5,15 @@ include {
     fit_scviv2;
     fit_scviv2 as fit_scviv2_mlp;
     fit_scviv2 as fit_scviv2_attention;
-    fit_scviv2 as fit_scviv2_prior;
-    fit_scviv2 as fit_scviv2_weighted;
+    fit_scviv2 as fit_scviv2_attention_ld;
+    fit_scviv2 as fit_scviv2_attention_hd;
 } from params.modules.fit_scviv2
 include {
     get_latent_scviv2;
     get_latent_scviv2 as get_latent_scviv2_mlp;
     get_latent_scviv2 as get_latent_scviv2_attention;
-    get_latent_scviv2 as get_latent_scviv2_prior;
-    get_latent_scviv2 as get_latent_scviv2_weighted;
+    get_latent_scviv2 as get_latent_scviv2_attention_ld;
+    get_latent_scviv2 as get_latent_scviv2_attention_hd;
 } from params.modules.get_latent_scviv2
 include {
     fit_and_get_latent_composition_baseline as fit_and_get_latent_composition_scvi_clusterkey;
@@ -44,11 +44,11 @@ workflow run_models {
     scvi_attention_outs = fit_scviv2_attention(adatas_in, false, true, false, false) | get_latent_scviv2_attention
     scvi_attention_adata = scvi_attention_outs.adata
 
-    scvi_prior_outs = fit_scviv2_prior(adatas_in, false, false, false, true) | get_latent_scviv2_prior
-    scvi_prior_adata = scvi_prior_outs.adata
+    scvi_attention_ld_outs = fit_scviv2_attention_ld(adatas_in, false, false, true, false) | get_latent_scviv2_attention_ld
+    scvi_attention_ld_adata = scvi_attention_ld_outs.adata
 
-    scvi_weighted_outs = fit_scviv2_weighted(adatas_in, false, false, true, false) | get_latent_scviv2_weighted
-    scvi_weighted_adata = scvi_weighted_outs.adata
+    scvi_attention_hd_outs = fit_scviv2_attention_hd(adatas_in, false, false, false, true) | get_latent_scviv2_attention_hd
+    scvi_attention_hd_adata = scvi_attention_hd_outs.adata
 
     // Organize all outputs
     distance_matrices = scvi_outs.distance_matrices.concat(
@@ -57,16 +57,16 @@ workflow run_models {
         scvi_mlp_outs.normalized_distance_matrices,
         scvi_attention_outs.distance_matrices,
         scvi_attention_outs.normalized_distance_matrices,
-        scvi_prior_outs.distance_matrices,
-        scvi_prior_outs.normalized_distance_matrices,
-        scvi_weighted_outs.distance_matrices,
-        scvi_weighted_outs.normalized_distance_matrices,
+        scvi_attention_ld_outs.distance_matrices,
+        scvi_attention_ld_outs.normalized_distance_matrices,
+        scvi_attention_hd_outs.distance_matrices,
+        scvi_attention_hd_outs.normalized_distance_matrices,
     )
     adatas = scvi_adata.concat(
         scvi_mlp_adata,
         scvi_attention_adata,
-        scvi_prior_adata,
-        scvi_weighted_adata,
+        scvi_attention_ld_adata,
+        scvi_attention_hd_adata,
     )
 
     if ( params.runAllModels) {

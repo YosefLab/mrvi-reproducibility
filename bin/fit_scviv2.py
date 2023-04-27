@@ -11,8 +11,8 @@ def fit_scviv2(
     model_out: str,
     use_mlp: str = "false",
     use_attention: str = "false",
-    use_weighted: str = "false",
-    use_prior: str = "false",
+    use_attention_ld: str = "false",
+    use_attention_hd: str = "false",
 ) -> scvi_v2.MrVI:
     """
     Train a MrVI model.
@@ -28,8 +28,9 @@ def fit_scviv2(
     """
     use_mlp = use_mlp.lower() == "true"
     use_attention = use_attention.lower() == "true"
-    use_weighted = use_weighted.lower() == "true"
-    use_prior = use_prior.lower() == "true"
+    use_attention_ld = use_attention_ld.lower() == "true"
+    use_attention_hd = use_attention_hd.lower() == "true"
+
 
     config = load_config(config_in)
     batch_key = config.get("batch_key", None)
@@ -57,13 +58,24 @@ def fit_scviv2(
                 "qz_kwargs": {"use_map": False},
             }
         )
-
-    if use_prior:
-        model_kwargs.update({"laplace_scale": 1.0})
-    if use_weighted:
+    if use_attention_ld:
         model_kwargs.update(
             {
-                "scale_observations": True,
+                "qz_nn_flavor": "attention",
+                "px_nn_flavor": "attention",
+                "qz_kwargs": {"use_map": False, "stop_gradients": True},
+                "px_kwargs": {"stop_gradients": True, "low_dim_batch": True},
+                "learn_z_u_prior_scale": True,
+            }
+        )
+    if use_attention_hd:
+        model_kwargs.update(
+            {
+                "qz_nn_flavor": "attention",
+                "px_nn_flavor": "attention",
+                "qz_kwargs": {"use_map": False, "stop_gradients": True},
+                "px_kwargs": {"stop_gradients": True, "low_dim_batch": False},
+                "learn_z_u_prior_scale": True,
             }
         )
     model = scvi_v2.MrVI(adata, **model_kwargs)
