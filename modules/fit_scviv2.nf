@@ -30,10 +30,6 @@ process fit_scviv2 {
     else if (use_double_attention_hd) {
         method_name = "scviv2_double_attention_hd"
     }
-    else if (use_prior)
-     {
-        method_name = "scviv2_prior"
-    }
     else {
         method_name = "scviv2"
     }
