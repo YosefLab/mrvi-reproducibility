@@ -16,13 +16,13 @@ process fit_scviv2 {
     else if (use_attention) {
         method_name = "scviv2_attention"
     }
-    else if (use_weighted)
+    else if (use_attention_ld)
      {
-        method_name = "scviv2_weighted"
+        method_name = "use_attention_ld"
     }
-    else if (use_prior)
+    else if (use_attention_hd)
      {
-        method_name = "scviv2_prior"
+        method_name = "use_attention_hd"
     }
     else {
         method_name = "scviv2"
