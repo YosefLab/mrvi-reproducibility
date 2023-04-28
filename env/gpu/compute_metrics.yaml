@@ -1,9 +1,8 @@
 name: compute-metrics
 channels:
-    - pytorch
-    - nvidia
     - conda-forge
     - bioconda
+    - nvidia
     - defaults
 dependencies:
     - python=3.10

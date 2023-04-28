@@ -1,17 +1,12 @@
 name: preprocess-data
 channels:
-    - pytorch
-    - nvidia
     - conda-forge
     - bioconda
+    - nvidia
     - defaults
 dependencies:
     - python=3.10
     - anndata>=0.8.0
-    - pytorch<2.0
-    - torchvision
-    - torchaudio
-    - pytorch-cuda=11.7
     - leidenalg=0.9.1
     - scanpy>=1.9.0
     - xarray=2022.12.0

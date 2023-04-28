@@ -1,18 +1,13 @@
 name: run-models
 channels:
-    - pytorch
-    - nvidia
     - conda-forge
     - bioconda
+    - nvidia
     - defaults
 dependencies:
     - python=3.10
     - anndata>=0.8.0
     - scanpy>=1.9.0
-    - pytorch
-    - torchvision
-    - torchaudio
-    - pytorch-cuda=11.8
     - xarray=2022.12.0
     - dask=2022.12.1
     - netcdf4=1.6.2
@@ -26,5 +21,5 @@ dependencies:
         - scikit-misc==0.1.4
         - scvi-tools
         - mrvi>=0.1.0
-        - git+ssh://git@github.com/YosefLab/scvi-v2.git@regs
+        - git+ssh://git@github.com/YosefLab/scvi-v2.git@main
         - remote-pdb==2.1.0

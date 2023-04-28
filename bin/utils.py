@@ -14,8 +14,6 @@ import pandas as pd
 import scanpy as sc
 from remote_pdb import RemotePdb
 
-INCH_TO_CM = 1 / 2.54
-
 
 def make_parents(*paths) -> None:
     """Make parent directories of a file path if they do not exist."""

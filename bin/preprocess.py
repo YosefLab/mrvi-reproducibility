@@ -47,7 +47,7 @@ def preprocess(
     adata = sc.read(adata_in)
     hvg_kwargs = config.get("hvg_kwargs", None)
     min_obs_per_sample = config.get("min_obs_per_sample", None)
-    requires_subset = "subset_celltypes" in config
+    requires_celltype_subset = "subset_celltypes" in config
 
     cell_type_key = config.get("labels_key")
     adata.obs.index.name = None  # ensuring that index is not named, which could cause problem when resetting index
@@ -56,19 +56,12 @@ def preprocess(
         adata.obs.loc[:, cell_type_key] = adata.obs.loc[:, cell_type_key].astype(
             "category"
         )
-    if hvg_kwargs is not None:
-        adata = _hvg(adata, **hvg_kwargs)
-    if requires_subset:
+    if requires_celltype_subset:
         adata = _subset_celltypes(adata, config)
     if min_obs_per_sample is not None:
-        n_obs_per_sample = adata.obs.groupby(config["sample_key"]).size()
-        selected_samples = n_obs_per_sample[
-            n_obs_per_sample >= min_obs_per_sample
-        ].index
-        adata = adata[adata.obs[config["sample_key"]].isin(selected_samples)].copy()
-        adata.obs.loc[:, config["sample_key"]] = pd.Categorical(
-            adata.obs.loc[:, config["sample_key"]]
-        )
+        adata = _subset_samples(adata, config)
+    if hvg_kwargs is not None:
+        adata = _hvg(adata, **hvg_kwargs)
     adata, distance_matrices = _run_dataset_specific_preprocessing(
         adata, adata_in, config
     )
@@ -108,6 +101,8 @@ def _run_dataset_specific_preprocessing(
             adata,
             config,
         )
+    if (adata_in == "haniffa.h5ad") or (adata_in == "haniffasubsample.h5ad"):
+        adata = _process_haniffa(adata, config)
     return adata, distance_matrices
 
 
@@ -535,11 +530,30 @@ def construct_sample_stratifications_from_subcelltypes(
     }
 
 
+def _process_haniffa(adata, config_in):
+    adata = adata[:, ~adata.var_names.str.startswith("AB")]
+    adata.obs.loc[:, "age_int"] = adata.obs.Age_interval.apply(
+        lambda x: x.split(",")[0][1:]
+    ).astype(int)
+    return adata.copy()
+
+
 def _subset_celltypes(adata, config_in):
     celltype_key = config_in["labels_key"]
     celltypes_to_subset = config_in["subset_celltypes"]
     good_cells = adata.obs[celltype_key].isin(celltypes_to_subset)
     adata = adata[good_cells].copy()
+    return adata
+
+
+def _subset_samples(adata, config_in):
+    min_obs_per_sample = config_in["min_obs_per_sample"]
+    n_obs_per_sample = adata.obs.groupby(config_in["sample_key"]).size()
+    selected_samples = n_obs_per_sample[n_obs_per_sample >= min_obs_per_sample].index
+    adata = adata[adata.obs[config_in["sample_key"]].isin(selected_samples)].copy()
+    adata.obs.loc[:, config_in["sample_key"]] = pd.Categorical(
+        adata.obs.loc[:, config_in["sample_key"]]
+    )
     return adata
 
 

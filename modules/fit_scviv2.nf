@@ -3,8 +3,8 @@ process fit_scviv2 {
     path adata_in
     val use_mlp
     val use_attention
-    val use_weighted
-    val use_prior
+    val use_attention_ld
+    val use_attention_hd
 
     script:
     adata_name = adata_in.getSimpleName()
@@ -36,8 +36,8 @@ process fit_scviv2 {
         --model_out ${model_out} \\
         --use_mlp ${use_mlp} \\
         --use_attention ${use_attention} \\
-        --use_weighted ${use_weighted} \\
-        --use_prior ${use_prior}
+        --use_attention_ld ${use_attention_ld} \\
+        --use_attention_hd ${use_attention_hd}
     """
 
     output:
