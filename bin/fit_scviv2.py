@@ -10,9 +10,11 @@ def fit_scviv2(
     config_in: str,
     model_out: str,
     use_mlp: str = "false",
+    use_mlp_smallu: str = "false",
     use_attention: str = "false",
-    use_attention_ld: str = "false",
-    use_attention_hd: str = "false",
+    use_attention_smallu: str = "false",
+    use_double_attention_ld: str = "false",
+    use_double_attention_hd: str = "false",
 ) -> scvi_v2.MrVI:
     """
     Train a MrVI model.
@@ -27,10 +29,11 @@ def fit_scviv2(
         Path to write the trained MrVI model.
     """
     use_mlp = use_mlp.lower() == "true"
+    use_mlp_smallu = use_mlp_smallu.lower() == "true"
     use_attention = use_attention.lower() == "true"
-    use_attention_ld = use_attention_ld.lower() == "true"
-    use_attention_hd = use_attention_hd.lower() == "true"
-
+    use_attention_smallu = use_attention_smallu.lower() == "true"
+    use_double_attention_ld = use_double_attention_ld.lower() == "true"
+    use_double_attention_hd = use_double_attention_hd.lower() == "true"
 
     config = load_config(config_in)
     batch_key = config.get("batch_key", None)
@@ -51,6 +54,15 @@ def fit_scviv2(
                 "qz_kwargs": {"use_map": False, "stop_gradients": True},
             }
         )
+    if use_mlp_smallu:
+        n_latent = model_kwargs.get("n_latent", 20)
+        model_kwargs.update(
+            {
+                "qz_nn_flavor": "mlp",
+                "qz_kwargs": {"use_map": False, "stop_gradients": True},
+                "n_latent_u": n_latent // 2,
+            }
+        )
     if use_attention:
         model_kwargs.update(
             {
@@ -58,7 +70,16 @@ def fit_scviv2(
                 "qz_kwargs": {"use_map": False},
             }
         )
-    if use_attention_ld:
+    if use_attention_smallu:
+        n_latent = model_kwargs.get("n_latent", 20)
+        model_kwargs.update(
+            {
+                "qz_nn_flavor": "attention",
+                "qz_kwargs": {"use_map": False},
+                "n_latent_u": n_latent // 2,
+            }
+        )
+    if use_double_attention_ld:
         model_kwargs.update(
             {
                 "qz_nn_flavor": "attention",
@@ -68,7 +89,7 @@ def fit_scviv2(
                 "learn_z_u_prior_scale": True,
             }
         )
-    if use_attention_hd:
+    if use_double_attention_hd:
         model_kwargs.update(
             {
                 "qz_nn_flavor": "attention",
