@@ -46,13 +46,13 @@ workflow run_models {
     scvi_mlp_adata = scvi_mlp_outs.adata
 
     // Run scviv2 mlp smallu
-    scvi_mlp_smallu_outs = fit_scviv2_mlp_smallu(adatas_in, false, false, true, false, false, false) | get_latent_scviv2_mlp_smallu
+    scvi_mlp_smallu_outs = fit_scviv2_mlp_smallu(adatas_in, false, true, false, false, false, false) | get_latent_scviv2_mlp_smallu
     scvi_mlp_smallu_adata = scvi_mlp_smallu_outs.adata
 
-    scvi_attention_outs = fit_scviv2_attention(adatas_in, false, false, false, true, false, false) | get_latent_scviv2_attention
+    scvi_attention_outs = fit_scviv2_attention(adatas_in, false, false, true, false, false, false) | get_latent_scviv2_attention
     scvi_attention_adata = scvi_attention_outs.adata
 
-    scvi_attention_smallu_outs = fit_scviv2_attention_smallu(adatas_in, false, false, false, false, true, false) | get_latent_scviv2_attention_smallu
+    scvi_attention_smallu_outs = fit_scviv2_attention_smallu(adatas_in, false, false, false, true, false, false) | get_latent_scviv2_attention_smallu
     scvi_attention_smallu_adata = scvi_attention_smallu_outs.adata
 
     scvi_double_attention_ld_outs = fit_scviv2_double_attention_ld(adatas_in, false, false, false, false, true, false) | get_latent_scviv2_double_attention_ld
