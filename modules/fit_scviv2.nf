@@ -2,9 +2,11 @@ process fit_scviv2 {
     input:
     path adata_in
     val use_mlp
+    val use_mlp_smallu
     val use_attention
-    val use_attention_ld
-    val use_attention_hd
+    val use_attention_smallu
+    val use_double_attention_ld
+    val use_double_attention_hd
 
     script:
     adata_name = adata_in.getSimpleName()
@@ -13,16 +15,20 @@ process fit_scviv2 {
     if (use_mlp) {
         method_name = "scviv2_mlp"
     }
+    else if (use_mlp_smallu) {
+        method_name = "scviv2_mlp_smallu"
+    }
     else if (use_attention) {
         method_name = "scviv2_attention"
     }
-    else if (use_attention_ld)
-     {
-        method_name = "use_attention_ld"
+    else if (use_attention_smallu) {
+        method_name = "scviv2_attention_smallu"
     }
-    else if (use_attention_hd)
-     {
-        method_name = "use_attention_hd"
+    else if (use_double_attention_ld) {
+        method_name = "scviv2_double_attention_ld"
+    }
+    else if (use_double_attention_hd) {
+        method_name = "scviv2_double_attention_hd"
     }
     else {
         method_name = "scviv2"
@@ -35,9 +41,11 @@ process fit_scviv2 {
         --config_in ${config_in} \\
         --model_out ${model_out} \\
         --use_mlp ${use_mlp} \\
+        --use_mlp_smallu ${use_mlp_smallu} \\
         --use_attention ${use_attention} \\
-        --use_attention_ld ${use_attention_ld} \\
-        --use_attention_hd ${use_attention_hd}
+        --use_attention_smallu ${use_attention_smallu} \\
+        --use_double_attention_ld ${use_double_attention_ld} \\
+        --use_double_attention_hd ${use_double_attention_hd}
     """
 
     output:
