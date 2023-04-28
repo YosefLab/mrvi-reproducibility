@@ -9,10 +9,12 @@
         "max_epochs": 400,
         "batch_size": 1024,
         "early_stopping": true,
-        "early_stopping_patience": 15,
+        "early_stopping_patience": 30,
         "check_val_every_n_epoch": 1,
+        "early_stopping_monitor": "validation_loss",
         "plan_kwargs": {
-            "n_epochs_kl_warmup": 25
+            "n_epochs_kl_warmup": 25,
+            "lr": 1e-3
         }
     },
     "composition_scvi_train_kwargs": {
