@@ -1,3 +1,4 @@
+import flax.linen as nn
 import scanpy as sc
 import scvi_v2
 from utils import load_config, make_parents, wrap_kwargs
@@ -13,8 +14,8 @@ def fit_scviv2(
     use_mlp_smallu: str = "false",
     use_attention: str = "false",
     use_attention_smallu: str = "false",
-    use_double_attention_ld: str = "false",
-    use_double_attention_hd: str = "false",
+    use_attention_noprior: str = "false",
+    use_attention_no_prior_mog: str = "false",
 ) -> scvi_v2.MrVI:
     """
     Train a MrVI model.
@@ -32,8 +33,8 @@ def fit_scviv2(
     use_mlp_smallu = use_mlp_smallu.lower() == "true"
     use_attention = use_attention.lower() == "true"
     use_attention_smallu = use_attention_smallu.lower() == "true"
-    use_double_attention_ld = use_double_attention_ld.lower() == "true"
-    use_double_attention_hd = use_double_attention_hd.lower() == "true"
+    use_attention_noprior = use_attention_noprior.lower() == "true"
+    use_attention_no_prior_mog = use_attention_no_prior_mog.lower() == "true"
 
     config = load_config(config_in)
     batch_key = config.get("batch_key", None)
@@ -67,7 +68,21 @@ def fit_scviv2(
         model_kwargs.update(
             {
                 "qz_nn_flavor": "attention",
-                "qz_kwargs": {"use_map": False},
+                "px_nn_flavor": "attention",
+                "qz_kwargs": {
+                    "use_map": False,
+                    "stop_gradients": False,
+                    "stop_gradients_mlp": True,
+                },
+                "px_kwargs": {
+                    "stop_gradients": False,
+                    "stop_gradients_mlp": True,
+                    "h_activation": nn.softmax,
+                },
+                "learn_z_u_prior_scale": False,
+                "z_u_prior": True,
+                "z_u_prior_scale": 2,
+                "u_prior_scale": 2,
             }
         )
     if use_attention_smallu:
@@ -75,28 +90,63 @@ def fit_scviv2(
         model_kwargs.update(
             {
                 "qz_nn_flavor": "attention",
-                "qz_kwargs": {"use_map": False},
+                "px_nn_flavor": "attention",
+                "qz_kwargs": {
+                    "use_map": False,
+                    "stop_gradients": False,
+                    "stop_gradients_mlp": True,
+                },
+                "px_kwargs": {
+                    "stop_gradients": False,
+                    "stop_gradients_mlp": True,
+                    "h_activation": nn.softmax,
+                },
+                "learn_z_u_prior_scale": False,
+                "z_u_prior": True,
+                "z_u_prior_scale": 2,
+                "qz_nn_flavor": "attention",
                 "n_latent_u": n_latent // 2,
             }
         )
-    if use_double_attention_ld:
+    if use_attention_noprior:
         model_kwargs.update(
             {
                 "qz_nn_flavor": "attention",
                 "px_nn_flavor": "attention",
-                "qz_kwargs": {"use_map": False, "stop_gradients": True},
-                "px_kwargs": {"stop_gradients": True, "low_dim_batch": True},
-                "learn_z_u_prior_scale": True,
+                "qz_kwargs": {
+                    "use_map": True,
+                    "stop_gradients": False,
+                    "stop_gradients_mlp": True,
+                },
+                "px_kwargs": {
+                    "stop_gradients": False,
+                    "stop_gradients_mlp": True,
+                    "h_activation": nn.softmax,
+                },
+                "learn_z_u_prior_scale": False,
+                "z_u_prior": False,
+                "u_prior_mixture": True,
+                "u_prior_mixture_k": 20,
             }
         )
-    if use_double_attention_hd:
+    if use_attention_no_prior_mog:
         model_kwargs.update(
             {
                 "qz_nn_flavor": "attention",
                 "px_nn_flavor": "attention",
-                "qz_kwargs": {"use_map": False, "stop_gradients": True},
-                "px_kwargs": {"stop_gradients": True, "low_dim_batch": False},
-                "learn_z_u_prior_scale": True,
+                "qz_kwargs": {
+                    "use_map": True,
+                    "stop_gradients": False,
+                    "stop_gradients_mlp": True,
+                },
+                "px_kwargs": {
+                    "stop_gradients": False,
+                    "stop_gradients_mlp": True,
+                    "h_activation": nn.softmax,
+                },
+                "learn_z_u_prior_scale": False,
+                "z_u_prior": False,
+                "u_prior_mixture": False,
             }
         )
     model = scvi_v2.MrVI(adata, **model_kwargs)
