@@ -1,6 +1,3 @@
-include { fit_mrvi } from params.modules.fit_mrvi
-include { get_latent_mrvi } from params.modules.get_latent_mrvi
-include { get_outputs_mrvi } from params.modules.get_outputs_mrvi
 include {
     fit_scviv2;
     fit_scviv2 as fit_scviv2_mlp;
@@ -87,10 +84,6 @@ workflow run_models {
     )
 
     if ( params.runAllModels) {
-        // Run MRVI, compute latents, distance matrices (old code)
-        // mrvi_outs = fit_mrvi(adatas_in) | get_latent_mrvi | get_outputs_mrvi
-        // mrvi_adata = mrvi_outs.adata
-
         // Run compositional models
         c_scvi_clusterkey_outs=fit_and_get_latent_composition_scvi_clusterkey(adatas_in, "SCVI_clusterkey_subleiden1")
         c_pca_clusterkey_outs=fit_and_get_latent_composition_pca_clusterkey(adatas_in, "PCA_clusterkey_subleiden1")
@@ -98,14 +91,12 @@ workflow run_models {
         c_pca_leiden_outs=fit_and_get_latent_composition_pca_leiden(adatas_in, "PCA_leiden1_subleiden1")
 
         distance_matrices = distance_matrices.concat(
-            // mrvi_outs.distance_matrices,
             c_pca_clusterkey_outs.distance_matrices,
             c_scvi_clusterkey_outs.distance_matrices,
             c_pca_leiden_outs.distance_matrices,
             c_scvi_leiden_outs.distance_matrices
         )
         adatas = adatas.concat(
-            // get_latent_mrvi.out,
             c_pca_clusterkey_outs.adata,
             c_scvi_clusterkey_outs.adata,
             c_pca_leiden_outs.adata,
