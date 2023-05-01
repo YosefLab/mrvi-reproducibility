@@ -60,7 +60,7 @@ def fit_scviv2(
             {
                 "qz_nn_flavor": "mlp",
                 "qz_kwargs": {"use_map": False, "stop_gradients": True},
-                "n_latent_u": n_latent // 2,
+                "n_latent_u": n_latent - 5,
             }
         )
     if use_attention:
@@ -76,7 +76,7 @@ def fit_scviv2(
             {
                 "qz_nn_flavor": "attention",
                 "qz_kwargs": {"use_map": False},
-                "n_latent_u": n_latent // 2,
+                "n_latent_u": n_latent - 5,
             }
         )
     if use_double_attention_ld:
