@@ -1,4 +1,4 @@
-name: run-models
+name: run-models-torch
 channels:
     - conda-forge
     - bioconda

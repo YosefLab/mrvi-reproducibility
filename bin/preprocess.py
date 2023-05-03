@@ -101,6 +101,12 @@ def _run_dataset_specific_preprocessing(
             adata,
             config,
         )
+    if adata_in == "pbmcs68k_for_subsample.h5ad":
+        adata = _process_semisynth2(
+            adata,
+            config,
+            subsample=True,
+        )
     if (adata_in == "haniffa.h5ad") or (adata_in == "haniffasubsample.h5ad"):
         adata = _process_haniffa(adata, config)
     return adata, distance_matrices
@@ -371,6 +377,7 @@ def _process_snrna(adata, config):
 def _process_semisynth2(
     adata,
     config,
+    subsample=False,
 ):
     """Construct a semi-synthetic dataset from PBMCs.
 
@@ -384,12 +391,18 @@ def _process_semisynth2(
     - `n_subclusters`: number of subclusters to construct within the positive cluster.
     - `n_replicates_per_subcluster`: number of replicates to construct for each subcluster.
     - `selected_cluster`: cluster to select as the positive cluster.
+
+    If `subsample` is True, the function will subsample a fraction of the samples in a second cluster
+    to test for model behavior in parts of the manifold with low data density.
     """
     semisynth_config = config["dataset_config"]
     resolution = semisynth_config["resolution"]
     n_subclusters = semisynth_config["n_subclusters"]
     n_replicates_per_subcluster = semisynth_config["n_replicates_per_subcluster"]
     selected_cluster = semisynth_config["selected_cluster"]
+    if subsample:
+        selected_subsample_cluster = semisynth_config["selected_subsample_cluster"]
+        subsample_rates = semisynth_config["subsample_rates"]
 
     # use SCVI to obtain latent space
     SCVI.setup_anndata(
@@ -453,6 +466,25 @@ def _process_semisynth2(
         "subcluster_assignment"
     ].astype(str)
     adata.obs.loc[:, "Site"] = "1"
+
+    if subsample:
+        sample_assignment_mapping = adata.obs[["sample_assignment", "subcluster_assignment"]].drop_duplicates(keep="first")
+        sample_assignment_mapping = sample_assignment_mapping[sample_assignment_mapping.subcluster_assignment != "NA"]
+        sample_assignment_mapping["subcluster_assignment"] = sample_assignment_mapping["subcluster_assignment"].astype(str).astype("category")
+        sample_assignment_mapping["sample_assignment_int"] = sample_assignment_mapping.sample_assignment.astype(int)
+        sample_assignment_mapping["rank"] = sample_assignment_mapping.groupby("subcluster_assignment")["sample_assignment_int"].rank(method="dense", ascending=True).astype(int)
+
+        subsampled_adatas = [adata[adata.obs.leiden != str(selected_subsample_cluster)]]
+        for rankminusone, subsample_rate in enumerate(subsample_rates):
+            rank = rankminusone + 1
+            samples_to_subsample = sample_assignment_mapping[sample_assignment_mapping["rank"] == rank]["sample_assignment"].to_list()
+            for sample in samples_to_subsample:
+                subsample_adata = adata[(adata.obs.sample_assignment == str(sample)) & (adata.obs["leiden"] == str(selected_subsample_cluster))]
+                subsample_adata = subsample_adata[np.random.choice(subsample_adata.shape[0], int(subsample_adata.shape[0] * subsample_rate), replace=False)]
+                subsample_adata.obs["rank"] = rank
+                subsampled_adatas.append(subsample_adata)
+        return sc.concat(subsampled_adatas)
+
     return adata
 
 

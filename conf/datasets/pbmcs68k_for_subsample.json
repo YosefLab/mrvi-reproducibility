@@ -1,0 +1,36 @@
+{
+    "batch_key": "Site",
+    "labels_key": "leiden",
+    "sample_key": "sample_assignment",
+    "mrvi_train_kwargs": {
+        "max_epochs": 400
+    },
+    "hvg_kwargs": {
+        "n_top_genes": 3000,
+        "flavor": "seurat_v3"
+    },
+    "scviv2_train_kwargs": {
+        "max_epochs": 400,
+        "batch_size": 1024,
+        "check_val_every_n_epoch": 1,
+        "early_stopping": true,
+        "early_stopping_patience": 30,
+        "early_stopping_monitor": "validation_loss",
+        "plan_kwargs": {
+            "n_epochs_kl_warmup": 25,
+            "lr": 1e-3
+        }
+    },
+    "composition_scvi_train_kwargs": {
+        "max_epochs": 400
+    },
+    "clustering_method": "ward",
+    "dataset_config": {
+        "resolution": 0.1,
+        "n_subclusters": 4,
+        "n_replicates_per_subcluster": 8,
+        "selected_cluster": 0,
+        "selected_subsample_cluster": 1,
+        "subsample_rates": [0.2, 0.4, 0.6, 0.8, 1.0, 1.0, 1.0, 1.0]
+    }
+}
