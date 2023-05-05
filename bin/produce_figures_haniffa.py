@@ -13,6 +13,43 @@ import xarray as xr
 from tree_utils import hierarchical_clustering, linkage_to_ete
 from scipy.cluster.hierarchy import fcluster
 from plot_utils import INCH_TO_CM, ALGO_RENAMER, SHARED_THEME
+from scib_metrics.benchmark import Benchmarker
+# import faiss
+from scib_metrics.nearest_neighbors import NeighborsOutput
+
+
+# def faiss_hnsw_nn(X: np.ndarray, k: int):
+#     """Gpu HNSW nearest neighbor search using faiss.
+
+#     See https://github.com/nmslib/hnswlib/blob/master/ALGO_PARAMS.md
+#     for index param details.
+#     """
+#     X = np.ascontiguousarray(X, dtype=np.float32)
+#     res = faiss.StandardGpuResources()
+#     M = 32
+#     index = faiss.IndexHNSWFlat(X.shape[1], M, faiss.METRIC_L2)
+#     gpu_index = faiss.index_cpu_to_gpu(res, 0, index)
+#     gpu_index.add(X)
+#     distances, indices = gpu_index.search(X, k)
+#     del index
+#     del gpu_index
+#     # distances are squared
+#     return NeighborsOutput(indices=indices, distances=np.sqrt(distances))
+
+
+# def faiss_brute_force_nn(X: np.ndarray, k: int):
+#     """Gpu brute force nearest neighbor search using faiss."""
+#     X = np.ascontiguousarray(X, dtype=np.float32)
+#     res = faiss.StandardGpuResources()
+#     index = faiss.IndexFlatL2(X.shape[1])
+#     gpu_index = faiss.index_cpu_to_gpu(res, 0, index)
+#     gpu_index.add(X)
+#     distances, indices = gpu_index.search(X, k)
+#     del index
+#     del gpu_index
+#     # distances are squared
+#     return NeighborsOutput(indices=indices, distances=np.sqrt(distances))
+
 
 sc.set_figure_params(dpi_save=500)
 plt.rcParams['axes.grid'] = False
@@ -24,122 +61,139 @@ os.makedirs(FIGURE_DIR, exist_ok=True)
 adata = sc.read_h5ad(
     "../results/aws_pipeline/haniffa.preprocessed.h5ad"
 )
-
-# %%
 adata_files = glob.glob(
     "../results/aws_pipeline/data/haniffa.*.final.h5ad"
 )
+# %%
+# %%
+from scvi_v2 import MrVI
+
+model = MrVI.load(
+    "/data1/scvi-v2-reproducibility/results/aws_pipeline/models/haniffa.scviv2_attention_noprior", adata=adata
+)
+# model = MrVI.load(
+#     "/data1/scvi-v2-reproducibility/results/aws_pipeline/models/haniffa.scviv2_attention_no_prior_mog", adata=adata
+# )
+
+# %%
+donor_info = model.adata.obs.drop_duplicates("_scvi_sample").set_index("_scvi_sample").sort_index()
+donor_embeds = np.array(model.module.params["qz"]["Embed_0"]["embedding"])
+
+from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
+
+tsne = TSNE(n_components=2, random_state=42, metric="cosine")
+donor_embeds_tsne = tsne.fit_transform(donor_embeds)
+donor_info.loc[:, ["tsne_1", "tsne_2"]] = donor_embeds_tsne
+
+(
+    p9.ggplot(donor_info, p9.aes(x="tsne_1", y="tsne_2", color="Site"))
+    + p9.geom_point()
+)
+
+# %%
+pca = PCA(n_components=2, random_state=42)
+donor_embeds_pca = pca.fit_transform(donor_embeds)
+donor_info.loc[:, ["pc_1", "pc_2"]] = donor_embeds_pca
+
+(
+    p9.ggplot(donor_info, p9.aes(x="pc_1", y="pc_2", color="Status"))
+    + p9.geom_point()
+)
+
+# %%
+
+# for adata_file in adata_files:
+#     adata_ = sc.read_h5ad(adata_file)
+#     print(adata_.shape)
+#     for obsm_key in adata_.obsm.keys():
+#         print(obsm_key)
+#         if obsm_key.endswith("mde") & ("scviv2" in obsm_key):
+#             rdm_perm = np.random.permutation(adata.shape[0])
+#             sc.pl.embedding(
+#                 adata_[rdm_perm],
+#                 basis=obsm_key,
+#                 color=["initial_clustering", "Status", "Site"],
+#                 save=f"haniffa.{obsm_key}.png",
+#                 ncols=1,
+#             )
+sc.set_figure_params(dpi_save=200)
 for adata_file in adata_files:
-    adata_ = sc.read_h5ad(adata_file)
+    try:
+        adata_ = sc.read_h5ad(adata_file)
+    except:
+        continue
     print(adata_.shape)
     for obsm_key in adata_.obsm.keys():
+        print(obsm_key)
         if obsm_key.endswith("mde") & ("scviv2" in obsm_key):
             print(obsm_key)
             rdm_perm = np.random.permutation(adata.shape[0])
-            sc.pl.embedding(
-                adata_[rdm_perm],
-                basis=obsm_key,
-                color=["initial_clustering", "Status", "Site"],
-                save=f"haniffa.{obsm_key}.png",
-                ncols=1,
-            )
-# %%
-scibv_files = glob.glob(
-    "../results/aws_pipeline/metrics/haniffa.*.csv"
-)
-scib_metrics = pd.DataFrame()
-for dmat_file in scibv_files:
-    d = pd.read_csv(dmat_file, index_col=0)
-    scib_metrics = pd.concat([scib_metrics, d], axis=0)
-scib_metrics.loc[:, "method"] = scib_metrics.latent_key.str.split("_").str[1:-1].apply(lambda x: "_".join(x))
-scib_metrics.loc[:, "latent"] = scib_metrics.latent_key.str.split("_").str[-1]
-
+            sc.pl.embedding(adata_[rdm_perm], basis=obsm_key, color=["initial_clustering", "Status", "Site"], ncols=1, save="_haniffa.png")
 
 # %%
-scib_metrics_ = (
-    scib_metrics.copy()
-    .assign(
-        metric_v=lambda x: np.round(x.metric_value, 3).astype(str),
-        latent=lambda x: x.latent.str.replace("subleiden1", "u"),
-        model=lambda x: x.method.replace(
-            {
-                "PCA_clusterkey": "composition_PCA_clusterkey_subleiden1",
-                "SCVI_clusterkey": "composition_SCVI_clusterkey_subleiden1",
-            }
+adata_file =  '../results/aws_pipeline/data/haniffa.scviv2_attention_noprior.final.h5ad'
+#  '../results/aws_pipeline/data/haniffa.scviv2_attention_no_prior_mog.final.h5ad',
+adata_ = sc.read_h5ad(adata_file)
+print(adata_.shape)
+for obsm_key in adata_.obsm.keys():
+    if obsm_key.endswith("mde") & ("scviv2" in obsm_key):
+        print(obsm_key)
+        rdm_perm = np.random.permutation(adata.shape[0])
+        sc.pl.embedding(
+            adata_[rdm_perm],
+            basis=obsm_key,
+            color=["initial_clustering", "Status", "Site", "patient_id"],
+            save=f"haniffa.{obsm_key}.png",
+            ncols=1,
         )
-    )
-    .loc[lambda x: x.model.isin(ALGO_RENAMER.keys())]
-    .assign(
-        Model=lambda x: pd.Categorical(x.model.replace(ALGO_RENAMER), categories=ALGO_RENAMER.values()),
-    )
-)
-# %%
-means_ = scib_metrics_.groupby("metric_name").mean()
-stds_ = scib_metrics_.groupby("metric_name").std()
-scib_metrics_ = scib_metrics_.assign(
-    metric_v_mean=lambda x: x.metric_name.map(means_.metric_value),
-    metric_v_std=lambda x: x.metric_name.map(stds_.metric_value),
-    metric_v_col=lambda x: (x.metric_value - x.metric_v_mean) / x.metric_v_std,
-)
 
 # %%
-plot_df = (
-    scib_metrics_.loc[lambda x: x.latent == "u"]
-)
-# scib_metrics_ = scib_metrics_.loc[lambda x: x.latent == "u", :]
-fig = (
-    p9.ggplot(plot_df, p9.aes(x="Model", y="metric_name", fill="metric_v_col"))
-    + p9.geom_tile()
-    + p9.geom_text(p9.aes(label="metric_v"), size=6)
-    # + p9.geom_point(stroke=0, size=3)
-    # + p9.facet_grid("latent~metric_name", scales="free")
-    + p9.coord_flip()
-    + p9.labs(
-        x="",
-        y="",
-    )
-    + p9.theme_classic()
-    + SHARED_THEME
-    + p9.theme(
-        aspect_ratio=1.0,
-        figure_size=(4 * INCH_TO_CM, 4 * INCH_TO_CM),
-        axis_text_x=p9.element_text(angle=-45),
-        legend_position="none",
-    )
-)
-fig.save(os.path.join(FIGURE_DIR, "haniffa.u.svg"))
-fig
+# Full SCIB metrics
+keys_of_interest = [
+    "X_SCVI_clusterkey_subleiden1",
+    "X_PCA_clusterkey_subleiden1",
+    "X_scviv2_u",
+    "X_scviv2_mlp_u",
+    # "X_scviv2_mlp_smallu_u",
+    "X_scviv2_attention_u",
+    # "X_scviv2_attention_smallu_u",
+    "X_scviv2_attention_noprior_u",
+    "X_scviv2_attention_no_prior_mog_u",
+    "X_PCA_leiden1_subleiden1",
+    "X_SCVI_leiden1_subleiden1",
+]
+for adata_file in adata_files:
+    try:
+        adata_ = sc.read_h5ad(adata_file)
+    except:
+        continue
+    obsm_keys = list(adata_.obsm.keys())
+    obsm_key_is_relevant = np.isin(obsm_keys, keys_of_interest)
+    if obsm_key_is_relevant.any():
+        assert obsm_key_is_relevant.sum() == 1
+        idx_ = np.where(obsm_key_is_relevant)[0][0]
+        print(obsm_keys[idx_])
+        obsm_key = obsm_keys[idx_]
+        adata.obsm[obsm_key] = adata_.obsm[obsm_key]
 
+adata_sub = adata.copy()
+sc.pp.subsample(adata_sub, n_obs=25000)
 # %%
-plot_df = (
-    scib_metrics_.loc[
-        lambda x: (x.latent == "z") | (~x.Model.str.startswith("scviv2"))
-    ]
+bm = Benchmarker(
+    adata_sub,
+    batch_key="patient_id",
+    label_key="initial_clustering",
+    embedding_obsm_keys=keys_of_interest,
+    # pre_integrated_embedding_obsm_key="X_pca",
+    n_jobs=-1,
 )
-fig = (
-    p9.ggplot(plot_df, p9.aes(x="Model", y="metric_name", fill="metric_v_col"))
-    + p9.geom_tile()
-    + p9.geom_text(p9.aes(label="metric_v"), size=6)
-    # + p9.geom_point(stroke=0, size=3)
-    # + p9.facet_grid("latent~metric_name", scales="free")
-    + p9.coord_flip()
-    + p9.labs(
-        x="",
-        y="",
-    )
-    + p9.theme_classic()
-    + SHARED_THEME
-    + p9.theme(
-        aspect_ratio=1.0,
-        figure_size=(4 * INCH_TO_CM, 4 * INCH_TO_CM),
-        axis_text_x=p9.element_text(angle=-45),
-        legend_position="none",
-    )
-)
-fig.save(os.path.join(FIGURE_DIR, "haniffa.z.svg"))
-fig
+
+bm.prepare(neighbor_computer=faiss_brute_force_nn)
+bm.benchmark()
 # %%
-scib_metrics_
+bm.plot_results_table(min_max_scale=False, save_dir=FIGURE_DIR,)
+
 # %%
 donor_info = adata_.obs.drop_duplicates("patient_id").set_index("patient_id")
 color_covid = donor_info["Status"].map({"Covid": "#9E1800", "Healthy": "#019E5D"})
@@ -157,14 +211,21 @@ color_age = donor_info["Age_interval"].map(
     '(80, 89]': "#00441b"
     }
 )
-donor_info["color_age"] = color_age
-
-
-colors = pd.concat(
-    [
-        color_site, color_age, color_covid
-    ], 1
+color_worst_status = donor_info["Worst_Clinical_Status"].map(
+    {
+        "Healthy": "#fffefe",
+        "LPS": "#fffefe",
+        "Asymptomatic": "#ffd4d4",
+        "Mild": "#ffaaaa",
+        "Moderate": "#ff7e7e",
+        "Severe": "#ff5454",
+        "Critical": "#ff2a2a",
+        "Death": "#000000",
+    }
 )
+donor_info["color_worst_status"] = color_age
+donor_info["color_age"] = color_age
+colors = pd.concat([color_site, color_age, color_covid, color_worst_status], axis=1)
 # %%
 dmat_files = glob.glob(
     "../results/aws_pipeline/distance_matrices/haniffa.*.nc"
@@ -173,19 +234,22 @@ dmat_files
 
 # %%
 dmat_file = "../results/aws_pipeline/distance_matrices/haniffa.scviv2_attention.distance_matrices.nc"
+dmat_file = "../results/aws_pipeline/distance_matrices/haniffa.scviv2_attention_no_prior_mog.distance_matrices.nc"
 d = xr.open_dataset(dmat_file)
 # %%
-# selected_ct = "CD16"
-selected_ct = "CD4"
+selected_ct = "CD16"
+# selected_ct = "CD4"
 
-d1 = d.loc[dict(initial_clustering_name=selected_ct)]["initial_clustering"]
-d1 = d1.loc[dict(sample_x=donor_info.index)].loc[dict(sample_y=donor_info.index)]
-Z = hierarchical_clustering(d1.values, method="complete", return_ete=False)
-clusters = fcluster(Z, t=3, criterion="maxclust")
-donor_info.loc[:, "cluster"] = clusters
-# cluster_colors = donor_info["cluster"].map({1: "#eb4034", 2: "#3452eb", 3: "#f7fcf5"})
-colors.loc[:, "cluster"] = donor_info["cluster"].map({1: "#eb4034", 2: "#3452eb", 3: "#f7fcf5"}).values
-sns.clustermap(d1.to_pandas(), row_linkage=Z, col_linkage=Z, row_colors=colors)
+# d1 = d.loc[dict(initial_clustering_name=selected_ct)]["initial_clustering"]
+# d1 = d1.loc[dict(sample_x=donor_info.index)].loc[dict(sample_y=donor_info.index)]
+# Z = hierarchical_clustering(d1.values, method="complete", return_ete=False)
+# clusters = fcluster(Z, t=3, criterion="maxclust")
+# donor_info.loc[:, "cluster"] = clusters
+# # cluster_colors = donor_info["cluster"].map({1: "#eb4034", 2: "#3452eb", 3: "#f7fcf5"})
+# colors.loc[:, "cluster"] = donor_info["cluster"].map({1: "#eb4034", 2: "#3452eb", 3: "#f7fcf5"}).values
+# sns.clustermap(d1.to_pandas(), row_linkage=Z, col_linkage=Z, row_colors=colors)
+
+plt.rcParams['axes.grid'] = False
 
 # %%
 mask_samples = donor_info.loc[lambda x: x.Site == "Ncl"].index
@@ -197,6 +261,7 @@ colors_ = colors.loc[d1.sample_x.values]
 colors_.loc[:, "cluster"] = clusters
 colors_.loc[:, "cluster"] = colors_.cluster.map(
     {1: "#eb4034", 2: "#3452eb", 3: "#f7fcf5", 4: "#FF8000"}
+    # red, blue, white
 ).values
 
 sns.clustermap(d1.to_pandas(), row_linkage=Z, col_linkage=Z, row_colors=colors_)
@@ -204,44 +269,62 @@ sns.clustermap(d1.to_pandas(), row_linkage=Z, col_linkage=Z, row_colors=colors_)
 
 
 # %%
-mask_samples = donor_info.loc[lambda x: x.Site == "Cambridge"].index
-d1 = d.loc[dict(initial_clustering_name=selected_ct)]["initial_clustering"]
-d1 = d1.loc[dict(sample_x=mask_samples)].loc[dict(sample_y=mask_samples)]
-Z = hierarchical_clustering(d1.values, method="complete", return_ete=False)
-sns.clustermap(d1.to_pandas(), row_linkage=Z, col_linkage=Z, row_colors=colors)
+# mask_samples = donor_info.loc[lambda x: x.Site == "Cambridge"].index
+# d1 = d.loc[dict(initial_clustering_name=selected_ct)]["initial_clustering"]
+# d1 = d1.loc[dict(sample_x=mask_samples)].loc[dict(sample_y=mask_samples)]
+# Z = hierarchical_clustering(d1.values, method="complete", return_ete=False)
+# sns.clustermap(d1.to_pandas(), row_linkage=Z, col_linkage=Z, row_colors=colors)
+
+# %%
+donor_info_ncl = donor_info.loc[colors_.index].copy()
+assert donor_info_ncl.index.equals(colors_.index)
+donor_info_ncl.loc[:, "cluster"] = clusters
+healthy_donors = donor_info_ncl.loc[lambda x: x.Status == "Healthy"].index
+covid1_donors = donor_info_ncl[donor_info_ncl.cluster.isin([1, 2])].index
+covid2_donors = donor_info_ncl[lambda x: (x.cluster == 3) & (x.Status!="Healthy")].index
+
+def get_donor_status(donor_id):
+    if donor_id in healthy_donors:
+        return "Healthy"
+    elif donor_id in covid1_donors:
+        return "Covid1"
+    else:
+        return "Covid2"
+
+donor_status = donor_info_ncl.index.astype(str).to_series().apply(get_donor_status)
+donor_status
 
 # %%
 adata_log = adata.copy()
 sc.pp.normalize_total(adata_log, target_sum=1e4)
 sc.pp.log1p(adata_log)
+adata_log = adata_log[adata_log.obs.Site == "Ncl"].copy()
+adata_log.obs.loc[:, "donor_status"] = adata_log.obs.patient_id.map(donor_status).values
 pop = adata_log[(adata_log.obs.initial_clustering == selected_ct)].copy()
-pop.obs.loc[:, "sample_group"] = "Group " + pop.obs["patient_id"].map(donor_info["cluster"]).astype(str)
-pop.obs.loc[:, "sample_group"] = pop.obs["sample_group"].astype("category")
 
-sc.tl.rank_genes_groups(pop, "sample_group", method="wilcoxon", n_genes=1000)
 
 # %%
+sc.tl.rank_genes_groups(pop, "donor_status", method="wilcoxon", n_genes=1000)
 sc.pl.rank_genes_groups_heatmap(
     pop,
     n_genes=10,
     save=f"haniffa.{selected_ct}.clustered.svg",
 )
 
-
 # %%
-pop_ncl = pop[pop.obs.Site == "Ncl"].copy()
-sc.tl.rank_genes_groups(pop_ncl, "sample_group", method="wilcoxon", n_genes=1000)
-sc.pl.rank_genes_groups(
-    pop_ncl,
-    n_genes=25,
+sc.pl.rank_genes_groups_dotplot(
+    pop,
+    n_genes=10,
 )
 
 # %%
-pop_cam = pop[pop.obs.Site == "Cambridge"].copy()
-sc.tl.rank_genes_groups(pop_cam, "sample_group", method="wilcoxon", n_genes=1000)
-sc.pl.rank_genes_groups_dotplot(
-    pop_cam,
-    n_genes=25,
+pop_ = pop[pop.obs.donor_status != "Healthy"].copy()
+pop_.obs.loc[:, "donor_status_"] = pop_.obs.donor_status.astype("str")
+sc.tl.rank_genes_groups(pop_, "donor_status_", method="wilcoxon", n_genes=1000)
+sc.pl.rank_genes_groups_heatmap(
+    pop_,
+    n_genes=10,
+    save=f"haniffa.{selected_ct}.clustered.svg",
 )
 
 # %%

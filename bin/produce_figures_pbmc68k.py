@@ -11,7 +11,44 @@ import scipy.stats as ss
 from ete3 import Tree
 import xarray as xr
 from tree_utils import hierarchical_clustering, linkage_to_ete
-from utils import INCH_TO_CM, ALGO_RENAMER, SHARED_THEME
+from plot_utils import INCH_TO_CM, ALGO_RENAMER, SHARED_THEME
+from scib_metrics.benchmark import Benchmarker
+import faiss
+from scib_metrics.nearest_neighbors import NeighborsOutput
+
+
+def faiss_hnsw_nn(X: np.ndarray, k: int):
+    """Gpu HNSW nearest neighbor search using faiss.
+
+    See https://github.com/nmslib/hnswlib/blob/master/ALGO_PARAMS.md
+    for index param details.
+    """
+    X = np.ascontiguousarray(X, dtype=np.float32)
+    res = faiss.StandardGpuResources()
+    M = 32
+    index = faiss.IndexHNSWFlat(X.shape[1], M, faiss.METRIC_L2)
+    gpu_index = faiss.index_cpu_to_gpu(res, 0, index)
+    gpu_index.add(X)
+    distances, indices = gpu_index.search(X, k)
+    del index
+    del gpu_index
+    # distances are squared
+    return NeighborsOutput(indices=indices, distances=np.sqrt(distances))
+
+
+def faiss_brute_force_nn(X: np.ndarray, k: int):
+    """Gpu brute force nearest neighbor search using faiss."""
+    X = np.ascontiguousarray(X, dtype=np.float32)
+    res = faiss.StandardGpuResources()
+    index = faiss.IndexFlatL2(X.shape[1])
+    gpu_index = faiss.index_cpu_to_gpu(res, 0, index)
+    gpu_index.add(X)
+    distances, indices = gpu_index.search(X, k)
+    del index
+    del gpu_index
+    # distances are squared
+    return NeighborsOutput(indices=indices, distances=np.sqrt(distances))
+
 
 def compute_ratio(dist, sample_to_mask):
     ratios = []
@@ -34,6 +71,13 @@ os.makedirs(FIGURE_DIR, exist_ok=True)
 
 adata = sc.read_h5ad(
     "../results/aws_pipeline/pbmcs68k.preprocessed.h5ad"
+)
+
+adata_files = glob.glob(
+    "../results/aws_pipeline/data/pbmc*.final.h5ad"
+)
+dmat_files = glob.glob(
+    "../results/aws_pipeline/distance_matrices/pbmc*.nc"
 )
 
 # %%
@@ -85,67 +129,69 @@ t = Tree(tree)
 print(t)
 
 # %%
-adata_files = glob.glob(
-    "../results/aws_pipeline/data/pbmc*.final.h5ad"
-)
+sc.set_figure_params(dpi_save=200)
 for adata_file in adata_files:
-    adata_ = sc.read_h5ad(adata_file)
+    try:
+        adata_ = sc.read_h5ad(adata_file)
+    except:
+        continue
     print(adata_.shape)
     for obsm_key in adata_.obsm.keys():
+        print(obsm_key)
         if obsm_key.endswith("mde") & ("scviv2" in obsm_key):
             print(obsm_key)
             rdm_perm = np.random.permutation(adata.shape[0])
-            sc.pl.embedding(adata_[rdm_perm], basis=obsm_key, color=["leiden", "subcluster_assignment"])
+            sc.pl.embedding(adata_[rdm_perm], basis=obsm_key, color=["leiden", "subcluster_assignment", "sample_assignment"], ncols=1, save="_pbmcs.png")
 
 # %%
-scibv_files = glob.glob(
-    "../results/aws_pipeline/metrics/pbmc*scviv2*.csv"
-)
-scib_metrics = pd.DataFrame()
-for dmat_file in scibv_files:
-    d = pd.read_csv(dmat_file, index_col=0)
-    scib_metrics = pd.concat([scib_metrics, d], axis=0)
-scib_metrics.loc[:, "method"] = scib_metrics.latent_key.str.split("_").str[1:-1].apply(lambda x: "_".join(x))
-scib_metrics.loc[:, "latent"] = scib_metrics.latent_key.str.split("_").str[-1]
-
-
-# %%
-# scib_metrics_scviv2 = scib_metrics[scib_metrics.method.str.startswith("scviv2")].copy()
-scib_metrics_ = (
-    scib_metrics.copy()
-    .assign(
-        metric_v=lambda x: np.round(x.metric_value, 3).astype(str),
-        latent=lambda x: x.latent.str.replace("subleiden1", "u"),
-    )
-)
-plot_df = (
-    scib_metrics_.loc[lambda x: x.latent == "u"]
-    # .assign
-)
-# scib_metrics_ = scib_metrics_.loc[lambda x: x.latent == "u", :]
-(
-    p9.ggplot(plot_df, p9.aes(x="method", y="metric_name", fill="metric_value"))
-    + p9.geom_tile()
-    + p9.geom_text(p9.aes(label="metric_v"), size=8)
-    # + p9.geom_point(stroke=0, size=3)
-    # + p9.facet_grid("latent~metric_name", scales="free")
-    + p9.coord_flip()
-    + p9.labs(
-        x="",
-        y="",
-    )
-    # + p9.theme(
-    #     legend_position="none",
-    # )
-)
+# Full SCIB metrics
+keys_of_interest = [
+    "X_SCVI_clusterkey_subleiden1",
+    "X_PCA_clusterkey_subleiden1",
+    "X_scviv2_u",
+    "X_scviv2_mlp_u",
+    # "X_scviv2_mlp_smallu_u",
+    "X_scviv2_attention_u",
+    # "X_scviv2_attention_smallu_u",
+    "X_scviv2_attention_noprior_u",
+    "X_scviv2_attention_no_prior_mog_u",
+    # "X_PCA_leiden1_subleiden1",
+    # "X_SCVI_leiden1_subleiden1",
+]
+for adata_file in adata_files:
+    try:
+        adata_ = sc.read_h5ad(adata_file)
+    except:
+        continue
+    obsm_keys = list(adata_.obsm.keys())
+    obsm_key_is_relevant = np.isin(obsm_keys, keys_of_interest)
+    if obsm_key_is_relevant.any():
+        assert obsm_key_is_relevant.sum() == 1
+        idx_ = np.where(obsm_key_is_relevant)[0][0]
+        print(obsm_keys[idx_])
+        obsm_key = obsm_keys[idx_]
+        adata.obsm[obsm_key] = adata_.obsm[obsm_key]
 
 # %%
-dmat_files = glob.glob(
-    "../results/aws_pipeline/distance_matrices/pbmc*.nc"
+
+bm = Benchmarker(
+    adata,
+    batch_key="sample_assignment",
+    label_key="leiden",
+    embedding_obsm_keys=keys_of_interest,
+    # pre_integrated_embedding_obsm_key="X_pca",
+    n_jobs=-1,
 )
+
+bm.prepare(neighbor_computer=faiss_brute_force_nn)
+bm.benchmark()
+# %%
+bm.plot_results_table(min_max_scale=False, save_dir=FIGURE_DIR)
+
+# %%
+
+# %%
 dmat_files
-
-# %%
 rf_metrics = pd.DataFrame()
 for dmat_file in dmat_files:
     print(dmat_file)
@@ -186,12 +232,10 @@ rf_metrics = (
     rf_metrics
     .assign(
         modeldistance=lambda x: x.model + "_" + x.dist,
-        Model=lambda x: pd.Categorical(x.model.replace(ALGO_RENAMER), categories=ALGO_RENAMER.values()),
+        # Model=lambda x: pd.Categorical(x.model.replace(ALGO_RENAMER), categories=ALGO_RENAMER.values()),
+        Model=lambda x: pd.Categorical(x.model),
     )
 )
-
-# %%
-rf_metrics
 
 # %%
 plot_df = (
@@ -211,7 +255,7 @@ fig = (
         x="", y="RF distance"
     )
 )
-fig.save(os.path.join(FIGURE_DIR, "rf_distance.svg"))
+fig.save(os.path.join(FIGURE_DIR, "pbmcs_rf_distance.svg"))
 fig
 
 # %%
@@ -231,11 +275,11 @@ sample_order = adata.obs["sample_assignment"].cat.categories
 
 all_res = []
 for dmat_file in dmat_files:
-# for dmat_file in ["../results/aws_pipeline/distance_matrices/pbmcs68k.composition_PCA_clusterkey_subleiden1.distance_matrices.nc"]:
     print(dmat_file)
     try:
         d = xr.open_dataset(dmat_file, engine="netcdf4")
     except:
+        print("Failed to open {}".format(dmat_file))
         continue
     basename = os.path.basename(dmat_file).split(".")
     modelname = basename[1]
@@ -251,7 +295,7 @@ for dmat_file in dmat_files:
     print(distname)
     print(basename)
     if distname == "normalized_distance_matrices":
-        break
+        continue
     res_ = []
 
     # d_foreground = d.loc[{ct_coord_name: "0"}]
@@ -293,7 +337,8 @@ for dmat_file in dmat_files:
 all_res = (
     pd.DataFrame(all_res)
     .assign(
-        Model=lambda x: pd.Categorical(x.model.replace(ALGO_RENAMER), categories=ALGO_RENAMER.values()),
+        # Model=lambda x: pd.Categorical(x.model.replace(ALGO_RENAMER), categories=ALGO_RENAMER.values()),
+        Model=lambda x: pd.Categorical(x.model),
     )
 )
 
@@ -312,8 +357,8 @@ fig = (
         x="", y="Intra-cluster distance ratio"
     )
 )
-fig.save(os.path.join(FIGURE_DIR, "intra_distance_ratios.svg"))
-
+fig.save(os.path.join(FIGURE_DIR, "pbmcs_intra_distance_ratios.svg"))
+fig
 
 # %%
 # (
@@ -347,7 +392,7 @@ fig = (
     + p9.coord_flip()
     + p9.labs(y="Inter cluster distance ratio", x="")
 )
-fig.save(os.path.join(FIGURE_DIR, "inter_distance_ratios.svg"))
+fig.save(os.path.join(FIGURE_DIR, "pbmcs_inter_distance_ratios.svg"))
 fig
 
 # %%
