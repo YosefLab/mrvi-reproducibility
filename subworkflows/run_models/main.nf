@@ -14,7 +14,7 @@ include {
     get_latent_scviv2 as get_latent_scviv2_attention;
     get_latent_scviv2 as get_latent_scviv2_attention_smallu;
     get_latent_scviv2 as get_latent_scviv2_attention_noprior;
-    get_latent_scviv2 as get_latent_scviv2_double_attention_hd;
+    get_latent_scviv2 as get_latent_scviv2_attention_no_prior_mog;
 } from params.modules.get_latent_scviv2
 include {
     fit_and_get_latent_composition_baseline as fit_and_get_latent_composition_scvi_clusterkey;
