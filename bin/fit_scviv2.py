@@ -1,3 +1,4 @@
+import jax.numpy as jnp
 import flax.linen as nn
 import scanpy as sc
 import scvi_v2
@@ -121,7 +122,7 @@ def fit_scviv2(
                 "px_kwargs": {
                     "stop_gradients": False,
                     "stop_gradients_mlp": True,
-                    "h_activation": nn.softmax,
+                    "h_activation": jnp.exp,
                 },
                 "learn_z_u_prior_scale": False,
                 "z_u_prior": False,
@@ -142,7 +143,7 @@ def fit_scviv2(
                 "px_kwargs": {
                     "stop_gradients": False,
                     "stop_gradients_mlp": True,
-                    "h_activation": nn.softmax,
+                    "h_activation": jnp.exp,
                 },
                 "learn_z_u_prior_scale": False,
                 "z_u_prior": False,
