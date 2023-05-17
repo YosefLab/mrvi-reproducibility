@@ -14,11 +14,9 @@ dependencies:
     - bottleneck=1.3.5
     - pip
     - pip:
-          - --find-links https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
-          - "jax[cuda11_pip]"
           - click
           - scikit-learn==1.0.2
           - scikit-misc==0.1.4
           - scvi-tools
-          - git+ssh://git@github.com/YosefLab/scvi-v2.git@multires
+          - mrvi>=0.1.0
           - remote-pdb==2.1.0

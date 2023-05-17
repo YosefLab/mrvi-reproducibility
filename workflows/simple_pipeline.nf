@@ -9,13 +9,15 @@ workflow run_main {
     input = Channel.fromPath(params.inputs)
 
     outs = preprocess_data(input) | run_models
-    metrics = compute_metrics(outs.adatas, outs.distance_matrices)
 
     results = outs.adatas.concat(
         outs.rfs,
         outs.distance_matrices,
-        metrics,
     )
+    if ( params.computeMetrics ) {
+        metrics = compute_metrics(outs.adatas, outs.distance_matrices)
+        results = results.concat(params)
+    }
 
     analyze_results(results)
 }
