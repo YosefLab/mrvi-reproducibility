@@ -12,43 +12,6 @@ from ete3 import Tree
 import xarray as xr
 from tree_utils import hierarchical_clustering, linkage_to_ete
 from plot_utils import INCH_TO_CM, ALGO_RENAMER, SHARED_THEME
-from scib_metrics.benchmark import Benchmarker
-import faiss
-from scib_metrics.nearest_neighbors import NeighborsOutput
-
-
-def faiss_hnsw_nn(X: np.ndarray, k: int):
-    """Gpu HNSW nearest neighbor search using faiss.
-
-    See https://github.com/nmslib/hnswlib/blob/master/ALGO_PARAMS.md
-    for index param details.
-    """
-    X = np.ascontiguousarray(X, dtype=np.float32)
-    res = faiss.StandardGpuResources()
-    M = 32
-    index = faiss.IndexHNSWFlat(X.shape[1], M, faiss.METRIC_L2)
-    gpu_index = faiss.index_cpu_to_gpu(res, 0, index)
-    gpu_index.add(X)
-    distances, indices = gpu_index.search(X, k)
-    del index
-    del gpu_index
-    # distances are squared
-    return NeighborsOutput(indices=indices, distances=np.sqrt(distances))
-
-
-def faiss_brute_force_nn(X: np.ndarray, k: int):
-    """Gpu brute force nearest neighbor search using faiss."""
-    X = np.ascontiguousarray(X, dtype=np.float32)
-    res = faiss.StandardGpuResources()
-    index = faiss.IndexFlatL2(X.shape[1])
-    gpu_index = faiss.index_cpu_to_gpu(res, 0, index)
-    gpu_index.add(X)
-    distances, indices = gpu_index.search(X, k)
-    del index
-    del gpu_index
-    # distances are squared
-    return NeighborsOutput(indices=indices, distances=np.sqrt(distances))
-
 
 def compute_ratio(dist, sample_to_mask):
     ratios = []
@@ -66,18 +29,11 @@ sc.set_figure_params(dpi_save=500)
 plt.rcParams['axes.grid'] = False
 plt.rcParams["svg.fonttype"] = "none"
 
-FIGURE_DIR = "/data1/scvi-v2-reproducibility/experiments/pbmcs68k"
+FIGURE_DIR = "../results/experiments/pbmcs68k_for_subsample"
 os.makedirs(FIGURE_DIR, exist_ok=True)
 
 adata = sc.read_h5ad(
-    "../results/aws_pipeline/pbmcs68k.preprocessed.h5ad"
-)
-
-adata_files = glob.glob(
-    "../results/aws_pipeline/data/pbmc*.final.h5ad"
-)
-dmat_files = glob.glob(
-    "../results/aws_pipeline/distance_matrices/pbmc*.nc"
+    "../results/aws_pipeline/pbmcs68k_for_subsample.preprocessed.h5ad"
 )
 
 # %%
@@ -124,145 +80,65 @@ sc.tl.umap(adata_sub)
 sc.pl.umap(adata_sub, color=["subcluster_assignment"])
 
 # %%
-tree = adata.uns["cluster0_tree_gt"]
-t = Tree(tree)
-print(t)
-
-# %%
-sc.set_figure_params(dpi_save=200)
+adata_files = glob.glob(
+    "../results/aws_pipeline/data/pbmcs68k_for_subsample*.final.h5ad"
+)
 for adata_file in adata_files:
-    if os.path.filename(adata_file).startswith("pbmc68k_for_subsample"):
-        continue
-    try:
-        adata_ = sc.read_h5ad(adata_file)
-    except:
-        continue
+    adata_ = sc.read_h5ad(adata_file)
     print(adata_.shape)
     for obsm_key in adata_.obsm.keys():
-        print(obsm_key)
         if obsm_key.endswith("mde") & ("scviv2" in obsm_key):
             print(obsm_key)
             rdm_perm = np.random.permutation(adata.shape[0])
-            sc.pl.embedding(adata_[rdm_perm], basis=obsm_key, color=["leiden", "subcluster_assignment", "sample_assignment"], ncols=1, save="_pbmcs.png")
+            sc.pl.embedding(adata_[rdm_perm], basis=obsm_key, color=["leiden", "subcluster_assignment"])
 
 # %%
-# Full SCIB metrics
-keys_of_interest = [
-    "X_SCVI_clusterkey_subleiden1",
-    "X_PCA_clusterkey_subleiden1",
-    "X_scviv2_u",
-    "X_scviv2_mlp_u",
-    # "X_scviv2_mlp_smallu_u",
-    "X_scviv2_attention_u",
-    # "X_scviv2_attention_smallu_u",
-    "X_scviv2_attention_noprior_u",
-    "X_scviv2_attention_no_prior_mog_u",
-    # "X_PCA_leiden1_subleiden1",
-    # "X_SCVI_leiden1_subleiden1",
-]
-for adata_file in adata_files:
-    if os.path.filename(adata_file).startswith("pbmc68k_for_subsample"):
-        continue
-    try:
-        adata_ = sc.read_h5ad(adata_file)
-    except:
-        continue
-    obsm_keys = list(adata_.obsm.keys())
-    obsm_key_is_relevant = np.isin(obsm_keys, keys_of_interest)
-    if obsm_key_is_relevant.any():
-        assert obsm_key_is_relevant.sum() == 1
-        idx_ = np.where(obsm_key_is_relevant)[0][0]
-        print(obsm_keys[idx_])
-        obsm_key = obsm_keys[idx_]
-        adata.obsm[obsm_key] = adata_.obsm[obsm_key]
-
-# %%
-
-bm = Benchmarker(
-    adata,
-    batch_key="sample_assignment",
-    label_key="leiden",
-    embedding_obsm_keys=keys_of_interest,
-    # pre_integrated_embedding_obsm_key="X_pca",
-    n_jobs=-1,
+scibv_files = glob.glob(
+    "../results/aws_pipeline/metrics/pbmcs68k_for_subsample*scviv2*.csv"
 )
+scib_metrics = pd.DataFrame()
+for dmat_file in scibv_files:
+    d = pd.read_csv(dmat_file, index_col=0)
+    scib_metrics = pd.concat([scib_metrics, d], axis=0)
+scib_metrics.loc[:, "method"] = scib_metrics.latent_key.str.split("_").str[1:-1].apply(lambda x: "_".join(x))
+scib_metrics.loc[:, "latent"] = scib_metrics.latent_key.str.split("_").str[-1]
 
-bm.prepare(neighbor_computer=faiss_brute_force_nn)
-bm.benchmark()
+
 # %%
-bm.plot_results_table(min_max_scale=False, save_dir=FIGURE_DIR)
-
-# %%
-
-# %%
-dmat_files
-rf_metrics = pd.DataFrame()
-for dmat_file in dmat_files:
-    if os.path.filename(dmat_file).startswith("pbmc68k_for_subsample"):
-        continue
-    print(dmat_file)
-    try:
-        d = xr.open_dataset(dmat_file, engine="netcdf4")
-    except:
-        continue
-    basename = os.path.basename(dmat_file).split(".")
-    modelname = basename[1]
-    distname = basename[2]
-    print(d)
-    if "leiden_1.0" in d:
-        continue
-    if "leiden_name" in d:
-        ct_coord_name = "leiden_name"
-        dmat_name = "leiden"
-    else:
-        ct_coord_name = "leiden"
-        dmat_name = "distance"
-    print(basename)
-    res_ = []
-    for leiden in d[ct_coord_name].values:
-        d_ = d.loc[{ct_coord_name: leiden}][dmat_name]
-        tree_ = hierarchical_clustering(d_.values, method="complete")
-        Z = hierarchical_clustering(d_.values, method="complete", return_ete=False)
-
-        gt_tree_key = f"cluster{leiden}_tree_gt"
-        if gt_tree_key not in adata.uns.keys():
-            # print("{} missing in adata.uns".format(gt_tree_key))
-            continue
-        gt_tree = Tree(adata.uns[gt_tree_key])
-        rf_dist = gt_tree.robinson_foulds(tree_)
-        norm_rf = rf_dist[0] / rf_dist[1]
-        res_.append(dict(rf=norm_rf, leiden=leiden))
-    res_ = pd.DataFrame(res_).assign(model=modelname, dist=distname)
-    rf_metrics = pd.concat([rf_metrics, res_], axis=0)
-rf_metrics = (
-    rf_metrics
+# scib_metrics_scviv2 = scib_metrics[scib_metrics.method.str.startswith("scviv2")].copy()
+scib_metrics_ = (
+    scib_metrics.copy()
     .assign(
-        modeldistance=lambda x: x.model + "_" + x.dist,
-        # Model=lambda x: pd.Categorical(x.model.replace(ALGO_RENAMER), categories=ALGO_RENAMER.values()),
-        Model=lambda x: pd.Categorical(x.model),
+        metric_v=lambda x: np.round(x.metric_value, 3).astype(str),
+        latent=lambda x: x.latent.str.replace("subleiden1", "u"),
     )
+)
+plot_df = (
+    scib_metrics_.loc[lambda x: x.latent == "u"]
+    # .assign
+)
+# scib_metrics_ = scib_metrics_.loc[lambda x: x.latent == "u", :]
+(
+    p9.ggplot(plot_df, p9.aes(x="method", y="metric_name", fill="metric_value"))
+    + p9.geom_tile()
+    + p9.geom_text(p9.aes(label="metric_v"), size=8)
+    # + p9.geom_point(stroke=0, size=3)
+    # + p9.facet_grid("latent~metric_name", scales="free")
+    + p9.coord_flip()
+    + p9.labs(
+        x="",
+        y="",
+    )
+    # + p9.theme(
+    #     legend_position="none",
+    # )
 )
 
 # %%
-plot_df = (
-    rf_metrics.loc[lambda x: x.dist == "distance_matrices"]
+dmat_files = glob.glob(
+    "../results/aws_pipeline/distance_matrices/pbmcs68k_for_subsample*.nc"
 )
-
-fig = (
-    p9.ggplot(plot_df, p9.aes(x="Model", y="rf"))
-    + p9.geom_col(fill="#3480eb")
-    + p9.theme_classic()
-    + p9.coord_flip()
-    + p9.theme(
-        figure_size=(4 * INCH_TO_CM, 4 * INCH_TO_CM),
-    )
-    + SHARED_THEME
-    + p9.labs(
-        x="", y="RF distance"
-    )
-)
-fig.save(os.path.join(FIGURE_DIR, "pbmcs_rf_distance.svg"))
-fig
+dmat_files
 
 # %%
 sample_to_group = (
@@ -281,21 +157,17 @@ sample_order = adata.obs["sample_assignment"].cat.categories
 
 all_res = []
 for dmat_file in dmat_files:
-# for dmat_file in ["../results/aws_pipeline/distance_matrices/pbmcs68k.composition_PCA_clusterkey_subleiden1.distance_matrices.nc"]:
-    if os.path.filename(dmat_file).startswith("pbmc68k_for_subsample"):
-        continue
     print(dmat_file)
     try:
         d = xr.open_dataset(dmat_file, engine="netcdf4")
     except:
-        print("Failed to open {}".format(dmat_file))
         continue
     basename = os.path.basename(dmat_file).split(".")
     modelname = basename[1]
     distname = basename[2]
     if "leiden_1.0" in d:
         continue
-    if "leiden_name" in d:
+    elif "leiden_name" in d:
         ct_coord_name = "leiden_name"
         dmat_name = "leiden"
     else:
@@ -304,7 +176,7 @@ for dmat_file in dmat_files:
     print(distname)
     print(basename)
     if distname == "normalized_distance_matrices":
-        continue
+       continue 
     res_ = []
 
     # d_foreground = d.loc[{ct_coord_name: "0"}]
@@ -346,15 +218,13 @@ for dmat_file in dmat_files:
 all_res = (
     pd.DataFrame(all_res)
     .assign(
-        # Model=lambda x: pd.Categorical(x.model.replace(ALGO_RENAMER), categories=ALGO_RENAMER.values()),
-        Model=lambda x: pd.Categorical(x.model),
+        Model=lambda x: pd.Categorical(x.model.replace(ALGO_RENAMER), categories=ALGO_RENAMER.values()),
     )
 )
 
 # %%
-# adat
 fig = (
-    p9.ggplot(all_res.query("leiden == '0'"), p9.aes(x="Model", y="ratio"))
+    p9.ggplot(all_res.query("leiden == '0'"), p9.aes(x="model", y="ratio"))
     + p9.geom_col(fill="#3480eb")
     + p9.theme_classic()
     + p9.coord_flip()
@@ -366,8 +236,8 @@ fig = (
         x="", y="Intra-cluster distance ratio"
     )
 )
-fig.save(os.path.join(FIGURE_DIR, "pbmcs_intra_distance_ratios.svg"))
-fig
+fig.save(os.path.join(FIGURE_DIR, "intra_distance_ratios.svg"))
+
 
 # %%
 # (
@@ -388,7 +258,7 @@ relative_d = (
 # relative_d
 
 fig = (
-    p9.ggplot(relative_d, p9.aes(x="Model", y="relative_d"))
+    p9.ggplot(relative_d, p9.aes(x="model", y="relative_d"))
     + p9.geom_boxplot(fill="#3480eb")
     + p9.geom_abline(slope=0, intercept=1, color="black", linetype="dashed", size=1)
     + p9.theme_classic()
@@ -401,7 +271,61 @@ fig = (
     + p9.coord_flip()
     + p9.labs(y="Inter cluster distance ratio", x="")
 )
-fig.save(os.path.join(FIGURE_DIR, "pbmcs_inter_distance_ratios.svg"))
+fig.save(os.path.join(FIGURE_DIR, "inter_distance_ratios.svg"))
 fig
 
+# %%
+# Plot variance of dist to sample 8 per rank
+sample_to_group_and_rank = pd.DataFrame(sample_to_group).reset_index()
+sample_to_group_and_rank["sample_assignment_int"] = sample_to_group_and_rank.sample_assignment.astype(int)
+sample_to_group_and_rank["rank"] = sample_to_group_and_rank.groupby('subcluster_assignment')["sample_assignment_int"].rank(method='dense', ascending=True).astype(int)
+
+variance_res = []
+for dmat_file in dmat_files:
+    print(dmat_file)
+    try:
+        d = xr.open_dataset(dmat_file, engine="netcdf4")
+    except:
+        continue
+    basename = os.path.basename(dmat_file).split(".")
+    modelname = basename[1]
+    distname = basename[2]
+    if "leiden_1.0" in d:
+        continue
+    elif "leiden_name" in d:
+        ct_coord_name = "leiden_name"
+        dmat_name = "leiden"
+    else:
+        ct_coord_name = "leiden"
+        dmat_name = "distance"
+    print(distname)
+    print(basename)
+    if distname == "normalized_distance_matrices":
+       continue 
+    res_ = []
+
+    sample_8_dists = d[dmat_name].sel(sample_y="8")
+    sample_8_dists_df = pd.DataFrame(sample_8_dists.values, columns=sample_8_dists.sample_x.values)
+    sample_8_dists_df["leiden"] = d[ct_coord_name].values.astype(int)
+
+    for rank in range(1,9):
+        samples_in_rank = sample_to_group_and_rank[(sample_to_group_and_rank["rank"] == rank) & (sample_to_group_and_rank["subcluster_assignment"] == 1)]["sample_assignment"].values
+        sample_8_dists_df[f"rank_{rank}"] = sample_8_dists_df[samples_in_rank].mean(axis=1)
+    for cluster in sample_to_group_and_rank["subcluster_assignment"].unique():
+        samples_in_cluster = sample_to_group_and_rank[sample_to_group_and_rank["subcluster_assignment"] == cluster]["sample_assignment"].values
+        sample_8_dists_df[f"cluster_{cluster}"] = sample_8_dists_df[samples_in_cluster].mean(axis=1)
+
+    sample_8_dists_melt_df = pd.melt(sample_8_dists_df, id_vars=["leiden"], value_vars=[f"rank_{rank}" for rank in range(1,9)], var_name="rank")
+    sample_8_dists_melt_df["rank"] = sample_8_dists_melt_df["rank"].map({f"rank_{rank}": rank for rank in range(1,9)}).astype(int)
+    sub_melt_df = sample_8_dists_melt_df[sample_8_dists_melt_df["leiden"].isin([1, 2])]
+    sns.barplot(x="rank", y="value", hue="leiden", data=sub_melt_df)
+    plt.savefig(os.path.join(FIGURE_DIR, f"{modelname}_{distname}_sample_8_dists_by_rank.png"))
+    plt.clf()
+
+    sample_8_dists_melt_df = pd.melt(sample_8_dists_df, id_vars=["leiden"], value_vars=[f"cluster_{cluster}" for cluster in range(1, 5)], var_name="cluster")
+    sample_8_dists_melt_df["cluster"] = sample_8_dists_melt_df["cluster"].map({f"cluster_{cluster}": cluster for cluster in range(1, 5)}).astype(int)
+    sub_melt_df = sample_8_dists_melt_df[sample_8_dists_melt_df["leiden"].isin([1, 2])]
+    sns.barplot(x="cluster", y="value", hue="leiden", data=sub_melt_df)
+    plt.savefig(os.path.join(FIGURE_DIR, f"{modelname}_{distname}_sample_8_dists_by_cluster.png"))
+    plt.clf()
 # %%

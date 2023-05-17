@@ -1,4 +1,4 @@
-name: run-models
+name: run-models-jax
 channels:
     - conda-forge
     - bioconda
