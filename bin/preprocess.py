@@ -567,6 +567,8 @@ def _process_haniffa(adata, config_in):
     adata.obs.loc[:, "age_int"] = adata.obs.Age_interval.apply(
         lambda x: x.split(",")[0][1:]
     ).astype(int)
+    if "subset_site" in config_in:
+        adata = adata[adata.obs.Site == config_in["subset_site"]].copy()
     return adata.copy()
 
 

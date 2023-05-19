@@ -17,8 +17,8 @@
         "early_stopping_patience": 30,
         "early_stopping_monitor": "validation_loss",
         "plan_kwargs": {
-            "n_epochs_kl_warmup": 25,
-            "lr": 1e-3
+            "n_epochs_kl_warmup": 50,
+            "lr": 3e-3
         }
     },
     "composition_scvi_train_kwargs": {
