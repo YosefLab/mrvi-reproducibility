@@ -26,7 +26,7 @@ sc.set_figure_params(dpi_save=500)
 plt.rcParams['axes.grid'] = False
 plt.rcParams["svg.fonttype"] = "none"
 
-FIGURE_DIR = "../results/experiments/pbmcs68k_for_subsample"
+FIGURE_DIR = "../results/aws_pipeline/experiments/pbmcs68k_for_subsample"
 os.makedirs(FIGURE_DIR, exist_ok=True)
 
 adata = sc.read_h5ad(
