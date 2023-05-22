@@ -7,10 +7,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import scipy.stats as ss
-from ete3 import Tree
 import xarray as xr
-from tree_utils import hierarchical_clustering, linkage_to_ete
 from plot_utils import INCH_TO_CM, ALGO_RENAMER, SHARED_THEME
 
 def compute_ratio(dist, sample_to_mask):
@@ -92,47 +89,39 @@ for adata_file in adata_files:
             rdm_perm = np.random.permutation(adata.shape[0])
             sc.pl.embedding(adata_[rdm_perm], basis=obsm_key, color=["leiden", "subcluster_assignment"])
 
-# %%
-scibv_files = glob.glob(
-    "../results/aws_pipeline/metrics/pbmcs68k_for_subsample*scviv2*.csv"
-)
-scib_metrics = pd.DataFrame()
-for dmat_file in scibv_files:
-    d = pd.read_csv(dmat_file, index_col=0)
-    scib_metrics = pd.concat([scib_metrics, d], axis=0)
-scib_metrics.loc[:, "method"] = scib_metrics.latent_key.str.split("_").str[1:-1].apply(lambda x: "_".join(x))
-scib_metrics.loc[:, "latent"] = scib_metrics.latent_key.str.split("_").str[-1]
+# # %%
+# scibv_files = glob.glob(
+#     "../results/aws_pipeline/metrics/pbmcs68k_for_subsample*scviv2*.csv"
+# )
+# scib_metrics = pd.DataFrame()
+# for dmat_file in scibv_files:
+#     d = pd.read_csv(dmat_file, index_col=0)
+#     scib_metrics = pd.concat([scib_metrics, d], axis=0)
+# scib_metrics.loc[:, "method"] = scib_metrics.latent_key.str.split("_").str[1:-1].apply(lambda x: "_".join(x))
+# scib_metrics.loc[:, "latent"] = scib_metrics.latent_key.str.split("_").str[-1]
 
 
 # %%
-# scib_metrics_scviv2 = scib_metrics[scib_metrics.method.str.startswith("scviv2")].copy()
-scib_metrics_ = (
-    scib_metrics.copy()
-    .assign(
-        metric_v=lambda x: np.round(x.metric_value, 3).astype(str),
-        latent=lambda x: x.latent.str.replace("subleiden1", "u"),
-    )
-)
-plot_df = (
-    scib_metrics_.loc[lambda x: x.latent == "u"]
-    # .assign
-)
-# scib_metrics_ = scib_metrics_.loc[lambda x: x.latent == "u", :]
-(
-    p9.ggplot(plot_df, p9.aes(x="method", y="metric_name", fill="metric_value"))
-    + p9.geom_tile()
-    + p9.geom_text(p9.aes(label="metric_v"), size=8)
-    # + p9.geom_point(stroke=0, size=3)
-    # + p9.facet_grid("latent~metric_name", scales="free")
-    + p9.coord_flip()
-    + p9.labs(
-        x="",
-        y="",
-    )
-    # + p9.theme(
-    #     legend_position="none",
-    # )
-)
+# scib_metrics_ = (
+#     scib_metrics.copy()
+#     .assign(
+#         metric_v=lambda x: np.round(x.metric_value, 3).astype(str),
+#         latent=lambda x: x.latent.str.replace("subleiden1", "u"),
+#     )
+# )
+# plot_df = (
+#     scib_metrics_.loc[lambda x: x.latent == "u"]
+# )
+# (
+#     p9.ggplot(plot_df, p9.aes(x="method", y="metric_name", fill="metric_value"))
+#     + p9.geom_tile()
+#     + p9.geom_text(p9.aes(label="metric_v"), size=8)
+#     + p9.coord_flip()
+#     + p9.labs(
+#         x="",
+#         y="",
+#     )
+# )
 
 # %%
 dmat_files = glob.glob(
@@ -178,19 +167,6 @@ for dmat_file in dmat_files:
     if distname == "normalized_distance_matrices":
        continue 
     res_ = []
-
-    # d_foreground = d.loc[{ct_coord_name: "0"}]
-    # Z = hierarchical_clustering(d_foreground[dmat_name].values, method="complete", return_ete=False)
-    # sns.clustermap(d_foreground[dmat_name].values, row_linkage=Z, col_linkage=Z)
-    # plt.suptitle(f"{modelname}_{distname} Cluster 0")
-
-    # d_background = d.loc[{ct_coord_name: "1"}]
-    # sns.clustermap(d_background[dmat_name].values, row_linkage=Z, col_linkage=Z)
-    # plt.suptitle(f"{modelname}_{distname} Cluster 1")
-
-    # d_background = d.loc[{ct_coord_name: "2"}]
-    # sns.clustermap(d_background[dmat_name].values, row_linkage=Z, col_linkage=Z)
-    # plt.suptitle(f"{modelname}_{distname} Cluster 2")
 
     d_foreground = d.loc[{ct_coord_name: "0"}]
     sns.heatmap(d_foreground[dmat_name].values)
@@ -238,12 +214,6 @@ fig = (
 )
 fig.save(os.path.join(FIGURE_DIR, "intra_distance_ratios.svg"))
 
-
-# %%
-# (
-#     p9.ggplot(all_res.query("leiden != '0'"), p9.aes(x="model", y="ratio", fill="model"))
-#     + p9.geom_boxplot()
-# )
 
 # %%
 mean_d_foreground = all_res.query("leiden == '0'").groupby("model").mean_d.mean().to_frame("foreground_mean_d")
