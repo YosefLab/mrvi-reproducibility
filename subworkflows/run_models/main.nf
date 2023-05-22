@@ -38,10 +38,17 @@ workflow run_models {
     scvi_attention_noprior_outs = fit_scviv2_attention_noprior(adatas_in, false, false, false, false, true, false) | get_latent_scviv2_attention_noprior
     scvi_attention_noprior_adata = scvi_attention_noprior_outs.adata
 
+    scvi_attention_no_prior_mog_outs = fit_scviv2_attention_no_prior_mog(adatas_in, false, false, false, false, false, true) | get_latent_scviv2_attention_no_prior_mog
+    scvi_attention_no_prior_mog_adata = scvi_attention_no_prior_mog_outs.adata
+
     distance_matrices = scvi_attention_noprior_outs.distance_matrices.concat(
-        scvi_attention_noprior_outs.normalized_distance_matrices
+        scvi_attention_noprior_outs.normalized_distance_matrices,
+        scvi_attention_no_prior_mog_outs.distance_matrices,
+        scvi_attention_no_prior_mog_outs.normalized_distance_matrices,
     )
-    adatas = scvi_attention_noprior_adata
+    adatas = scvi_attention_noprior_adata.concat(
+        scvi_attention_no_prior_mog_adata,
+    )
 
 
     if ( params.runAllMRVIModels ) {
@@ -62,9 +69,6 @@ workflow run_models {
         scvi_attention_smallu_outs = fit_scviv2_attention_smallu(adatas_in, false, false, false, true, false, false) | get_latent_scviv2_attention_smallu
         scvi_attention_smallu_adata = scvi_attention_smallu_outs.adata
 
-        scvi_attention_no_prior_mog_outs = fit_scviv2_attention_no_prior_mog(adatas_in, false, false, false, false, false, true) | get_latent_scviv2_attention_no_prior_mog
-        scvi_attention_no_prior_mog_adata = scvi_attention_no_prior_mog_outs.adata
-
         distance_matrices = distance_matrices.concat(
             scvi_outs.distance_matrices,
             scvi_outs.normalized_distance_matrices,
@@ -76,8 +80,6 @@ workflow run_models {
             scvi_attention_outs.normalized_distance_matrices,
             scvi_attention_smallu_outs.distance_matrices,
             scvi_attention_smallu_outs.normalized_distance_matrices,
-            scvi_attention_no_prior_mog_outs.distance_matrices,
-            scvi_attention_no_prior_mog_outs.normalized_distance_matrices,
         )
 
         // Organize all outputs
@@ -87,7 +89,6 @@ workflow run_models {
             scvi_mlp_smallu_adata,
             scvi_attention_adata,
             scvi_attention_smallu_adata,
-            scvi_attention_no_prior_mog_adata,
         )
     }
 
