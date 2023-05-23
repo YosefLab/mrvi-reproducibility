@@ -252,7 +252,6 @@ sample_to_group_and_rank["rank"] = sample_to_group_and_rank.groupby('subcluster_
 
 variance_res = []
 for dmat_file in dmat_files:
-    print(dmat_file)
     try:
         d = xr.open_dataset(dmat_file, engine="netcdf4")
     except:
@@ -268,8 +267,6 @@ for dmat_file in dmat_files:
     else:
         ct_coord_name = "leiden"
         dmat_name = "distance"
-    print(distname)
-    print(basename)
     if distname == "normalized_distance_matrices":
        continue 
     res_ = []
@@ -278,24 +275,42 @@ for dmat_file in dmat_files:
     sample_8_dists_df = pd.DataFrame(sample_8_dists.values, columns=sample_8_dists.sample_x.values)
     sample_8_dists_df["leiden"] = d[ct_coord_name].values.astype(int)
 
-    for rank in range(1,9):
+    for rank in range(1,8):
         samples_in_rank = sample_to_group_and_rank[(sample_to_group_and_rank["rank"] == rank) & (sample_to_group_and_rank["subcluster_assignment"] == 1)]["sample_assignment"].values
         sample_8_dists_df[f"rank_{rank}"] = sample_8_dists_df[samples_in_rank].mean(axis=1)
     for cluster in sample_to_group_and_rank["subcluster_assignment"].unique():
         samples_in_cluster = sample_to_group_and_rank[sample_to_group_and_rank["subcluster_assignment"] == cluster]["sample_assignment"].values
         sample_8_dists_df[f"cluster_{cluster}"] = sample_8_dists_df[samples_in_cluster].mean(axis=1)
 
-    sample_8_dists_melt_df = pd.melt(sample_8_dists_df, id_vars=["leiden"], value_vars=[f"rank_{rank}" for rank in range(1,9)], var_name="rank")
-    sample_8_dists_melt_df["rank"] = sample_8_dists_melt_df["rank"].map({f"rank_{rank}": rank for rank in range(1,9)}).astype(int)
-    sub_melt_df = sample_8_dists_melt_df[sample_8_dists_melt_df["leiden"].isin([1, 2])]
-    sns.barplot(x="rank", y="value", hue="leiden", data=sub_melt_df)
-    plt.savefig(os.path.join(FIGURE_DIR, f"{modelname}_{distname}_sample_8_dists_by_rank.png"))
+    sample_8_dists_melt_df = pd.melt(sample_8_dists_df, id_vars=["leiden"], value_vars=[f"rank_{rank}" for rank in range(1,8)], var_name="rank")
+    sample_8_dists_melt_df["rank"] = sample_8_dists_melt_df["rank"].map({f"rank_{rank}": rank for rank in range(1,8)}).astype(int)
+    sub_melt_df = sample_8_dists_melt_df[sample_8_dists_melt_df["leiden"].isin([0, 1, 2])]
+
+    fig, ax = plt.subplots(1, 1, figsize=(12 * INCH_TO_CM, 12 * INCH_TO_CM))
+    sns.barplot(x="rank", y="value", hue="leiden", data=sub_melt_df, ax=ax)
+    plt.title("Mean Distance to non-subsampled donor in donor group 1")
+    plt.ylabel("Mean Distance")
+    plt.xlabel("Donor (labeled by subsample rate)")
+    L = plt.legend()
+    L.get_texts()[0].set_text("Positive cluster")
+    L.get_texts()[1].set_text("Subsampled cluster")
+    L.get_texts()[2].set_text("Non-subsampled cluster")
+    ax.set_xticklabels([0.2, 0.4, 0.6, 0.8, 1.0, 1.0, 1.0])
+    plt.savefig(os.path.join(FIGURE_DIR, f"{modelname}_{distname}_sample_8_dists_by_rank.svg"))
     plt.clf()
 
+    fig, ax = plt.subplots(1, 1, figsize=(12 * INCH_TO_CM, 12 * INCH_TO_CM))
     sample_8_dists_melt_df = pd.melt(sample_8_dists_df, id_vars=["leiden"], value_vars=[f"cluster_{cluster}" for cluster in range(1, 5)], var_name="cluster")
     sample_8_dists_melt_df["cluster"] = sample_8_dists_melt_df["cluster"].map({f"cluster_{cluster}": cluster for cluster in range(1, 5)}).astype(int)
-    sub_melt_df = sample_8_dists_melt_df[sample_8_dists_melt_df["leiden"].isin([1, 2])]
-    sns.barplot(x="cluster", y="value", hue="leiden", data=sub_melt_df)
-    plt.savefig(os.path.join(FIGURE_DIR, f"{modelname}_{distname}_sample_8_dists_by_cluster.png"))
+    sub_melt_df = sample_8_dists_melt_df[sample_8_dists_melt_df["leiden"].isin([0, 1, 2])]
+    sns.barplot(x="cluster", y="value", hue="leiden", data=sub_melt_df, ax=ax)
+    plt.title("Mean Distance to non-subsampled subcluster 1 donor")
+    plt.ylabel("Mean Distance")
+    plt.xlabel("Donor Subcluster Assignment")
+    L = plt.legend()
+    L.get_texts()[0].set_text("Positive cluster")
+    L.get_texts()[1].set_text("Subsampled cluster")
+    L.get_texts()[2].set_text("Non-subsampled cluster")
+    plt.savefig(os.path.join(FIGURE_DIR, f"{modelname}_{distname}_sample_8_dists_by_cluster.svg"))
     plt.clf()
 # %%
