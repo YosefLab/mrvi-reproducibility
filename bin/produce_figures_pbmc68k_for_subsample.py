@@ -10,6 +10,7 @@ import seaborn as sns
 import xarray as xr
 from plot_utils import INCH_TO_CM, ALGO_RENAMER, SHARED_THEME
 
+
 def compute_ratio(dist, sample_to_mask):
     ratios = []
     for sample_id, sample_dists in enumerate(dist):
@@ -22,16 +23,15 @@ def compute_ratio(dist, sample_to_mask):
         ratios.append(dist_to_same / dist_to_diff)
     return np.array(ratios)
 
+
 sc.set_figure_params(dpi_save=500)
-plt.rcParams['axes.grid'] = False
+plt.rcParams["axes.grid"] = False
 plt.rcParams["svg.fonttype"] = "none"
 
 FIGURE_DIR = "../results/aws_pipeline/experiments/pbmcs68k_for_subsample"
 os.makedirs(FIGURE_DIR, exist_ok=True)
 
-adata = sc.read_h5ad(
-    "../results/aws_pipeline/pbmcs68k_for_subsample.preprocessed.h5ad"
-)
+adata = sc.read_h5ad("../results/aws_pipeline/pbmcs68k_for_subsample.preprocessed.h5ad")
 
 # %%
 (
@@ -56,13 +56,7 @@ fig = (
     + SHARED_THEME
     + p9.theme_void()
     + p9.scale_color_manual(
-        values=[
-            "#1f77b4",
-            "#ff7f0e",
-            "#2ca02c",
-            "#d62728",
-            "#878787"
-        ]
+        values=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#878787"]
     )
 )
 fig.save(os.path.join(FIGURE_DIR, "pbmcs68k_subcluster_assignment.png"), dpi=500)
@@ -87,7 +81,11 @@ for adata_file in adata_files:
         if obsm_key.endswith("mde") & ("scviv2" in obsm_key):
             print(obsm_key)
             rdm_perm = np.random.permutation(adata.shape[0])
-            sc.pl.embedding(adata_[rdm_perm], basis=obsm_key, color=["leiden", "subcluster_assignment"])
+            sc.pl.embedding(
+                adata_[rdm_perm],
+                basis=obsm_key,
+                color=["leiden", "subcluster_assignment"],
+            )
 
 # # %%
 # scibv_files = glob.glob(
@@ -131,13 +129,11 @@ dmat_files
 
 # %%
 sample_to_group = (
-    adata.obs
-    .query("leiden == '0'")
+    adata.obs.query("leiden == '0'")
     .drop_duplicates("sample_assignment")
     .set_index("sample_assignment")
     .sort_index()
-    .subcluster_assignment
-    .astype(str)
+    .subcluster_assignment.astype(str)
     .apply(lambda x: np.int32(x))
 )
 
@@ -165,7 +161,7 @@ for dmat_file in dmat_files:
     print(distname)
     print(basename)
     if distname == "normalized_distance_matrices":
-       continue 
+        continue
     res_ = []
 
     d_foreground = d.loc[{ct_coord_name: "0"}]
@@ -191,11 +187,10 @@ for dmat_file in dmat_files:
                 mean_d=mean_d,
             )
         )
-all_res = (
-    pd.DataFrame(all_res)
-    .assign(
-        Model=lambda x: pd.Categorical(x.model.replace(ALGO_RENAMER), categories=ALGO_RENAMER.values()),
-    )
+all_res = pd.DataFrame(all_res).assign(
+    Model=lambda x: pd.Categorical(
+        x.model.replace(ALGO_RENAMER), categories=ALGO_RENAMER.values()
+    ),
 )
 
 # %%
@@ -208,18 +203,20 @@ fig = (
         figure_size=(4 * INCH_TO_CM, 4 * INCH_TO_CM),
     )
     + SHARED_THEME
-    + p9.labs(
-        x="", y="Intra-cluster distance ratio"
-    )
+    + p9.labs(x="", y="Intra-cluster distance ratio")
 )
 fig.save(os.path.join(FIGURE_DIR, "intra_distance_ratios.svg"))
 
 
 # %%
-mean_d_foreground = all_res.query("leiden == '0'").groupby("model").mean_d.mean().to_frame("foreground_mean_d")
+mean_d_foreground = (
+    all_res.query("leiden == '0'")
+    .groupby("model")
+    .mean_d.mean()
+    .to_frame("foreground_mean_d")
+)
 relative_d = (
-    all_res
-    .query("leiden != '0'")
+    all_res.query("leiden != '0'")
     .merge(mean_d_foreground, left_on="model", right_index=True)
     .assign(
         relative_d=lambda x: x.mean_d / x.foreground_mean_d,
@@ -247,8 +244,14 @@ fig
 # %%
 # Plot variance of dist to sample 8 per rank
 sample_to_group_and_rank = pd.DataFrame(sample_to_group).reset_index()
-sample_to_group_and_rank["sample_assignment_int"] = sample_to_group_and_rank.sample_assignment.astype(int)
-sample_to_group_and_rank["rank"] = sample_to_group_and_rank.groupby('subcluster_assignment')["sample_assignment_int"].rank(method='dense', ascending=True).astype(int)
+sample_to_group_and_rank[
+    "sample_assignment_int"
+] = sample_to_group_and_rank.sample_assignment.astype(int)
+sample_to_group_and_rank["rank"] = (
+    sample_to_group_and_rank.groupby("subcluster_assignment")["sample_assignment_int"]
+    .rank(method="dense", ascending=True)
+    .astype(int)
+)
 
 variance_res = []
 for dmat_file in dmat_files:
@@ -268,23 +271,45 @@ for dmat_file in dmat_files:
         ct_coord_name = "leiden"
         dmat_name = "distance"
     if distname == "normalized_distance_matrices":
-       continue 
+        continue
     res_ = []
 
     sample_8_dists = d[dmat_name].sel(sample_y="8")
-    sample_8_dists_df = pd.DataFrame(sample_8_dists.values, columns=sample_8_dists.sample_x.values)
+    sample_8_dists_df = pd.DataFrame(
+        sample_8_dists.values, columns=sample_8_dists.sample_x.values
+    )
     sample_8_dists_df["leiden"] = d[ct_coord_name].values.astype(int)
 
-    for rank in range(1,8):
-        samples_in_rank = sample_to_group_and_rank[(sample_to_group_and_rank["rank"] == rank) & (sample_to_group_and_rank["subcluster_assignment"] == 1)]["sample_assignment"].values
-        sample_8_dists_df[f"rank_{rank}"] = sample_8_dists_df[samples_in_rank].mean(axis=1)
+    for rank in range(1, 8):
+        samples_in_rank = sample_to_group_and_rank[
+            (sample_to_group_and_rank["rank"] == rank)
+            & (sample_to_group_and_rank["subcluster_assignment"] == 1)
+        ]["sample_assignment"].values
+        sample_8_dists_df[f"rank_{rank}"] = sample_8_dists_df[samples_in_rank].mean(
+            axis=1
+        )
     for cluster in sample_to_group_and_rank["subcluster_assignment"].unique():
-        samples_in_cluster = sample_to_group_and_rank[sample_to_group_and_rank["subcluster_assignment"] == cluster]["sample_assignment"].values
-        sample_8_dists_df[f"cluster_{cluster}"] = sample_8_dists_df[samples_in_cluster].mean(axis=1)
+        samples_in_cluster = sample_to_group_and_rank[
+            sample_to_group_and_rank["subcluster_assignment"] == cluster
+        ]["sample_assignment"].values
+        sample_8_dists_df[f"cluster_{cluster}"] = sample_8_dists_df[
+            samples_in_cluster
+        ].mean(axis=1)
 
-    sample_8_dists_melt_df = pd.melt(sample_8_dists_df, id_vars=["leiden"], value_vars=[f"rank_{rank}" for rank in range(1,8)], var_name="rank")
-    sample_8_dists_melt_df["rank"] = sample_8_dists_melt_df["rank"].map({f"rank_{rank}": rank for rank in range(1,8)}).astype(int)
-    sub_melt_df = sample_8_dists_melt_df[sample_8_dists_melt_df["leiden"].isin([0, 1, 2])]
+    sample_8_dists_melt_df = pd.melt(
+        sample_8_dists_df,
+        id_vars=["leiden"],
+        value_vars=[f"rank_{rank}" for rank in range(1, 8)],
+        var_name="rank",
+    )
+    sample_8_dists_melt_df["rank"] = (
+        sample_8_dists_melt_df["rank"]
+        .map({f"rank_{rank}": rank for rank in range(1, 8)})
+        .astype(int)
+    )
+    sub_melt_df = sample_8_dists_melt_df[
+        sample_8_dists_melt_df["leiden"].isin([0, 1, 2])
+    ]
 
     fig, ax = plt.subplots(1, 1, figsize=(12 * INCH_TO_CM, 12 * INCH_TO_CM))
     sns.barplot(x="rank", y="value", hue="leiden", data=sub_melt_df, ax=ax)
@@ -296,13 +321,27 @@ for dmat_file in dmat_files:
     L.get_texts()[1].set_text("Subsampled cluster")
     L.get_texts()[2].set_text("Non-subsampled cluster")
     ax.set_xticklabels([0.2, 0.4, 0.6, 0.8, 1.0, 1.0, 1.0])
-    plt.savefig(os.path.join(FIGURE_DIR, f"{modelname}_{distname}_sample_8_dists_by_rank.svg"))
+    plt.savefig(
+        os.path.join(FIGURE_DIR, f"{modelname}_{distname}_sample_8_dists_by_rank.svg"),
+        bbox_inches="tight",
+    )
     plt.clf()
 
     fig, ax = plt.subplots(1, 1, figsize=(12 * INCH_TO_CM, 12 * INCH_TO_CM))
-    sample_8_dists_melt_df = pd.melt(sample_8_dists_df, id_vars=["leiden"], value_vars=[f"cluster_{cluster}" for cluster in range(1, 5)], var_name="cluster")
-    sample_8_dists_melt_df["cluster"] = sample_8_dists_melt_df["cluster"].map({f"cluster_{cluster}": cluster for cluster in range(1, 5)}).astype(int)
-    sub_melt_df = sample_8_dists_melt_df[sample_8_dists_melt_df["leiden"].isin([0, 1, 2])]
+    sample_8_dists_melt_df = pd.melt(
+        sample_8_dists_df,
+        id_vars=["leiden"],
+        value_vars=[f"cluster_{cluster}" for cluster in range(1, 5)],
+        var_name="cluster",
+    )
+    sample_8_dists_melt_df["cluster"] = (
+        sample_8_dists_melt_df["cluster"]
+        .map({f"cluster_{cluster}": cluster for cluster in range(1, 5)})
+        .astype(int)
+    )
+    sub_melt_df = sample_8_dists_melt_df[
+        sample_8_dists_melt_df["leiden"].isin([0, 1, 2])
+    ]
     sns.barplot(x="cluster", y="value", hue="leiden", data=sub_melt_df, ax=ax)
     plt.title("Mean Distance to non-subsampled subcluster 1 donor")
     plt.ylabel("Mean Distance")
@@ -311,6 +350,11 @@ for dmat_file in dmat_files:
     L.get_texts()[0].set_text("Positive cluster")
     L.get_texts()[1].set_text("Subsampled cluster")
     L.get_texts()[2].set_text("Non-subsampled cluster")
-    plt.savefig(os.path.join(FIGURE_DIR, f"{modelname}_{distname}_sample_8_dists_by_cluster.svg"))
+    plt.savefig(
+        os.path.join(
+            FIGURE_DIR, f"{modelname}_{distname}_sample_8_dists_by_cluster.svg"
+        ),
+        bbox_inches="tight",
+    )
     plt.clf()
 # %%
