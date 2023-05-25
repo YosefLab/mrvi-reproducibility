@@ -475,8 +475,7 @@ def _process_semisynth2(
         sample_assignment_mapping["rank"] = sample_assignment_mapping.groupby("subcluster_assignment")["sample_assignment_int"].rank(method="dense", ascending=True).astype(int)
 
         subsampled_adatas = [adata[adata.obs.leiden != str(selected_subsample_cluster)]]
-        for rankminusone, subsample_rate in enumerate(subsample_rates):
-            rank = rankminusone + 1
+        for rank, subsample_rate in enumerate(subsample_rates, 1):
             samples_to_subsample = sample_assignment_mapping[sample_assignment_mapping["rank"] == rank]["sample_assignment"].to_list()
             for sample in samples_to_subsample:
                 subsample_adata = adata[(adata.obs.sample_assignment == str(sample)) & (adata.obs["leiden"] == str(selected_subsample_cluster))]
@@ -567,6 +566,8 @@ def _process_haniffa(adata, config_in):
     adata.obs.loc[:, "age_int"] = adata.obs.Age_interval.apply(
         lambda x: x.split(",")[0][1:]
     ).astype(int)
+    if "subset_site" in config_in:
+        adata = adata[adata.obs.Site == config_in["subset_site"]].copy()
     return adata.copy()
 
 

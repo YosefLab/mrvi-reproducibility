@@ -118,17 +118,19 @@ def fit_scviv2(
                     "use_map": True,
                     "stop_gradients": False,
                     "stop_gradients_mlp": True,
+                    "dropout_rate": 0.03
                 },
                 "px_kwargs": {
                     "stop_gradients": False,
                     "stop_gradients_mlp": True,
-                    "h_activation": jnp.exp,
+                    "h_activation": nn.softmax,
+                    "dropout_rate": 0.03,
+                    "low_dim_batch": True
                 },
                 "learn_z_u_prior_scale": False,
-                "z_u_prior": False,
-                "u_prior_mixture": True,
-                "u_prior_mixture_k": 20,
-            }
+                "z_u_prior": True,
+                "u_prior_mixture": False,
+        }
         )
     if use_attention_no_prior_mog:
         model_kwargs.update(
@@ -143,11 +145,13 @@ def fit_scviv2(
                 "px_kwargs": {
                     "stop_gradients": False,
                     "stop_gradients_mlp": True,
-                    "h_activation": jnp.exp,
+                    "h_activation": nn.softmax,
+                    "low_dim_batch": True,
                 },
                 "learn_z_u_prior_scale": False,
                 "z_u_prior": False,
-                "u_prior_mixture": False,
+                "u_prior_mixture": True,
+                "u_prior_mixture_k": 20,
             }
         )
     model = scvi_v2.MrVI(adata, **model_kwargs)

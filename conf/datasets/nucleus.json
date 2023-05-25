@@ -2,18 +2,28 @@
     "batch_key": "suspension_type",
     "labels_key": "cell_type",
     "sample_key": "library_uuid",
+    "mrvi_train_kwargs": {
+        "max_epochs": 400
+    },
     "hvg_kwargs": {
         "n_top_genes": 3000,
         "flavor": "seurat_v3"
     },
-    "mrvi_train_kwargs": {
-        "max_epochs": 300
-    },
     "scviv2_train_kwargs": {
-        "max_epochs": 300
+        "max_epochs": 400,
+        "batch_size": 1024,
+        "early_stopping": true,
+        "early_stopping_patience": 30,
+        "check_val_every_n_epoch": 1,
+        "early_stopping_monitor": "validation_loss",
+        "plan_kwargs": {
+            "n_epochs_kl_warmup": 50,
+            "lr": 3e-3
+        }
     },
     "composition_scvi_train_kwargs": {
-        "max_epochs": 300
+        "max_epochs": 400
     },
-    "clustering_method": "ward"
+    "clustering_method": "ward",
+    "compute_local_representations": true
 }
