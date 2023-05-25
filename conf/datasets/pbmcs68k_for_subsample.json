@@ -27,10 +27,11 @@
     "clustering_method": "ward",
     "dataset_config": {
         "resolution": 0.1,
-        "n_subclusters": 4,
+        "n_subclusters": 8,
         "n_replicates_per_subcluster": 8,
         "selected_cluster": 0,
         "selected_subsample_cluster": 1,
-        "subsample_rates": [0.2, 0.4, 0.6, 0.8, 1.0, 1.0, 1.0, 1.0]
+        "subsample_rates": [0.2, 0.4, 0.6, 0.8, 1.0, 1.0, 1.0, 1.0],
+        "n_genes_for_subclustering": 500
     }
 }

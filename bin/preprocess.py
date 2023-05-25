@@ -400,33 +400,35 @@ def _process_semisynth2(
     n_subclusters = semisynth_config["n_subclusters"]
     n_replicates_per_subcluster = semisynth_config["n_replicates_per_subcluster"]
     selected_cluster = semisynth_config["selected_cluster"]
+    n_genes_for_subclustering = semisynth_config["n_genes_for_subclustering"]
     if subsample:
         selected_subsample_cluster = semisynth_config["selected_subsample_cluster"]
         subsample_rates = semisynth_config["subsample_rates"]
 
     # use SCVI to obtain latent space
-    SCVI.setup_anndata(
-        adata,
-    )
-    scvi = SCVI(adata)
-    scvi.train(
-        max_epochs=400,
-        batch_size=1024,
-        early_stopping=True,
-        early_stopping_patience=20,
-        early_stopping_monitor="reconstruction_loss_validation",
-    )
-    latent = scvi.get_latent_representation()
-    adata.obsm["X_scvi"] = latent
-    sc.pp.neighbors(adata, use_rep="X_scvi")
-    sc.tl.leiden(adata, resolution=resolution, key_added="leiden")
+    adata_log = adata.copy()
+    sc.pp.normalize_total(adata_log)
+    sc.pp.log1p(adata_log)
+    sc.pp.pca(adata_log, n_comps=50)
+    sc.pp.neighbors(adata_log, use_rep="X_pca")
+    sc.tl.leiden(adata_log, resolution=resolution, key_added="leiden")
+    adata.obs["leiden"] = adata_log.obs["leiden"]
+    if n_genes_for_subclustering is not None:
+        selected_genes_for_subclustering = np.random.choice(
+            adata.var_names, n_genes_for_subclustering, replace=False
+        )
+        adata_log_ = adata_log[:, selected_genes_for_subclustering].copy()
+        sc.pp.pca(adata_log_, n_comps=50)
+        adata.obsm["X_rep_subclustering"] = adata_log_.obsm["X_pca"]
+    else:
+        adata.obsm["X_rep_subclustering"] = adata_log.obsm["X_pca"]
 
     cluster_to_sizes = adata.obs.leiden.value_counts().sort_values(ascending=False)
     cluster_name = cluster_to_sizes.index[selected_cluster]
     sample_assignments = pd.DataFrame()
     for unique_cluster in tqdm(adata.obs["leiden"].unique()):
         adata_ = adata[adata.obs["leiden"] == unique_cluster].copy()
-        latent_reps = adata_.obsm["X_scvi"]
+        latent_reps = adata_.obsm["X_rep_subclustering"]
         if unique_cluster == cluster_name:
             res_ = construct_sample_stratifications_from_subcelltypes(
                 latent_reps,
@@ -488,12 +490,12 @@ def _process_semisynth2(
 
 
 def construct_sample_stratifications_from_subcelltypes(
-    latent_reps, n_subclusters, n_replicates_per_subcluster
+    latent_reps, n_subclusters, n_replicates_per_subcluster, linkage_method="ward"
 ):
     """Construct semisynthetic dataset"""
     dmat = pairwise_distances(latent_reps)
     dmat = squareform(dmat)
-    Z = sch.linkage(dmat, method="complete")
+    Z = sch.linkage(dmat, method=linkage_method)
     subclusters = sch.fcluster(Z, n_subclusters, criterion="maxclust")
 
     # get names of internal nodes associated with each cluster
