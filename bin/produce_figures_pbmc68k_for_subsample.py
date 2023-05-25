@@ -76,16 +76,51 @@ adata_files = glob.glob(
 )
 for adata_file in adata_files:
     adata_ = sc.read_h5ad(adata_file)
-    print(adata_.shape)
     for obsm_key in adata_.obsm.keys():
         if obsm_key.endswith("mde") & ("scviv2" in obsm_key):
             print(obsm_key)
             rdm_perm = np.random.permutation(adata.shape[0])
-            sc.pl.embedding(
+            adata_.obs["cell_type"] = adata.obs.leiden.copy().astype(str)
+            adata_.obs.loc[~adata_.obs.leiden.isin(("0", "1")), "cell_type"] = "other"
+            adata_.obs["cell_type"] = adata_.obs["cell_type"].astype("category")
+            adata_.uns["cell_type_colors"] = {
+                "0": "#7AB5FF",
+                "1": "#FF7A7A",
+                "other": "lightgray",
+            }
+            adata_.uns["subcluster_assignment_colors"] = {
+                "1": "#2CA02C",
+                "2": "#D62728",
+                "3": "#FF7F0E",
+                "4": "#1F77B4",
+                "NA": "lightgray",
+            }
+            fig = sc.pl.embedding(
                 adata_[rdm_perm],
                 basis=obsm_key,
-                color=["leiden", "subcluster_assignment"],
+                color="cell_type",
+                palette=adata_.uns["cell_type_colors"],
+                return_fig=True,
+                show=False,
             )
+            plt.savefig(
+                os.path.join(FIGURE_DIR, f"{obsm_key}_ct.svg"),
+                bbox_inches="tight",
+            )
+            plt.clf()
+            fig = sc.pl.embedding(
+                adata_[rdm_perm],
+                basis=obsm_key,
+                color="subcluster_assignment",
+                palette=adata_.uns["subcluster_assignment_colors"],
+                return_fig=True,
+                show=False,
+            )
+            plt.savefig(
+                os.path.join(FIGURE_DIR, f"{obsm_key}_subcluster.svg"),
+                bbox_inches="tight",
+            )
+            plt.clf()
 
 # # %%
 # scibv_files = glob.glob(
@@ -162,14 +197,28 @@ for dmat_file in dmat_files:
     print(basename)
     if distname == "normalized_distance_matrices":
         continue
+    # reorder samples
+    d = d.sel(
+        sample_x=[str(i) for i in range(1, len(d.sample_x) + 1)],
+        sample_y=[str(i) for i in range(1, len(d.sample_y) + 1)],
+    )
     res_ = []
 
     d_foreground = d.loc[{ct_coord_name: "0"}]
     sns.heatmap(d_foreground[dmat_name].values)
-    plt.suptitle(f"{modelname}_{distname}")
-    plt.savefig(
-        os.path.join(FIGURE_DIR, f"{modelname}_{distname}_cluster0_heatmap.svg")
+    plt.suptitle(f"{modelname}_{distname} CT 0")
+    plt.savefig(os.path.join(FIGURE_DIR, f"{modelname}_{distname}_ct0_heatmap.svg"))
+    plt.show()
+    plt.close()
+
+    d_subsampled = d.loc[{ct_coord_name: "1"}]
+    sns.heatmap(
+        d_subsampled[dmat_name].values,
+        vmin=0,
+        vmax=d_foreground[dmat_name].values.max(),
     )
+    plt.suptitle(f"{modelname}_{distname} CT 1")
+    plt.savefig(os.path.join(FIGURE_DIR, f"{modelname}_{distname}_ct1_heatmap.svg"))
     plt.show()
     plt.close()
 
@@ -357,4 +406,12 @@ for dmat_file in dmat_files:
         bbox_inches="tight",
     )
     plt.clf()
+# %%
+# Subsample ratio heatmap
+ss_ratio_df = pd.DataFrame({"sample": [str(i) for i in range(1, 33)], "subsample rate":[0.2, 0.4, 0.6, 0.8, 1.0, 1.0, 1.0, 1.0] * 4})
+sns.heatmap(ss_ratio_df["subsample rate"].values[:, None].T, cmap="YlGnBu", vmin=0, vmax=1)
+plt.savefig(
+    os.path.join(FIGURE_DIR, f"subsample_ratio_heatmap.svg"), bbox_inches="tight"
+)
+plt.clf()
 # %%
