@@ -9,7 +9,6 @@ import scipy.cluster.hierarchy as sch
 import xarray as xr
 from anndata import AnnData
 from scipy.spatial.distance import squareform
-from scvi.model import SCVI
 from sklearn.metrics import pairwise_distances
 from tqdm import tqdm
 from tree_utils import linkage_to_ete
@@ -424,18 +423,18 @@ def _process_semisynth2(
         adata.obsm["X_rep_subclustering"] = adata_log.obsm["X_pca"]
 
     cluster_to_sizes = adata.obs.leiden.value_counts().sort_values(ascending=False)
-    cluster_name = cluster_to_sizes.index[selected_cluster]
+    positive_cluster = cluster_to_sizes.index[selected_cluster]
     sample_assignments = pd.DataFrame()
     for unique_cluster in tqdm(adata.obs["leiden"].unique()):
         adata_ = adata[adata.obs["leiden"] == unique_cluster].copy()
         latent_reps = adata_.obsm["X_rep_subclustering"]
-        if unique_cluster == cluster_name:
+        if unique_cluster == positive_cluster:
             res_ = construct_sample_stratifications_from_subcelltypes(
                 latent_reps,
                 n_subclusters,
                 n_replicates_per_subcluster,
             )
-            adata.uns[f"cluster{unique_cluster}_tree_gt"] = res_["tree_gt"].write()
+            adata.uns[f"cluster{positive_cluster}_tree_gt"] = res_["tree_gt"].write()
             sample_assignments = pd.concat(
                 [
                     sample_assignments,
@@ -470,27 +469,57 @@ def _process_semisynth2(
     adata.obs.loc[:, "Site"] = "1"
 
     if subsample:
-        sample_assignment_mapping = adata.obs[["sample_assignment", "subcluster_assignment"]].drop_duplicates(keep="first")
-        sample_assignment_mapping = sample_assignment_mapping[sample_assignment_mapping.subcluster_assignment != "NA"]
-        sample_assignment_mapping["subcluster_assignment"] = sample_assignment_mapping["subcluster_assignment"].astype(str).astype("category")
-        sample_assignment_mapping["sample_assignment_int"] = sample_assignment_mapping.sample_assignment.astype(int)
-        sample_assignment_mapping["rank"] = sample_assignment_mapping.groupby("subcluster_assignment")["sample_assignment_int"].rank(method="dense", ascending=True).astype(int)
+        sample_assignment_mapping = adata.obs[
+            ["sample_assignment", "subcluster_assignment"]
+        ].drop_duplicates(keep="first")
+        sample_assignment_mapping = sample_assignment_mapping[
+            sample_assignment_mapping.subcluster_assignment != "NA"
+        ]
+        sample_assignment_mapping["subcluster_assignment"] = (
+            sample_assignment_mapping["subcluster_assignment"]
+            .astype(str)
+            .astype("category")
+        )
+        sample_assignment_mapping[
+            "sample_assignment_int"
+        ] = sample_assignment_mapping.sample_assignment.astype(int)
+        sample_assignment_mapping["rank"] = (
+            sample_assignment_mapping.groupby("subcluster_assignment")[
+                "sample_assignment_int"
+            ]
+            .rank(method="dense", ascending=True)
+            .astype(int)
+        )
 
         subsampled_adatas = [adata[adata.obs.leiden != str(selected_subsample_cluster)]]
         for rank, subsample_rate in enumerate(subsample_rates, 1):
-            samples_to_subsample = sample_assignment_mapping[sample_assignment_mapping["rank"] == rank]["sample_assignment"].to_list()
+            samples_to_subsample = sample_assignment_mapping[
+                sample_assignment_mapping["rank"] == rank
+            ]["sample_assignment"].to_list()
             for sample in samples_to_subsample:
-                subsample_adata = adata[(adata.obs.sample_assignment == str(sample)) & (adata.obs["leiden"] == str(selected_subsample_cluster))]
-                subsample_adata = subsample_adata[np.random.choice(subsample_adata.shape[0], int(subsample_adata.shape[0] * subsample_rate), replace=False)]
+                subsample_adata = adata[
+                    (adata.obs.sample_assignment == str(sample))
+                    & (adata.obs["leiden"] == str(selected_subsample_cluster))
+                ]
+                subsample_adata = subsample_adata[
+                    np.random.choice(
+                        subsample_adata.shape[0],
+                        int(subsample_adata.shape[0] * subsample_rate),
+                        replace=False,
+                    )
+                ]
                 subsample_adata.obs["rank"] = rank
                 subsampled_adatas.append(subsample_adata)
-        return sc.concat(subsampled_adatas)
-
+        res = sc.concat(subsampled_adatas)
+        res.uns[f"cluster{positive_cluster}_tree_gt"] = adata.uns[
+            f"cluster{positive_cluster}_tree_gt"
+        ]
+        return res
     return adata
 
 
 def construct_sample_stratifications_from_subcelltypes(
-    latent_reps, n_subclusters, n_replicates_per_subcluster, linkage_method="ward"
+    latent_reps, n_subclusters, n_replicates_per_subcluster, linkage_method="complete"
 ):
     """Construct semisynthetic dataset"""
     dmat = pairwise_distances(latent_reps)
