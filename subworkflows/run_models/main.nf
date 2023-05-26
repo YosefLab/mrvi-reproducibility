@@ -50,45 +50,48 @@ workflow run_models {
         scvi_attention_no_prior_mog_adata,
     )
 
-
     if ( params.runAllMRVIModels ) {
+        // run old base model
         scvi_outs = fit_scviv2(adatas_in, false, false, false, false, false, false) | get_latent_scviv2
         scvi_adata = scvi_outs.adata
 
-        // Run scviv2 mlp
-        scvi_mlp_outs = fit_scviv2_mlp(adatas_in, true, false, false, false, false, false) | get_latent_scviv2_mlp
-        scvi_mlp_adata = scvi_mlp_outs.adata
+        // // Run scviv2 mlp
+        // scvi_mlp_outs = fit_scviv2_mlp(adatas_in, true, false, false, false, false, false) | get_latent_scviv2_mlp
+        // scvi_mlp_adata = scvi_mlp_outs.adata
 
-        // Run scviv2 mlp smallu
-        scvi_mlp_smallu_outs = fit_scviv2_mlp_smallu(adatas_in, false, true, false, false, false, false) | get_latent_scviv2_mlp_smallu
-        scvi_mlp_smallu_adata = scvi_mlp_smallu_outs.adata
+        // // Run scviv2 mlp smallu
+        // scvi_mlp_smallu_outs = fit_scviv2_mlp_smallu(adatas_in, false, true, false, false, false, false) | get_latent_scviv2_mlp_smallu
+        // scvi_mlp_smallu_adata = scvi_mlp_smallu_outs.adata
 
-        scvi_attention_outs = fit_scviv2_attention(adatas_in, false, false, true, false, false, false) | get_latent_scviv2_attention
-        scvi_attention_adata = scvi_attention_outs.adata
+        // scvi_attention_outs = fit_scviv2_attention(adatas_in, false, false, true, false, false, false) | get_latent_scviv2_attention
+        // scvi_attention_adata = scvi_attention_outs.adata
 
-        scvi_attention_smallu_outs = fit_scviv2_attention_smallu(adatas_in, false, false, false, true, false, false) | get_latent_scviv2_attention_smallu
-        scvi_attention_smallu_adata = scvi_attention_smallu_outs.adata
+        // scvi_attention_smallu_outs = fit_scviv2_attention_smallu(adatas_in, false, false, false, true, false, false) | get_latent_scviv2_attention_smallu
+        // scvi_attention_smallu_adata = scvi_attention_smallu_outs.adata
 
         distance_matrices = distance_matrices.concat(
             scvi_outs.distance_matrices,
             scvi_outs.normalized_distance_matrices,
-            scvi_mlp_outs.distance_matrices,
-            scvi_mlp_outs.normalized_distance_matrices,
-            scvi_mlp_smallu_outs.distance_matrices,
-            scvi_mlp_smallu_outs.normalized_distance_matrices,
-            scvi_attention_outs.distance_matrices,
-            scvi_attention_outs.normalized_distance_matrices,
-            scvi_attention_smallu_outs.distance_matrices,
-            scvi_attention_smallu_outs.normalized_distance_matrices,
+        //     scvi_mlp_outs.distance_matrices,
+        //     scvi_mlp_outs.normalized_distance_matrices,
+        //     scvi_mlp_smallu_outs.distance_matrices,
+        //     scvi_mlp_smallu_outs.normalized_distance_matrices,
+        //     scvi_attention_outs.distance_matrices,
+        //     scvi_attention_outs.normalized_distance_matrices,
+        //     scvi_attention_smallu_outs.distance_matrices,
+        //     scvi_attention_smallu_outs.normalized_distance_matrices,
+            scvi_attention_no_prior_mog_outs.distance_matrices,
+            scvi_attention_no_prior_mog_outs.normalized_distance_matrices,
         )
 
         // Organize all outputs
         adatas = adatas.concat(
             scvi_adata,
-            scvi_mlp_adata,
-            scvi_mlp_smallu_adata,
-            scvi_attention_adata,
-            scvi_attention_smallu_adata,
+            // scvi_mlp_adata,
+            // scvi_mlp_smallu_adata,
+            // scvi_attention_adata,
+            // scvi_attention_smallu_adata,
+            scvi_attention_no_prior_mog_adata,
         )
     }
 

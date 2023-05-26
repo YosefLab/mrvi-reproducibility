@@ -10,7 +10,7 @@ import plotnine as p9
 from utils import load_config, load_results, save_figures
 
 # Change to False if you want to run this script directly
-RUN_WITH_PARSER = True
+RUN_WITH_PARSER = False
 SHARED_THEME = p9.theme_classic() + p9.theme(
     strip_background=p9.element_blank(),
 )
@@ -46,24 +46,31 @@ if RUN_WITH_PARSER:
     )
 
 else:
-    dataset_name = "symsim_new"
-    output_dir = f"../results/aws_pipeline/figures/{dataset_name}"
-    good_filenames = (
-        pd.read_csv(os.path.join(output_dir, "path_to_intermediary_files.txt"))
-        .squeeze()
-        .values.flatten()
-    )
+    dataset_name = "sciplex_A549_simple_filtered_all_phases"
+    output_dir = f"../results/sciplex_pipeline/figures/{dataset_name}"
+    # good_filenames = (
+    #     pd.read_csv(os.path.join(output_dir, "path_to_intermediary_files.txt"))
+    #     .squeeze()
+    #     .values.flatten()
+    # )
     basedir = Path(output_dir).parent.parent.absolute()
     all_results_files = glob.glob(os.path.join(basedir, "**"), recursive=True)
     results_paths = [
-        x for x in all_results_files if os.path.basename(x) in good_filenames
+        # x for x in all_results_files if os.path.basename(x) in good_filenames
+        x
+        for x in all_results_files
+        if x.startswith(
+            f"/home/justin/ghrepos/scvi-v2-reproducibility/bin/../results/sciplex_pipeline/data/{dataset_name}"
+        )
+        and x.endswith(".final.h5ad")
     ]
-    assert len(results_paths) == len(good_filenames)
+    # assert len(results_paths) == len(good_filenames)
     config_path = f"../conf/datasets/{dataset_name}.json"
 
 
 config = load_config(config_path)
 colors = extract_colors_from_config_file(config)
+colors.append("pathway")
 all_results = load_results(results_paths)
 
 # %%
@@ -157,7 +164,7 @@ if all_results["representations"].size >= 1:
         unique_reps = mde_reps.representation_name.unique()
         for rep in unique_reps:
             for color_by in colors:
-                rep_plots = mde_reps.query(f"representation_name == '{rep}'")
+                rep_plots = mde_reps.query(f"representation_name == '{rep}' and A549_deg_product_dose == 'True'")
                 rep_fig = (
                     p9.ggplot(rep_plots, p9.aes(x="x", y="y", fill=color_by))
                     + p9.geom_point(stroke=0, size=0.5)
@@ -178,5 +185,6 @@ if all_results["representations"].size >= 1:
                     f"representations/{rep}_{color_by}",
                     save_svg=False,
                 )
+                plt.clf()
 
 # %%

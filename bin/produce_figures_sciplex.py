@@ -16,7 +16,7 @@ from utils import load_results
 from plot_utils import INCH_TO_CM
 
 # Change to False if you want to run this script directly
-RUN_WITH_PARSER = True
+RUN_WITH_PARSER = False
 plt.rcParams["svg.fonttype"] = "none"
 
 # %%
@@ -124,11 +124,9 @@ for dataset_name in sciplex_metrics_df["dataset_name"].unique():
 # %%
 cell_lines = ["A549", "MCF7", "K562"]
 method_names = [
-    "scviv2",
-    "scviv2_attention",
-    "scviv2_mlp",
-    "scviv2_prior",
-    "scviv2_weighted",
+    # "scviv2",
+    "scviv2_attention_noprior",
+    "scviv2_attention_no_prior_mog",
 ]
 
 # Per dataset plots
@@ -170,7 +168,7 @@ for method_name in method_names:
 
         if not RUN_WITH_PARSER:
             n_deg_dict = pd.read_csv(
-                f"notebooks/output/{cl}_flat_deg_dict.csv", index_col=0
+                f"../notebooks/output/{cl}_flat_deg_dict.csv", index_col=0
             ).to_dict()["0"]
             sample_to_n_deg_df = normalized_dists.sample_x.to_series().map(n_deg_dict)
             sample_to_n_deg_df = sample_to_n_deg_df.map(
@@ -340,10 +338,18 @@ for method_name in baseline_method_names:
         dataset_name = f"sciplex_{cl}_simple_filtered_all_phases"
 
         dists_path = f"{dataset_name}.{method_name}.distance_matrices.nc"
+        if not RUN_WITH_PARSER:
+            dists_path = os.path.join(
+                "../results/sciplex_pipeline/distance_matrices", dists_path
+            )
         dists = xr.open_dataarray(dists_path)
         cluster_dim_name = dists.dims[0]
 
         adata_path = f"{dataset_name}.{method_name}.final.h5ad"
+        if not RUN_WITH_PARSER:
+            adata_path = os.path.join(
+                "../results/sciplex_pipeline/data", adata_path
+            )
         adata = sc.read(adata_path)
 
         sample_to_pathway = (
