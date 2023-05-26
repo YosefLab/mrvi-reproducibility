@@ -12,7 +12,7 @@ from scipy.spatial.distance import squareform
 from sklearn.metrics import pairwise_distances
 from tqdm import tqdm
 from tree_utils import linkage_to_ete
-from utils import load_config, make_parents, wrap_kwargs
+from utils import load_config, make_parents, wrap_kwargs, set_breakpoint
 
 
 @wrap_kwargs
@@ -519,7 +519,7 @@ def _process_semisynth2(
 
 
 def construct_sample_stratifications_from_subcelltypes(
-    latent_reps, n_subclusters, n_replicates_per_subcluster, linkage_method="complete"
+    latent_reps, n_subclusters, n_replicates_per_subcluster, linkage_method="ward"
 ):
     """Construct semisynthetic dataset"""
     dmat = pairwise_distances(latent_reps)
