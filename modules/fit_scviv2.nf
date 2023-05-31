@@ -7,6 +7,8 @@ process fit_scviv2 {
     val use_attention_smallu
     val use_attention_noprior
     val use_attention_no_prior_mog
+    val use_attention_mog
+    val use_attention_no_prior_mog_large
 
     script:
     adata_name = adata_in.getSimpleName()
@@ -30,6 +32,12 @@ process fit_scviv2 {
     else if (use_attention_no_prior_mog) {
         method_name = "scviv2_attention_no_prior_mog"
     }
+    else if (use_attention_mog) {
+        method_name = "scviv2_attention_mog"
+    }
+    else if (use_attention_no_prior_mog_large) {
+        method_name = "scviv2_attention_no_prior_mog_large"
+    }
     else {
         method_name = "scviv2"
     }
@@ -45,7 +53,9 @@ process fit_scviv2 {
         --use_attention ${use_attention} \\
         --use_attention_smallu ${use_attention_smallu} \\
         --use_attention_noprior ${use_attention_noprior} \\
-        --use_attention_no_prior_mog ${use_attention_no_prior_mog}
+        --use_attention_no_prior_mog ${use_attention_no_prior_mog} \\
+        --use_attention_mog ${use_attention_mog} \\
+        --use_attention_no_prior_mog_large ${use_attention_no_prior_mog_large}
     """
 
     output:

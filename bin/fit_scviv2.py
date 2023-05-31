@@ -17,6 +17,8 @@ def fit_scviv2(
     use_attention_smallu: str = "false",
     use_attention_noprior: str = "false",
     use_attention_no_prior_mog: str = "false",
+    use_attention_mog: str = "false",
+    use_attention_no_prior_mog_large: str = "false",
 ) -> scvi_v2.MrVI:
     """
     Train a MrVI model.
@@ -36,6 +38,7 @@ def fit_scviv2(
     use_attention_smallu = use_attention_smallu.lower() == "true"
     use_attention_noprior = use_attention_noprior.lower() == "true"
     use_attention_no_prior_mog = use_attention_no_prior_mog.lower() == "true"
+    use_attention_no_prior_mog_large = use_attention_no_prior_mog_large.lower() == "true"
 
     config = load_config(config_in)
     batch_key = config.get("batch_key", None)
@@ -150,6 +153,52 @@ def fit_scviv2(
                 },
                 "learn_z_u_prior_scale": False,
                 "z_u_prior": False,
+                "u_prior_mixture": True,
+                "u_prior_mixture_k": 20,
+            }
+        )
+    if use_attention_no_prior_mog_large:
+        model_kwargs.update(
+            {
+                "n_latent": 100,
+                "n_latent_u": 10,
+                "qz_nn_flavor": "attention",
+                "px_nn_flavor": "attention",
+                "qz_kwargs": {
+                    "use_map": True,
+                    "stop_gradients": False,
+                    "stop_gradients_mlp": True,
+                },
+                "px_kwargs": {
+                    "stop_gradients": False,
+                    "stop_gradients_mlp": True,
+                    "h_activation": nn.softmax,
+                    "low_dim_batch": True,
+                },
+                "learn_z_u_prior_scale": False,
+                "z_u_prior": False,
+                "u_prior_mixture": True,
+                "u_prior_mixture_k": 20,
+            }
+        )
+    if use_attention_mog:
+        model_kwargs.update(
+            {
+                "qz_nn_flavor": "attention",
+                "px_nn_flavor": "attention",
+                "qz_kwargs": {
+                    "use_map": True,
+                    "stop_gradients": False,
+                    "stop_gradients_mlp": True,
+                },
+                "px_kwargs": {
+                    "stop_gradients": False,
+                    "stop_gradients_mlp": True,
+                    "h_activation": nn.softmax,
+                    "low_dim_batch": True,
+                },
+                "learn_z_u_prior_scale": False,
+                "z_u_prior": True,
                 "u_prior_mixture": True,
                 "u_prior_mixture_k": 20,
             }

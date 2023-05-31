@@ -106,7 +106,7 @@ def _run_dataset_specific_preprocessing(
             config,
             subsample=True,
         )
-    if (adata_in == "haniffa.h5ad") or (adata_in == "haniffasubsample.h5ad"):
+    if adata_in in ["haniffa.h5ad", "haniffasubsample.h5ad", "haniffa2.h5ad"]:
         adata = _process_haniffa(adata, config)
     return adata, distance_matrices
 
@@ -594,6 +594,7 @@ def construct_sample_stratifications_from_subcelltypes(
 
 def _process_haniffa(adata, config_in):
     adata = adata[:, ~adata.var_names.str.startswith("AB")]
+    adata = adata[adata.obs.Status.isin(["Covid", "Healthy"])]
     adata.obs.loc[:, "age_int"] = adata.obs.Age_interval.apply(
         lambda x: x.split(",")[0][1:]
     ).astype(int)
