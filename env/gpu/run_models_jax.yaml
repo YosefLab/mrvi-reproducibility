@@ -20,5 +20,5 @@ dependencies:
           - scikit-learn==1.0.2
           - scikit-misc==0.1.4
           - scvi-tools
-          - git+ssh://git@github.com/YosefLab/scvi-v2.git@can_multires
+          - git+ssh://git@github.com/YosefLab/scvi-v2.git@jhong/normalizedrevisit
           - remote-pdb==2.1.0

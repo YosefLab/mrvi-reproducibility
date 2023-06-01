@@ -1,5 +1,5 @@
 {
-    "batch_key": "plate_oligo",
+    "batch_key": "_dummy",
     "sample_key": "product_dose",
     "labels_key": "_dummy",
     "mrvi_train_kwargs": {

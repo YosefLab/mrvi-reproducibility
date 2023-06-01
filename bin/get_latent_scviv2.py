@@ -62,7 +62,7 @@ def get_latent_scviv2(
         Path(cell_representations_out).touch()
 
     cell_dists = model.get_local_sample_distances(
-        adata, keep_cell=False, groupby=labels_key
+        adata, keep_cell=False, groupby=labels_key, batch_size=64
     )
     make_parents(distance_matrices_out)
     cell_dists.to_netcdf(distance_matrices_out)
@@ -72,6 +72,8 @@ def get_latent_scviv2(
     try:
         cell_normalized_dists = model.get_local_sample_distances(
             adata,
+            batch_size=64,
+            mc_samples=5,
             use_mean=True,
             normalize_distances=True,
             keep_cell=False,

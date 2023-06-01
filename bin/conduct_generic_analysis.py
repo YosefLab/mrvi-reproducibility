@@ -164,10 +164,12 @@ if all_results["representations"].size >= 1:
         unique_reps = mde_reps.representation_name.unique()
         for rep in unique_reps:
             for color_by in colors:
-                rep_plots = mde_reps.query(f"representation_name == '{rep}' and A549_deg_product_dose == 'True'")
+                rep_plots = mde_reps.query(
+                    f"representation_name == '{rep}' and A549_deg_product_dose == 'True'"
+                )
                 rep_fig = (
                     p9.ggplot(rep_plots, p9.aes(x="x", y="y", fill=color_by))
-                    + p9.geom_point(stroke=0, size=0.5)
+                    + p9.geom_point(stroke=0, size=1.5)
                     + SHARED_THEME
                     + p9.theme(
                         axis_text=p9.element_blank(),
