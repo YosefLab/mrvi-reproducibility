@@ -44,8 +44,8 @@ if RUN_WITH_PARSER:
         os.path.join(output_dir, "path_to_intermediary_files.txt"), index=False
     )
 else:
-    output_dir = os.path.join("../results/A549_sciplex_pipeline/figures")
-    results_paths = set(glob.glob("../results/A549_sciplex_pipeline/*/*.csv"))
+    output_dir = os.path.join("../results/sciplex_pipeline/figures")
+    results_paths = set(glob.glob("../results/sciplex_pipeline/*/*.csv"))
 
 
 # %%
@@ -89,7 +89,7 @@ rep_results_paths = [
     x
     for x in all_results_files
     if x.startswith(
-        f"/home/justin/ghrepos/scvi-v2-reproducibility/bin/../results/A549_sciplex_pipeline/data/{dataset_name}"
+        f"/home/justin/ghrepos/scvi-v2-reproducibility/bin/../results/sciplex_pipeline/data/{dataset_name}"
     )
     and x.endswith(".final.h5ad")
 ]
@@ -148,13 +148,20 @@ for dataset_name in sciplex_metrics_df["dataset_name"].unique():
         "in_product_all_dist_avg_percentile",
         "in_product_top_2_dist_avg_percentile",
     ]:
+        if plot_df[metric].isna().all():
+            continue
         fig, ax = plt.subplots(figsize=(4 * INCH_TO_CM, 4 * INCH_TO_CM))
         sns.barplot(
             data=plot_df,
             y="model_name",
             x=metric,
+            order=plot_df.sort_values(metric, ascending=False)["model_name"].values,
+            color="blue",
             ax=ax,
         )
+        min_lim = plot_df[metric].min() - 0.05
+        max_lim = plot_df[metric].max() + 0.05
+        ax.set_xlim(min_lim, max_lim)
         save_figures(metric, dataset_name)
         plt.clf()
 
@@ -182,11 +189,15 @@ for dataset_name in sciplex_metrics_df["dataset_name"].unique():
         "in_product_all_dist_avg_percentile",
         "in_product_top_2_dist_avg_percentile",
     ]:
+        if plot_df[metric].isna().all():
+            continue
         fig, ax = plt.subplots(figsize=(4 * INCH_TO_CM, 4 * INCH_TO_CM))
         sns.barplot(
             data=plot_df,
             y="model_name",
             x=metric,
+            order=plot_df.sort_values(metric, ascending=False)["model_name"].values,
+            color="blue",
             ax=ax,
         )
         min_lim = plot_df[metric].min() - 0.05
@@ -198,11 +209,17 @@ for dataset_name in sciplex_metrics_df["dataset_name"].unique():
 
 # %%
 cell_lines = ["A549"]
-# cell_lines = ["A549", "MCF7", "K562"]
 method_names = [
-    # "scviv2",
-    "scviv2_attention_noprior",
-    "scviv2_attention_no_prior_mog",
+    # "scviv2_attention_noprior",
+    # "scviv2_attention_no_prior_mog",
+    # "scviv2_z10",
+    # "scviv2_z30",
+    # "scviv2_z10_u5",
+    # "scviv2_z20_u5",
+    # "scviv2_z30_u5",
+    "scviv2_z10_u10",
+    "scviv2_z20_u10",
+    "scviv2_z30_u10",
 ]
 
 # Per dataset plots
@@ -214,23 +231,21 @@ for method_name in method_names:
         )
         if not RUN_WITH_PARSER:
             normalized_dists_path = os.path.join(
-                "../results/A549_sciplex_pipeline/distance_matrices",
+                "../results/sciplex_pipeline/distance_matrices",
                 normalized_dists_path,
             )
         normalized_dists = xr.open_dataarray(normalized_dists_path)
         dists_path = f"{dataset_name}.{method_name}.distance_matrices.nc"
         if not RUN_WITH_PARSER:
             dists_path = os.path.join(
-                "../results/A549_sciplex_pipeline/distance_matrices", dists_path
+                "../results/sciplex_pipeline/distance_matrices", dists_path
             )
         dists = xr.open_dataarray(dists_path)
         cluster_dim_name = dists.dims[0]
 
         adata_path = f"{dataset_name}.{method_name}.final.h5ad"
         if not RUN_WITH_PARSER:
-            adata_path = os.path.join(
-                "../results/A549_sciplex_pipeline/data", adata_path
-            )
+            adata_path = os.path.join("../results/sciplex_pipeline/data", adata_path)
         adata = sc.read(adata_path)
 
         sample_to_pathway = (
@@ -462,20 +477,20 @@ for method_name in method_names:
 # %%
 # Final distance matrix and DE analysis
 cl = "A549"
-method_name = "scviv2_attention_no_prior_mog"
+method_name = "scviv2_z20_u5"
 
 dataset_name = f"sciplex_{cl}_simple_filtered_all_phases"
 normalized_dists_path = f"{dataset_name}.{method_name}.normalized_distance_matrices.nc"
 if not RUN_WITH_PARSER:
     normalized_dists_path = os.path.join(
-        "../results/A549_sciplex_pipeline/distance_matrices", normalized_dists_path
+        "../results/sciplex_pipeline/distance_matrices", normalized_dists_path
     )
 normalized_dists = xr.open_dataarray(normalized_dists_path)
 cluster_dim_name = normalized_dists.dims[0]
 
 adata_path = f"{dataset_name}.{method_name}.final.h5ad"
 if not RUN_WITH_PARSER:
-    adata_path = os.path.join("../results/A549_sciplex_pipeline/data", adata_path)
+    adata_path = os.path.join("../results/sciplex_pipeline/data", adata_path)
 adata = sc.read(adata_path)
 
 sample_to_pathway = (
@@ -493,7 +508,7 @@ sample_to_dose = (
     .drop_duplicates()
     .set_index("product_dose")["dose"]
     .fillna(0.0)
-    .map(lambda x: cm.get_cmap("viridis", 256)(np.log10(x) / 4))
+    .map(lambda x: cm.get_cmap("viridis", 256)(np.log10(max(x, 1)) / 4))
 )
 
 color_cols = [
@@ -518,7 +533,7 @@ d1 = normalized_dists.loc[1].sel(
     sample_x=sig_samples,
     sample_y=sig_samples,
 )
-normalized_vmax = d1.max()
+normalized_vmax = np.percentile(normalized_dists.values, 90)
 Z = hierarchical_clustering(d1.values, method="ward", return_ete=False)
 g = sns.clustermap(
     d1.to_pandas(),
@@ -554,7 +569,7 @@ save_figures(
 # DE analysis
 plt.rcParams["axes.grid"] = False
 
-n_clusters = 4
+n_clusters = 6
 
 clusters = fcluster(Z, t=n_clusters, criterion="maxclust")
 donor_info_ = pd.DataFrame({"cluster_id": clusters}, index=d1.sample_x.values)
@@ -562,7 +577,7 @@ donor_info_ = pd.DataFrame({"cluster_id": clusters}, index=d1.sample_x.values)
 # %%
 adata_path = f"{dataset_name}.preprocessed.h5ad"
 if not RUN_WITH_PARSER:
-    adata_path = os.path.join("../results/A549_sciplex_pipeline/data", adata_path)
+    adata_path = os.path.join("../results/sciplex_pipeline/data", adata_path)
 adata = sc.read(adata_path)
 adata_log = adata[adata.obs.product_dose.isin(sig_samples)].copy()
 sc.pp.normalize_total(adata_log)
@@ -601,5 +616,108 @@ shutil.move(
 )
 if not os.listdir(f"figures/"):
     os.rmdir(f"figures/")
+
+# %%
+# z mdes colored by cluster membership
+fig, ax = plt.subplots(figsize=(15 * INCH_TO_CM, 15 * INCH_TO_CM))
+plot_df = pd.DataFrame(adata.obsm[f"X_{method_name}_z_mde"], columns=["x", "y"])
+plot_df["product_cluster"] = (
+    adata.obs["product_dose"].map(donor_info_["cluster_id"]).values
+)
+plot_df = plot_df.loc[~plot_df["product_cluster"].isna()]
+plot_df["product_cluster"] = plot_df["product_cluster"].astype(int).astype(str)
+# shuffle
+plot_df = plot_df.sample(frac=1).reset_index(drop=True)
+sns.scatterplot(
+    plot_df,
+    x="x",
+    y="y",
+    hue="product_cluster",
+    hue_order=[str(i) for i in range(1, n_clusters + 1)],
+    ax=ax,
+    s=20,
+)
+ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
+ax.set_xlabel("MDE1")
+ax.set_ylabel("MDE2")
+ax.set_title(method_name)
+save_figures(
+    f"{method_name}.z_mdes_colored_by_cluster",
+    dataset_name,
+)
+
+# %%
+# u mdes colored by cluster membership
+fig, ax = plt.subplots(figsize=(15 * INCH_TO_CM, 15 * INCH_TO_CM))
+plot_df = pd.DataFrame(adata.obsm[f"X_{method_name}_u_mde"], columns=["x", "y"])
+plot_df["product_cluster"] = (
+    adata.obs["product_dose"].map(donor_info_["cluster_id"]).values
+)
+plot_df = plot_df.loc[~plot_df["product_cluster"].isna()]
+plot_df["product_cluster"] = plot_df["product_cluster"].astype(int).astype(str)
+# shuffle
+plot_df = plot_df.sample(frac=1).reset_index(drop=True)
+sns.scatterplot(
+    plot_df,
+    x="x",
+    y="y",
+    hue="product_cluster",
+    hue_order=[str(i) for i in range(1, n_clusters + 1)],
+    ax=ax,
+    s=20,
+)
+ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
+ax.set_xlabel("MDE1")
+ax.set_ylabel("MDE2")
+ax.set_title(method_name)
+save_figures(f"{method_name}.u_mdes_colored_by_cluster", dataset_name)
+
+# %%
+# admissibility check
+train_adata_path = f"{dataset_name}.preprocessed.h5ad"
+if not RUN_WITH_PARSER:
+    train_adata_path = os.path.join(
+        "../results/sciplex_pipeline/data", train_adata_path
+    )
+train_adata = sc.read(train_adata_path)
+
+# %%
+import scvi_v2
+
+model_path = f"{dataset_name}.{method_name}"
+if not RUN_WITH_PARSER:
+    model_path = os.path.join("../results/sciplex_pipeline/models", model_path)
+model = scvi_v2.MrVI.load(model_path, adata=train_adata)
+# %%
+outlier_res = model.get_outlier_cell_sample_pairs(
+    flavor="ap",
+    subsample_size=5000,
+    quantile_threshold=0.05,
+    admissibility_threshold=0.0,
+)
+outlier_res
+# %%
+outlier_res.to_netcdf(
+    os.path.join(output_dir, f"{dataset_name}.{method_name}.outlier_res.nc")
+)
+# %%
+adata.obs.loc[
+    outlier_res.cell_name.values, "total_admissible"
+] = outlier_res.is_admissible.sum(axis=1).values
+plot_df = pd.DataFrame(adata.obsm[f"X_{method_name}_u_mde"], columns=["x", "y"])
+plot_df["total_admissible"] = adata.obs.total_admissible.values
+
+fig, ax = plt.subplots(figsize=(15 * INCH_TO_CM, 15 * INCH_TO_CM))
+sns.scatterplot(plot_df, x="x", y="y", hue="total_admissible", ax=ax, s=20)
+ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
+ax.set_xlabel("MDE1")
+ax.set_ylabel("MDE2")
+ax.set_title(method_name)
+save_figures(f"{method_name}.u_total_admissible", dataset_name)
+
+# %%
+fig, ax = plt.subplots(figsize=(15 * INCH_TO_CM, 15 * INCH_TO_CM))
+sns.histplot(plot_df, x="total_admissible", ax=ax)
+save_figures(f"{method_name}.total_admissible_hist", dataset_name)
 
 # %%
