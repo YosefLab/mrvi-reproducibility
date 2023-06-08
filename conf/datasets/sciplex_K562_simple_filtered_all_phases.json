@@ -5,9 +5,6 @@
     "mrvi_train_kwargs": {
         "max_epochs": 400
     },
-    "scviv2_model_kwargs": {
-        "n_latent": 10
-    },
     "scviv2_train_kwargs": {
         "max_epochs": 400,
         "batch_size": 256,

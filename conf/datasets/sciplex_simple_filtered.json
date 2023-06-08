@@ -1,12 +1,9 @@
 {
     "batch_key": "_dummy",
     "sample_key": "product_dose",
-    "labels_key": "_dummy",
+    "labels_key": "cell_type",
     "mrvi_train_kwargs": {
         "max_epochs": 400
-    },
-    "scviv2_model_kwargs": {
-        "n_latent": 10
     },
     "scviv2_train_kwargs": {
         "max_epochs": 400,
