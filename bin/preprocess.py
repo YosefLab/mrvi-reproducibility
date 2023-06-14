@@ -435,6 +435,10 @@ def _process_semisynth2(
                 n_replicates_per_subcluster,
             )
             adata.uns[f"cluster{positive_cluster}_tree_gt"] = res_["tree_gt"].write()
+            adata.uns[f"cluster{positive_cluster}_tree_linkage"] = res_["tree_linkage"]
+            adata.uns[f"cluster{positive_cluster}_tree_gt_clusters"] = res_["tree_gt_clusters"].write()
+            adata.uns[f"cluster{positive_cluster}_tree_linkage_clusters"] = res_["tree_linkage_clusters"]
+            adata.uns[f"cluster{positive_cluster}_tree_linkage_leaders"] = res_["tree_linkage_leaders"]
             sample_assignments = pd.concat(
                 [
                     sample_assignments,
@@ -511,9 +515,13 @@ def _process_semisynth2(
                 subsample_adata.obs["rank"] = rank
                 subsampled_adatas.append(subsample_adata)
         res = sc.concat(subsampled_adatas)
-        res.uns[f"cluster{positive_cluster}_tree_gt"] = adata.uns[
-            f"cluster{positive_cluster}_tree_gt"
-        ]
+        res = sc.AnnData(
+            X=res.X,
+            obs=res.obs,
+            obsm=res.obsm,
+            var=res.var,
+            uns=adata.uns,
+        )
         return res
     return adata
 
@@ -588,7 +596,11 @@ def construct_sample_stratifications_from_subcelltypes(
     )
     return {
         "tree_gt": tree_with_replicates,
+        "tree_gt_clusters": tree,
         "cluster_info": cluster_info,
+        "tree_linkage": Z,
+        "tree_linkage_clusters": L,
+        "tree_linkage_leaders": M,
     }
 
 

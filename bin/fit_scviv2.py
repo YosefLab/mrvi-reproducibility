@@ -165,18 +165,20 @@ def fit_scviv2(
                 "qz_nn_flavor": "attention",
                 "px_nn_flavor": "attention",
                 "qz_kwargs": {
-                    "use_map": True,
+                    "use_map": False,
                     "stop_gradients": False,
                     "stop_gradients_mlp": True,
+                    "dropout_rate": 0.03,
                 },
                 "px_kwargs": {
                     "stop_gradients": False,
                     "stop_gradients_mlp": True,
                     "h_activation": nn.softmax,
                     "low_dim_batch": True,
+                    "dropout_rate": 0.03,
                 },
                 "learn_z_u_prior_scale": False,
-                "z_u_prior": False,
+                "z_u_prior": True,
                 "u_prior_mixture": True,
                 "u_prior_mixture_k": 20,
             }
@@ -184,21 +186,25 @@ def fit_scviv2(
     if use_attention_mog:
         model_kwargs.update(
             {
+                "n_latent": 100,
+                "n_latent_u": 10,
                 "qz_nn_flavor": "attention",
                 "px_nn_flavor": "attention",
                 "qz_kwargs": {
                     "use_map": True,
                     "stop_gradients": False,
                     "stop_gradients_mlp": True,
+                    "dropout_rate": 0.03,
                 },
                 "px_kwargs": {
                     "stop_gradients": False,
                     "stop_gradients_mlp": True,
                     "h_activation": nn.softmax,
                     "low_dim_batch": True,
+                    "dropout_rate": 0.03,
                 },
                 "learn_z_u_prior_scale": False,
-                "z_u_prior": True,
+                "z_u_prior": False,
                 "u_prior_mixture": True,
                 "u_prior_mixture_k": 20,
             }

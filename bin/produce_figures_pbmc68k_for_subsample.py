@@ -35,8 +35,22 @@ plt.rcParams["svg.fonttype"] = "none"
 FIGURE_DIR = "../results/aws_pipeline/experiments/pbmcs68k_for_subsample"
 os.makedirs(FIGURE_DIR, exist_ok=True)
 
-adata = sc.read_h5ad("../results/aws_pipeline/pbmcs68k_for_subsample.preprocessed.h5ad")
+adata = sc.read_h5ad("../results/aws_pipeline/data/pbmcs68k_for_subsample.preprocessed.h5ad")
 
+# %%
+import scipy.cluster.hierarchy as sch
+
+adata.uns.keys()
+
+# %%
+n_subclusters = 8
+Z = adata.uns["cluster0_tree_linkage"]
+L = adata.uns["cluster0_tree_linkage_clusters"]
+M = adata.uns["cluster0_tree_linkage_leaders"]
+
+
+sch.dendrogram(Z, truncate_mode="lastp", p=n_subclusters, no_plot=False)
+plt.savefig(os.path.join(FIGURE_DIR, "pbmcs68k_dendrogram.svg"), dpi=500)
 # %%
 (
     adata.obs.loc[lambda x: x.subcluster_assignment != "NA"]
@@ -117,7 +131,6 @@ for adata_file in adata_files:
                 return_fig=True,
                 show=False,
             )
-            plt.show()
             plt.savefig(
                 os.path.join(FIGURE_DIR, f"{obsm_key}_ct.svg"),
                 bbox_inches="tight",
@@ -131,7 +144,6 @@ for adata_file in adata_files:
                 return_fig=True,
                 show=False,
             )
-            plt.show()
             plt.savefig(
                 os.path.join(FIGURE_DIR, f"{obsm_key}_subcluster.svg"),
                 bbox_inches="tight",
@@ -259,13 +271,33 @@ all_res = pd.DataFrame(all_res).assign(
 )
 
 # %%
+model_renamer = {
+    "scviv2_attention_noprior": "MrVI",
+    "scviv2_attention_no_prior_mog": "MrVI (MoG)",
+    "composition_PCA_clusterkey_subleiden1": "Composition (PCA)",
+    "composition_SCVI_clusterkey_subleiden1": "Composition (SCVI)",
+}
+
+all_res_ = (
+    all_res
+    .loc[
+        lambda x: x.model.isin(model_renamer.keys())
+    ]
+    .assign(
+        Model=lambda x: pd.Categorical(
+            x.model.replace(model_renamer), categories=model_renamer.values()
+        )
+    )
+)
+
+# %%
 fig = (
-    p9.ggplot(all_res.query("leiden == '0'"), p9.aes(x="model", y="ratio"))
+    p9.ggplot(all_res_.query("leiden == '0'"), p9.aes(x="Model", y="ratio"))
     + p9.geom_col(fill="#3480eb")
     + p9.theme_classic()
     + p9.coord_flip()
     + p9.theme(
-        figure_size=(4 * INCH_TO_CM, 4 * INCH_TO_CM),
+        figure_size=(5.8 * INCH_TO_CM, 4 * INCH_TO_CM),
     )
     + SHARED_THEME
     + p9.labs(x="", y="Intra-cluster distance ratio")
@@ -287,16 +319,24 @@ relative_d = (
         relative_d=lambda x: x.mean_d / x.foreground_mean_d,
     )
 )
-# relative_d
+relative_d = (
+    relative_d
+    .loc[lambda x: x.model.isin(model_renamer.keys())]
+    .assign(
+        Model=lambda x: pd.Categorical(
+            x.model.replace(model_renamer), categories=list(model_renamer.values())[::-1]
+        )
+    )
+)
 
 fig = (
-    p9.ggplot(relative_d, p9.aes(x="model", y="relative_d"))
+    p9.ggplot(relative_d, p9.aes(x="Model", y="relative_d"))
     + p9.geom_boxplot(fill="#3480eb")
     + p9.geom_abline(slope=0, intercept=1, color="black", linetype="dashed", size=1)
     + p9.theme_classic()
     + SHARED_THEME
     + p9.theme(
-        figure_size=(4 * INCH_TO_CM, 4 * INCH_TO_CM),
+        figure_size=(5.8 * INCH_TO_CM, 4 * INCH_TO_CM),
         legend_position="none",
     )
     + p9.ylim(0, 1.2)
@@ -433,66 +473,67 @@ plt.savefig(
 plt.show()
 plt.clf()
 # %%
-dmat_files
-rf_metrics = pd.DataFrame()
-for dmat_file in dmat_files:
-    if os.path.basename(dmat_file).startswith("pbmcs68k."):
-        continue
-    print(dmat_file)
-    try:
-        d = xr.open_dataset(dmat_file, engine="netcdf4")
-    except:
-        continue
-    basename = os.path.basename(dmat_file).split(".")
-    modelname = basename[1]
-    distname = basename[2]
-    print(d)
-    if "leiden_1.0" in d:
-        continue
-    if "leiden_name" in d:
-        ct_coord_name = "leiden_name"
-        dmat_name = "leiden"
-    else:
-        ct_coord_name = "leiden"
-        dmat_name = "distance"
-    print(basename)
-    res_ = []
-    for leiden in d[ct_coord_name].values:
-        d_ = d.loc[{ct_coord_name: leiden}][dmat_name]
-        tree_ = hierarchical_clustering(d_.values, method="complete")
-        Z = hierarchical_clustering(d_.values, method="complete", return_ete=False)
+# dmat_files
+# rf_metrics = pd.DataFrame()
+# for dmat_file in dmat_files:
+#     if os.path.basename(dmat_file).startswith("pbmcs68k."):
+#         continue
+#     print(dmat_file)
+#     try:
+#         d = xr.open_dataset(dmat_file, engine="netcdf4")
+#     except:
+#         continue
+#     basename = os.path.basename(dmat_file).split(".")
+#     modelname = basename[1]
+#     distname = basename[2]
+#     print(d)
+#     if "leiden_1.0" in d:
+#         continue
+#     if "leiden_name" in d:
+#         ct_coord_name = "leiden_name"
+#         dmat_name = "leiden"
+#     else:
+#         ct_coord_name = "leiden"
+#         dmat_name = "distance"
+#     print(basename)
+#     res_ = []
+#     for leiden in d[ct_coord_name].values:
+#         d_ = d.loc[{ct_coord_name: leiden}][dmat_name]
+#         tree_ = hierarchical_clustering(d_.values, method="complete")
+#         Z = hierarchical_clustering(d_.values, method="complete", return_ete=False)
 
-        gt_tree_key = f"cluster{leiden}_tree_gt"
-        if gt_tree_key not in adata.uns.keys():
-            # print("{} missing in adata.uns".format(gt_tree_key))
-            continue
-        gt_tree = Tree(adata.uns[gt_tree_key])
-        rf_dist = gt_tree.robinson_foulds(tree_)
-        norm_rf = rf_dist[0] / rf_dist[1]
-        res_.append(dict(rf=norm_rf, leiden=leiden))
-    res_ = pd.DataFrame(res_).assign(model=modelname, dist=distname)
-    rf_metrics = pd.concat([rf_metrics, res_], axis=0)
-rf_metrics = rf_metrics.assign(
-    modeldistance=lambda x: x.model + "_" + x.dist,
-    # Model=lambda x: pd.Categorical(x.model.replace(ALGO_RENAMER), categories=ALGO_RENAMER.values()),
-    Model=lambda x: pd.Categorical(x.model),
-)
+#         gt_tree_key = f"cluster{leiden}_tree_gt"
+#         if gt_tree_key not in adata.uns.keys():
+#             # print("{} missing in adata.uns".format(gt_tree_key))
+#             continue
+#         gt_tree = Tree(adata.uns[gt_tree_key])
+#         rf_dist = gt_tree.robinson_foulds(tree_)
+#         norm_rf = rf_dist[0] / rf_dist[1]
+#         res_.append(dict(rf=norm_rf, leiden=leiden))
+#     res_ = pd.DataFrame(res_).assign(model=modelname, dist=distname)
+#     rf_metrics = pd.concat([rf_metrics, res_], axis=0)
+# rf_metrics = rf_metrics.assign(
+#     modeldistance=lambda x: x.model + "_" + x.dist,
+#     # Model=lambda x: pd.Categorical(x.model.replace(ALGO_RENAMER), categories=ALGO_RENAMER.values()),
+#     Model=lambda x: pd.Categorical(x.model),
+# )
+# # %%
+# plot_df = rf_metrics.loc[lambda x: x.dist == "distance_matrices"]
 
-# %%
-plot_df = rf_metrics.loc[lambda x: x.dist == "distance_matrices"]
+# fig = (
+#     p9.ggplot(plot_df, p9.aes(x="Model", y="rf"))
+#     + p9.geom_col(fill="#3480eb")
+#     + p9.theme_classic()
+#     + p9.coord_flip()
+#     + p9.theme(
+#         figure_size=(4 * INCH_TO_CM, 4 * INCH_TO_CM),
+#     )
+#     + SHARED_THEME
+#     + p9.labs(x="", y="RF distance")
+# )
+# fig.save(os.path.join(FIGURE_DIR, "pbmcs_rf_distance.svg"))
+# fig
 
-fig = (
-    p9.ggplot(plot_df, p9.aes(x="Model", y="rf"))
-    + p9.geom_col(fill="#3480eb")
-    + p9.theme_classic()
-    + p9.coord_flip()
-    + p9.theme(
-        figure_size=(4 * INCH_TO_CM, 4 * INCH_TO_CM),
-    )
-    + SHARED_THEME
-    + p9.labs(x="", y="RF distance")
-)
-fig.save(os.path.join(FIGURE_DIR, "pbmcs_rf_distance.svg"))
-fig
+# # %%
 
 # %%

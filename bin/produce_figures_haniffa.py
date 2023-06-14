@@ -49,6 +49,13 @@ FIGURE_DIR = "/data1/scvi-v2-reproducibility/experiments/haniffa2"
 os.makedirs(FIGURE_DIR, exist_ok=True)
 
 adata = sc.read_h5ad("../results/aws_pipeline/haniffa2.preprocessed.h5ad")
+adata.obs = adata.obs.merge(
+    metad, left_on="sample_id", right_index=True, how="left", suffixes=("", "_y")
+)
+adata.obs.loc[:, "age_group"] = adata.obs.Age >= 60
+adata.obs.loc[:, "age_group"] = adata.obs.age_group.replace(
+    {True: ">=60", False: "<60"}
+).astype("category")
 adata_files = glob.glob("../results/aws_pipeline/data/haniffa2.*.final.h5ad")
 # %%
 from scvi_v2 import MrVI
@@ -485,19 +492,84 @@ for idx, (selected_ct, n_cluster) in enumerate(zip(selected_cts, n_clusters)):
 # )
 
 # %%
+ood_res = model.get_outlier_cell_sample_pairs(
+        subsample_size=5000,
+        minibatch_size=256,
+        quantile_threshold=0.05
+)
+
+
+# %%
+n_admissible = (
+    ood_res
+    .to_dataframe()["is_admissible"]
+    .unstack()
+    .sum(1)
+    .to_frame("n_admissible")
+)
+obs_ = adata.obs.join(n_admissible)
+
+atleast = 25
+n_donors_with_atleast = (
+    obs_
+    .groupby(["initial_clustering"])
+    .apply(lambda x: x.loc[x.n_admissible >= atleast].patient_id.nunique())
+    .to_frame("n_donors_with_atleast")
+)
+n_donors_with_atleast
+
+n_pred_donors = (
+    obs_
+    .groupby(["initial_clustering"])
+    .n_admissible
+    .mean()
+    .to_frame("n_pred_donors")
+)
+
+joined = n_donors_with_atleast.join(n_pred_donors)
+
+# %%
+(
+    p9.ggplot(joined.reset_index(), p9.aes(x="n_donors_with_atleast", y="n_pred_donors"))
+    + p9.geom_point()
+    + p9.geom_abline(intercept=0, slope=1)
+)
+
+# %%
+adata.obs
+# %%
+adata_embs.obs.loc[:, "n_valid_donors"] = res["is_admissible"].values.sum(axis=1)
+for obsm_key in adata_embs.obsm.keys():
+    if obsm_key.endswith("mde") & ("scviv2" in obsm_key):
+        print(obsm_key)
+        sc.pl.embedding(
+            # adata_embs[rdm_perm],
+            adata_embs,
+            basis=obsm_key,
+            color=["initial_clustering","n_valid_donors"],
+            save=f"haniffa.{obsm_key}.svg",
+            ncols=1,
+        )
+
+# %%
 donor_keys = [
     "Sex",
     "Status",
-    "age_int",
+    "age_group",
 ]
-
+# %%
 res = model.perform_multivariate_analysis(
     donor_keys=donor_keys,
     adata=None,
     batch_size=256,
     normalize_design_matrix=True,
     offset_design_matrix=False,
+    filter_donors=True,
+    subsample_size=500,
+    quantile_threshold=0.05
 )
+
+
 
 # %%
 es_keys = [f"es_{cov}" for cov in res.covariate.values]
@@ -507,6 +579,23 @@ is_sig_keys = [f"is_sig_{cov}" for cov in res.covariate.values]
 adata.obs.loc[:, es_keys] = res["effect_size"].values
 adata.obs.loc[:, is_sig_keys_] = res["padj"].values <= 0.1
 adata.obs.loc[:, is_sig_keys] = adata.obs.loc[:, is_sig_keys_].astype(str).values
+
+adata_embs.obs.loc[:, es_keys] = res["effect_size"].values
+adata_embs.obs.loc[:, is_sig_keys_] = res["padj"].values <= 0.1
+adata_embs.obs.loc[:, is_sig_keys] = adata_embs.obs.loc[:, is_sig_keys_].astype(str).values
+
+# %%
+for obsm_key in adata_embs.obsm.keys():
+    if obsm_key.endswith("mde") & ("scviv2" in obsm_key):
+        print(obsm_key)
+        sc.pl.embedding(
+            # adata_embs[rdm_perm],
+            adata_embs,
+            basis=obsm_key,
+            color=["initial_clustering"] + es_keys,
+            save=f"haniffa.{obsm_key}.svg",
+            ncols=1,
+        )
 
 # %%
 plot_df = (
@@ -527,7 +616,7 @@ plot_df = (
             {
                 "es_SexMale": "Sex",
                 "es_StatusHealthy": "Status",
-                "es_age_int": "Age",
+                "es_age_group>=60": "Age",
             }
         )
     )
@@ -542,7 +631,8 @@ plt.rcParams["svg.fonttype"] = "none"
 
 fig = (
     p9.ggplot(
-        plot_df.loc[lambda x: x.n_points > 7000, :],
+        # plot_df.loc[lambda x: x.n_points > 7000, :],
+        plot_df,
         p9.aes(x="initial_clustering", y="value")
     )
     + p9.geom_boxplot(outlier_shape="", fill="#3492eb")
@@ -575,7 +665,7 @@ sc.pl.umap(
 
 
 # %%
-selected_cluster = "B_cell"
+selected_cluster = "CD4"
 adata.obsm = adata_embs.obsm
 adata_ = adata[adata.obs.initial_clustering == selected_cluster].copy()
 res = model.perform_multivariate_analysis(
@@ -586,10 +676,143 @@ res = model.perform_multivariate_analysis(
     offset_design_matrix=False,
     store_lfc=True,
     eps_lfc=1e-4,
+#     filter_donors=True,
+#     subsample_size=500,
+#     quantile_threshold=0.05
 )
 
 gene_properties = (adata_.X != 0).mean(axis=0).A1
 gene_properties = pd.DataFrame(gene_properties, index=adata_.var_names, columns=["sparsity"])
+
+
+# %%
+betas_ = res.lfc.transpose("cell_name", "covariate", "gene")
+betas_ = betas_.loc[{"covariate": "StatusHealthy"}].values
+betas_ = betas_.reshape(betas_.shape[0], -1)
+beta_pca = PCA(n_components=2)
+betas_rep = beta_pca.fit_transform(betas_)
+
+adata_.obsm["betas_rep"] = betas_rep
+sc.pl.embedding(
+    adata_,
+    basis="betas_rep",
+)
+
+# %%
+plt.hist(beta_pca.components_[0], bins=100)
+
+# %%
+lfc_std = res.lfc.loc[{"covariate": "StatusHealthy"}].std("cell_name").to_dataframe().reset_index().rename(columns={"lfc": "lfc_std"})
+lfc_mean = res.lfc.loc[{"covariate": "StatusHealthy"}].mean("cell_name").to_dataframe().reset_index().rename(columns={"lfc": "lfc_mean"})
+lfc_mean = (
+    lfc_mean.merge(lfc_std, on=["gene", "covariate"])
+    .assign(
+        cov=lambda x: np.abs(x.lfc_mean) / x.lfc_std,
+    )
+    .sort_values("cov", ascending=False)
+)
+lfc_mean
+
+
+# %%
+# umap_rep
+gene_name = "IFI27"
+_lfc = res.lfc.loc[{"covariate": "StatusHealthy"}].loc[{ "gene": gene_name}].to_dataframe().loc[:, ["lfc"]]
+_lfc = _lfc.loc[adata_.obs_names, :]
+adata_.obs.loc[:, "lfc"] = _lfc.values
+# gene_tag = f"{gene_name}_log"
+# adata_.obs.loc[:, gene_tag] = np.log1p(adata_[:, gene_name].X.toarray().squeeze())
+sc.pl.embedding(
+    adata_,
+    basis="X_scviv2_attention_no_prior_mog_large_u_mde",
+    color=["full_clustering", "lfc"],
+    ncols=1
+)
+# %%
+# umap_rep
+gene_name = "IFI27"
+gene_tag = f"{gene_name}_log"
+adata_.obs.loc[:, gene_tag] = np.log1p(adata_[:, gene_name].X.toarray().squeeze())
+sc.pl.embedding(
+    adata_,
+    basis="X_scviv2_attention_no_prior_mog_large_z_mde",
+    color=["full_clustering", "Status"] +  [gene_tag],
+    ncols=1
+)
+
+# %%
+(
+    p9.ggplot(
+        adata_.obs,
+        p9.aes(x="Status", y=gene_tag)
+    )
+    + p9.geom_violin()
+    + p9.facet_wrap("~full_clustering")
+)
+
+
+# %%
+(
+    p9.ggplot(
+        lfc_mean,
+        p9.aes(x="lfc_mean", y="lfc_std")
+    )
+    + p9.geom_point()
+    + p9.geom_text(
+        lfc_mean.loc[lambda x: x.lfc_std > 0.1, :],
+        p9.aes(label="gene"), size=15, nudge_y=0.1
+    )
+)
+
+# %%
+selected_genes = lfc_mean.loc[lambda x: x.lfc_std > 0.1]["gene"].tolist()
+selected_genes
+
+selected_lfcs = (
+    res.lfc
+    .loc[{"covariate": "StatusHealthy"}]
+    .loc[{"gene": selected_genes}]
+    .to_dataframe()
+    .merge(adata.obs, left_on="cell_name", right_index=True, how="left")
+    .reset_index()
+    .assign(
+        full_clustering=lambda x: x.full_clustering.astype(str)
+    )
+)
+
+selected_cts = adata_.obs.full_clustering.value_counts().loc[lambda x: x > 1000].index.tolist()
+selected_cts
+
+selected_lfcs = selected_lfcs.loc[lambda x: x.full_clustering.isin(selected_cts), :]
+
+(
+    p9.ggplot(
+        selected_lfcs,
+        p9.aes(x="lfc", y=p9.after_stat("density"), fill="full_clustering")
+    )
+    + p9.geom_histogram(bins=100, position="identity", alpha=0.5)
+    + p9.facet_wrap("~gene", scales="free_y")
+    + p9.theme(
+        aspect_ratio=1.0,
+    )
+)
+
+# %%
+(
+    p9.ggplot(
+        selected_lfcs,
+        p9.aes(x="full_clustering", y="lfc", fill="full_clustering")
+    )
+    + p9.geom_boxplot(
+        outlier_alpha=0.0,
+    )
+    + p9.coord_flip()
+    + p9.facet_wrap("~gene", scales="free_y")
+    + p9.theme(
+        aspect_ratio=1.0,
+    )
+)
+
 
 # %%
 lfcs = (
@@ -611,6 +834,11 @@ lfcs.loc[lfcs.covariate == "StatusHealthy", "lfc"] = -lfcs.loc[lfcs.covariate ==
     + p9.facet_wrap("~covariate")
 )
 
+
+# %%
+adata_.obs.full_clustering.value_counts()
+
+
 # %%
 top_genes = (
     # lfcs.query("covariate == 'StatusHealthy'")
@@ -621,8 +849,6 @@ top_genes = (
     .query("abs_lfc > 0.2")
     # .iloc[:10]
 )
-
-
 
 # %%
 fig = (
