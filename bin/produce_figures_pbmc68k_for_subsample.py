@@ -274,6 +274,8 @@ all_res = pd.DataFrame(all_res).assign(
 model_renamer = {
     "scviv2_attention_noprior": "MrVI",
     "scviv2_attention_no_prior_mog": "MrVI (MoG)",
+    "scviv2_attention_mog": "MrVI (MoG Large)",
+    "scviv2_attention_no_prior_mog_large": "MrVI (MoG Large w/ Prior)",
     "composition_PCA_clusterkey_subleiden1": "Composition (PCA)",
     "composition_SCVI_clusterkey_subleiden1": "Composition (SCVI)",
 }
@@ -379,41 +381,41 @@ for dmat_file in dmat_files:
         continue
     res_ = []
 
-    sample_8_dists = d[dmat_name].sel(sample_y="8")
-    sample_8_dists_df = pd.DataFrame(
-        sample_8_dists.values, columns=sample_8_dists.sample_x.values
+    sample_4_dists = d[dmat_name].sel(sample_y="4")
+    sample_4_dists_df = pd.DataFrame(
+        sample_4_dists.values, columns=sample_4_dists.sample_x.values
     )
-    sample_8_dists_df["leiden"] = d[ct_coord_name].values.astype(int)
+    sample_4_dists_df["leiden"] = d[ct_coord_name].values.astype(int)
 
     for rank in range(1, 8):
         samples_in_rank = sample_to_group_and_rank[
             (sample_to_group_and_rank["rank"] == rank)
             & (sample_to_group_and_rank["subcluster_assignment"] == 1)
         ]["sample_assignment"].values
-        sample_8_dists_df[f"rank_{rank}"] = sample_8_dists_df[samples_in_rank].mean(
+        sample_4_dists_df[f"rank_{rank}"] = sample_4_dists_df[samples_in_rank].mean(
             axis=1
         )
     for cluster in sample_to_group_and_rank["subcluster_assignment"].unique():
         samples_in_cluster = sample_to_group_and_rank[
             sample_to_group_and_rank["subcluster_assignment"] == cluster
         ]["sample_assignment"].values
-        sample_8_dists_df[f"cluster_{cluster}"] = sample_8_dists_df[
+        sample_4_dists_df[f"cluster_{cluster}"] = sample_4_dists_df[
             samples_in_cluster
         ].mean(axis=1)
 
-    sample_8_dists_melt_df = pd.melt(
-        sample_8_dists_df,
+    sample_4_dists_melt_df = pd.melt(
+        sample_4_dists_df,
         id_vars=["leiden"],
-        value_vars=[f"rank_{rank}" for rank in range(1, 8)],
+        value_vars=[f"rank_{rank}" for rank in range(1, 4)],
         var_name="rank",
     )
-    sample_8_dists_melt_df["rank"] = (
-        sample_8_dists_melt_df["rank"]
-        .map({f"rank_{rank}": rank for rank in range(1, 8)})
+    sample_4_dists_melt_df["rank"] = (
+        sample_4_dists_melt_df["rank"]
+        .map({f"rank_{rank}": rank for rank in range(1, 4)})
         .astype(int)
     )
-    sub_melt_df = sample_8_dists_melt_df[
-        sample_8_dists_melt_df["leiden"].isin([0, 1, 2])
+    sub_melt_df = sample_4_dists_melt_df[
+        sample_4_dists_melt_df["leiden"].isin([0, 1, 2])
     ]
 
     fig, ax = plt.subplots(1, 1, figsize=(12 * INCH_TO_CM, 12 * INCH_TO_CM))
@@ -425,27 +427,27 @@ for dmat_file in dmat_files:
     L.get_texts()[0].set_text("Positive cluster")
     L.get_texts()[1].set_text("Subsampled cluster")
     L.get_texts()[2].set_text("Non-subsampled cluster")
-    ax.set_xticklabels([0.2, 0.4, 0.6, 0.8, 1.0, 1.0, 1.0])
+    ax.set_xticklabels([0.1, 0.3, 0.6])
     plt.savefig(
-        os.path.join(FIGURE_DIR, f"{modelname}_{distname}_sample_8_dists_by_rank.svg"),
+        os.path.join(FIGURE_DIR, f"{modelname}_{distname}_sample_4_dists_by_rank.svg"),
         bbox_inches="tight",
     )
     plt.clf()
 
     fig, ax = plt.subplots(1, 1, figsize=(12 * INCH_TO_CM, 12 * INCH_TO_CM))
-    sample_8_dists_melt_df = pd.melt(
-        sample_8_dists_df,
+    sample_4_dists_melt_df = pd.melt(
+        sample_4_dists_df,
         id_vars=["leiden"],
-        value_vars=[f"cluster_{cluster}" for cluster in range(1, 5)],
+        value_vars=[f"cluster_{cluster}" for cluster in range(1, 9)],
         var_name="cluster",
     )
-    sample_8_dists_melt_df["cluster"] = (
-        sample_8_dists_melt_df["cluster"]
-        .map({f"cluster_{cluster}": cluster for cluster in range(1, 5)})
+    sample_4_dists_melt_df["cluster"] = (
+        sample_4_dists_melt_df["cluster"]
+        .map({f"cluster_{cluster}": cluster for cluster in range(1, 9)})
         .astype(int)
     )
-    sub_melt_df = sample_8_dists_melt_df[
-        sample_8_dists_melt_df["leiden"].isin([0, 1, 2])
+    sub_melt_df = sample_4_dists_melt_df[
+        sample_4_dists_melt_df["leiden"].isin([0, 1, 2])
     ]
     sns.barplot(x="cluster", y="value", hue="leiden", data=sub_melt_df, ax=ax)
     plt.title("Mean Distance to non-subsampled subcluster 1 donor")
@@ -457,16 +459,18 @@ for dmat_file in dmat_files:
     L.get_texts()[2].set_text("Non-subsampled cluster")
     plt.savefig(
         os.path.join(
-            FIGURE_DIR, f"{modelname}_{distname}_sample_8_dists_by_cluster.svg"
+            FIGURE_DIR, f"{modelname}_{distname}_sample_4_dists_by_cluster.svg"
         ),
         bbox_inches="tight",
     )
+    print(modelname)
     plt.show()
     plt.clf()
 # %%
 # Subsample ratio heatmap
-ss_ratio_df = pd.DataFrame({"sample": [str(i) for i in range(1, 33)], "subsample rate":[0.2, 0.4, 0.6, 0.8, 1.0, 1.0, 1.0, 1.0] * 4})
-sns.heatmap(ss_ratio_df["subsample rate"].values[:, None].T, cmap="YlGnBu", vmin=0, vmax=1)
+fig, ax = plt.subplots(1, 1, figsize=(12 * INCH_TO_CM, 1 * INCH_TO_CM))
+ss_ratio_df = pd.DataFrame({"sample": [str(i) for i in range(1, 33)], "subsample rate":[0.1, 0.3, 0.6, 1.0] * 8})
+sns.heatmap(ss_ratio_df["subsample rate"].values[:, None].T, cmap="YlGnBu_r", vmin=0, vmax=1, ax=ax)
 plt.savefig(
     os.path.join(FIGURE_DIR, f"subsample_ratio_heatmap.svg"), bbox_inches="tight"
 )
@@ -536,4 +540,140 @@ plt.clf()
 
 # # %%
 
+# %%
+# DEG Analysis
+import scvi_v2
+
+modelname = "scviv2_attention_mog"
+
+adata_path = os.path.join(
+    f"../results/aws_pipeline/data/pbmcs68k_for_subsample.preprocessed.h5ad"
+)
+model_path = os.path.join(
+    f"../results/aws_pipeline/models/pbmcs68k_for_subsample.{modelname}"
+)
+adata = sc.read(adata_path)
+model = scvi_v2.MrVI.load(model_path, adata=adata)
+model
+
+# %%
+model_out_adata_path = os.path.join(
+    f"../results/aws_pipeline/data/pbmcs68k_for_subsample.{modelname}.final.h5ad"
+)
+model_out_adata = sc.read(model_out_adata_path)
+model_out_adata
+
+# %%
+# DEG clusters of samples against each other.
+# Create one hot obs columns for each group.
+for group in sample_to_group.unique():
+    adata.obs[f"group_{group}"] = 0
+    adata.obs.loc[adata.obs.sample_assignment.isin(sample_to_group[sample_to_group == group].index), f"group_{group}"] = 1
+obs_df = adata.obs.copy()
+obs_df = obs_df.loc[~obs_df._scvi_sample.duplicated("first")]
+model.donor_info = obs_df.set_index("_scvi_sample").sort_index()
+adata.obs
+
+# %%
+mv_deg_res = model.perform_multivariate_analysis(adata, donor_keys=[f"group_{group}" for group in sample_to_group.unique()], store_lfc=True)
+mv_deg_res
+
+# %%
+group_no = 1
+model_out_adata.obs[f"group_{group_no}_eff_size"] = mv_deg_res.effect_size.sel(covariate=f"group_{group_no}")
+fig = sc.pl.embedding(model_out_adata, basis='X_scviv2_attention_mog_u_mde', color=f'group_{group_no}_eff_size',
+                      vmax="p95", vmin="p5",
+                return_fig=True,
+                show=False,
+            )
+plt.savefig(
+    os.path.join(FIGURE_DIR, f"pres_{modelname}_group_{group_no}_eff_size.svg"),
+    bbox_inches="tight",
+)
+
+# %%
+high_eff_size_cells = model_out_adata[model_out_adata.obs["group_1_eff_size"] > 400].obs_names.to_numpy()
+group_lfcs = (
+    mv_deg_res
+    .lfc
+    .sel(covariate=f"group_{group_no}")
+    .sel(cell_name=high_eff_size_cells)
+    .mean("cell_name")
+    .to_dataframe()
+    .reset_index()
+    .assign(
+        abs_lfc=lambda x: np.abs(x.lfc),
+    )
+    .sort_values("abs_lfc", ascending=False)
+)
+group_lfcs["is_gene_for_subclustering"] = False
+group_lfcs.loc[np.where(adata.var["is_gene_for_subclustering"])[0], "is_gene_for_subclustering"] = True
+group_lfcs
+
+# %%
+highest_group_gene = group_lfcs.iloc[0]["gene"]
+model_out_adata.obs.loc[adata.obs_names, highest_group_gene] = adata[:, highest_group_gene].X.toarray()
+fig = sc.pl.embedding(model_out_adata, basis='X_scviv2_attention_mog_z_mde', color=[highest_group_gene, "subcluster_assignment"], vmax="p95",
+                return_fig=True, show=False,)
+plt.savefig(
+    os.path.join(FIGURE_DIR, f"pres_{modelname}_group_{group_no}_de_top_gene.svg"),
+    bbox_inches="tight",
+)
+
+# %%
+highest_group_gene = group_lfcs.iloc[0]["gene"]
+model_out_adata.obs.loc[:, f"{highest_group_gene}_lfc"] = mv_deg_res.lfc.sel(covariate=f"group_{group_no}").sel(gene=highest_group_gene).sel(cell_name=model_out_adata.obs_names.to_numpy())
+fig = sc.pl.embedding(model_out_adata, basis='X_scviv2_attention_mog_z_mde', color=[f"{highest_group_gene}_lfc", "subcluster_assignment"], vmax="p95",
+                      vcenter=0, cmap="RdBu",
+                return_fig=True, show=False,)
+plt.savefig(
+    os.path.join(FIGURE_DIR, f"pres_{modelname}_group_{group_no}_de_lfc_top_gene.svg"),
+    bbox_inches="tight",
+)
+
+# %%
+# Admissibility for rank 1 subsampled (can subsample further to see effect)
+model_out_adata[model_out_adata.obs["sample_assignment"] == "1"]
+ball_res = model.get_outlier_cell_sample_pairs(flavor="ball", quantile_threshold=0.05, minibatch_size=1000)
+ball_res
+
+# %%
+model_out_adata.obs["sample_1_admissibility"] = ball_res.is_admissible.sel(sample="1").astype(str)
+fig = sc.pl.embedding(model_out_adata, basis='X_scviv2_attention_mog_u_mde', color=["sample_1_admissibility", "leiden"],
+                return_fig=True, show=False,)
+plt.savefig(
+    os.path.join(FIGURE_DIR, f"pres_{modelname}_sample_1_admissibility.svg"),
+    bbox_inches="tight",
+)
+
+# %%
+fig = sc.pl.embedding(model_out_adata[model_out_adata.obs["sample_assignment"] == "1"], basis='X_scviv2_attention_mog_u_mde', color=["leiden"],
+                return_fig=True, show=False,)
+plt.savefig(
+    os.path.join(FIGURE_DIR, f"pres_{modelname}_sample_1_only.svg"),
+    bbox_inches="tight",
+)
+
+# %%
+fig = sc.pl.embedding(model_out_adata[model_out_adata.obs["sample_assignment"] == "4"], basis='X_scviv2_attention_mog_u_mde', color=["leiden"],
+                return_fig=True, show=False,)
+plt.savefig(
+    os.path.join(FIGURE_DIR, f"pres_{modelname}_sample_4_only.svg"),
+    bbox_inches="tight",
+)
+
+
+# %%
+# Differential abundance rank 1 vs rank 4
+ap_res = model.get_outlier_cell_sample_pairs(flavor="ap", minibatch_size=1000)
+ap_res
+
+# %%
+model_out_adata.obs["sample_1_4_da"] = (ap_res.log_probs.sel(sample="1") - ap_res.log_probs.sel(sample="4"))
+fig = sc.pl.embedding(model_out_adata, basis='X_scviv2_attention_mog_u_mde', color=["sample_1_4_da", "leiden"], vmax="p95", vmin="p5", vcenter=0, cmap="RdBu",
+                show=False, return_fig=True)
+plt.savefig(
+    os.path.join(FIGURE_DIR, f"pres_{modelname}_rank_1_4_da.svg"),
+    bbox_inches="tight",
+)
 # %%
