@@ -417,6 +417,8 @@ def _process_semisynth2(
             adata.var_names, n_genes_for_subclustering, replace=False
         )
         adata_log_ = adata_log[:, selected_genes_for_subclustering].copy()
+        adata.var["is_gene_for_subclustering"] = False
+        adata.var.loc[selected_genes_for_subclustering, "is_gene_for_subclustering"] = True
         sc.pp.pca(adata_log_, n_comps=50)
         adata.obsm["X_rep_subclustering"] = adata_log_.obsm["X_pca"]
     else:
@@ -519,7 +521,7 @@ def _process_semisynth2(
             X=res.X,
             obs=res.obs,
             obsm=res.obsm,
-            var=res.var,
+            var=adata.var,
             uns=adata.uns,
         )
         return res
