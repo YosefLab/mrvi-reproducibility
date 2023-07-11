@@ -11,9 +11,11 @@ workflow run_main {
     outs = preprocess_data(input) | run_models
     // metrics = compute_metrics(outs.adatas, outs.distance_matrices)
 
-    // results = outs.adatas.concat(
-    //     outs.rfs,
-    //     outs.distance_matrices,
-    //     // metrics,
-    // )
+    results = outs.adatas.concat(
+        outs.rfs,
+        outs.distance_matrices,
+        // metrics,
+    )
+
+    // analyze_results(results)
 }
