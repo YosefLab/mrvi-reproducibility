@@ -19,3 +19,6 @@ dependencies:
     - loompy=3.0.6
     - anndata=0.9.1
     - r-rjson=0.2.21
+    - r-devtools
+    - r-igraph=1.4.3
+    - r-nloptr=2.0.3
