@@ -26,6 +26,7 @@ include {
     fit_and_get_latent_composition_baseline as fit_and_get_latent_composition_scvi_leiden;
     fit_and_get_latent_composition_baseline as fit_and_get_latent_composition_pca_leiden;
 } from params.modules.fit_and_get_latent_composition_baseline
+include { run_milo } from params.modules.run_milo
 include { compute_rf } from params.modules.compute_rf
 include { compute_2dreps } from params.modules.compute_2dreps
 
@@ -71,6 +72,9 @@ workflow run_models {
         scvi_attention_no_prior_mog_large_adata,
     )
 
+    if ( params.runMILO ) {
+        run_milo(adatas_in)
+    }
 
     if ( params.runAllMRVIModels ) {
         scvi_outs = fit_scviv2(adatas_in, false, false, false, false, false, false, false) | get_latent_scviv2

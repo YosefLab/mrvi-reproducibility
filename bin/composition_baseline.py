@@ -6,7 +6,6 @@ from anndata import AnnData
 from scvi.model import SCVI
 from sklearn.metrics import pairwise_distances
 
-
 class CompositionBaseline:
     def __init__(
         self,
@@ -92,22 +91,10 @@ class CompositionBaseline:
                 .to_frame("n_cells")
                 .reset_index()
             )
-            szs_total = (
-                szs.groupby(self.subcluster_key)
-                .sum()
-                .rename(columns={"n_cells": "n_cells_total"})
-            )
-            comps = szs.merge(szs_total, on=self.subcluster_key).assign(
-                freqs=lambda x: x.n_cells / x.n_cells_total
-            )
-            freqs = (
-                comps.loc[:, [self.sample_key, self.subcluster_key, "freqs"]]
-                .set_index([self.sample_key, self.subcluster_key])
-                .squeeze()
-                .unstack()
-            )
-            freqs_ = freqs
-            freqs_all[unique_cluster] = freqs_
+            szs_total = szs.groupby(self.sample_key)["n_cells"].sum().squeeze().to_frame("n_cells_total")
+            comps = szs.merge(szs_total, left_on=self.sample_key, right_index=True).assign(freqs=lambda x: x.n_cells / x.n_cells_total)
+            freqs = comps.loc[:, [self.sample_key, self.subcluster_key, "freqs"]].set_index([self.sample_key, self.subcluster_key]).squeeze().unstack()
+            freqs_all[unique_cluster] = freqs
             # n_donors, n_clusters
         return freqs_all
 

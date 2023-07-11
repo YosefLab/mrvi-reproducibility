@@ -418,7 +418,9 @@ def _process_semisynth2(
         )
         adata_log_ = adata_log[:, selected_genes_for_subclustering].copy()
         adata.var["is_gene_for_subclustering"] = False
-        adata.var.loc[selected_genes_for_subclustering, "is_gene_for_subclustering"] = True
+        adata.var.loc[
+            selected_genes_for_subclustering, "is_gene_for_subclustering"
+        ] = True
         sc.pp.pca(adata_log_, n_comps=50)
         adata.obsm["X_rep_subclustering"] = adata_log_.obsm["X_pca"]
     else:
@@ -438,14 +440,28 @@ def _process_semisynth2(
             )
             adata.uns[f"cluster{positive_cluster}_tree_gt"] = res_["tree_gt"].write()
             adata.uns[f"cluster{positive_cluster}_tree_linkage"] = res_["tree_linkage"]
-            adata.uns[f"cluster{positive_cluster}_tree_gt_clusters"] = res_["tree_gt_clusters"].write()
-            adata.uns[f"cluster{positive_cluster}_tree_linkage_clusters"] = res_["tree_linkage_clusters"]
-            adata.uns[f"cluster{positive_cluster}_tree_linkage_leaders"] = res_["tree_linkage_leaders"]
+            adata.uns[f"cluster{positive_cluster}_tree_gt_clusters"] = res_[
+                "tree_gt_clusters"
+            ].write()
+            adata.uns[f"cluster{positive_cluster}_tree_linkage_clusters"] = res_[
+                "tree_linkage_clusters"
+            ]
+            adata.uns[f"cluster{positive_cluster}_tree_linkage_leaders"] = res_[
+                "tree_linkage_leaders"
+            ]
             sample_assignments = pd.concat(
                 [
                     sample_assignments,
-                    res_["cluster_info"].assign(cell_index=adata_.obs_names),
+                    res_["cluster_info"]
+                    .loc[:, ["sample_assignments"]]
+                    .assign(cell_index=adata_.obs_names),
                 ]
+            )
+
+            sample_assignment_mapping_ = (
+                res_["cluster_info"]
+                .drop_duplicates()
+                .rename(columns={"sample_assignments": "sample_assignment"})
             )
         else:
             sample_names = 1 + np.arange(n_subclusters * n_replicates_per_subcluster)
@@ -455,34 +471,32 @@ def _process_semisynth2(
             sample_assignments_ = (
                 pd.Series(sample_assignments_)
                 .to_frame("sample_assignments")
-                .assign(cell_index=adata_.obs_names, subcluster_assignments="NA")
+                .assign(cell_index=adata_.obs_names)
             )
             sample_assignments = pd.concat([sample_assignments, sample_assignments_])
-    adata.obs.loc[:, "sample_assignment"] = (
-        sample_assignments.set_index("cell_index")
-        .loc[adata.obs_names, "sample_assignments"]
-        .values
+    sample_assignments = sample_assignments.set_index("cell_index").loc[
+        adata.obs_names
+    ]["sample_assignments"]
+    adata.obs = (
+        adata.obs.assign(sample_assignment=sample_assignments.values, cell_index=adata.obs_names)
+        .merge(sample_assignment_mapping_, on="sample_assignment", how="left")
+        .assign(
+            has_sample_stratification=lambda x: x.leiden == positive_cluster,
+            Site="1",
+            subcluster_assignment=lambda x: x.apply(
+                lambda y: y.sample_group if y.has_sample_stratification else "NA",
+                axis=1,
+            ).astype(str)
+        )
+        .set_index("cell_index")
     )
-    adata.obs.loc[:, "subcluster_assignment"] = (
-        sample_assignments.set_index("cell_index")
-        .loc[adata.obs_names, "subcluster_assignments"]
-        .values
-    )
-    adata.obs.loc[:, "sample_assignment"] = adata.obs["sample_assignment"].astype(str)
-    adata.obs.loc[:, "subcluster_assignment"] = adata.obs[
-        "subcluster_assignment"
-    ].astype(str)
-    adata.obs.loc[:, "Site"] = "1"
-
+    adata.obs.index.name = None
     if subsample:
-        sample_assignment_mapping = adata.obs[
-            ["sample_assignment", "subcluster_assignment"]
-        ].drop_duplicates(keep="first")
-        sample_assignment_mapping = sample_assignment_mapping[
-            sample_assignment_mapping.subcluster_assignment != "NA"
+        sample_assignment_mapping = sample_assignment_mapping_[
+            ["sample_assignment", "sample_group"]
         ]
         sample_assignment_mapping["subcluster_assignment"] = (
-            sample_assignment_mapping["subcluster_assignment"]
+            sample_assignment_mapping["sample_group"]
             .astype(str)
             .astype("category")
         )
@@ -536,6 +550,7 @@ def construct_sample_stratifications_from_subcelltypes(
     dmat = squareform(dmat)
     Z = sch.linkage(dmat, method=linkage_method)
     subclusters = sch.fcluster(Z, n_subclusters, criterion="maxclust")
+    metadata1 = sch.fcluster(Z, 2, criterion="maxclust")
 
     # get names of internal nodes associated with each cluster
     L, M = sch.leaders(Z, subclusters)
@@ -593,7 +608,8 @@ def construct_sample_stratifications_from_subcelltypes(
     cluster_info = pd.DataFrame(
         {
             "sample_assignments": sample_assignments,
-            "subcluster_assignments": subclusters,
+            "sample_group": subclusters,
+            "sample_metadata": metadata1,
         }
     )
     return {
