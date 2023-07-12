@@ -6,6 +6,7 @@ from anndata import AnnData
 from scvi.model import SCVI
 from sklearn.metrics import pairwise_distances
 
+
 class CompositionBaseline:
     def __init__(
         self,
@@ -55,7 +56,6 @@ class CompositionBaseline:
         return self.adata.obsm[self.rep_key]
 
     def get_local_sample_representation(self):
-
         if self.clustering_on == "leiden":
             self.cluster_key = f"leiden_{self.cluster_resolution}"
             sc.pp.neighbors(self.adata, n_neighbors=30, use_rep=self.rep_key)
@@ -91,9 +91,20 @@ class CompositionBaseline:
                 .to_frame("n_cells")
                 .reset_index()
             )
-            szs_total = szs.groupby(self.sample_key)["n_cells"].sum().rename({self.sample_key: "n_cells_total"}})
-            comps = szs.merge(szs_total, left_on=self.sample_key, right_index=True).assign(freqs=lambda x: x.n_cells / x.n_cells_total)
-            freqs = comps.loc[:, [self.sample_key, self.subcluster_key, "freqs"]].set_index([self.sample_key, self.subcluster_key]).squeeze().unstack()
+            szs_total = (
+                szs.groupby(self.sample_key)["n_cells"]
+                .sum()
+                .rename({self.sample_key: "n_cells_total"})
+            )
+            comps = szs.merge(
+                szs_total, left_on=self.sample_key, right_index=True
+            ).assign(freqs=lambda x: x.n_cells / x.n_cells_total)
+            freqs = (
+                comps.loc[:, [self.sample_key, self.subcluster_key, "freqs"]]
+                .set_index([self.sample_key, self.subcluster_key])
+                .squeeze()
+                .unstack()
+            )
             freqs_all[unique_cluster] = freqs
             # n_donors, n_clusters
         return freqs_all
