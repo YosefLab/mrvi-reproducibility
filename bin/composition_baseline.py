@@ -91,7 +91,7 @@ class CompositionBaseline:
                 .to_frame("n_cells")
                 .reset_index()
             )
-            szs_total = szs.groupby(self.sample_key)["n_cells"].sum().squeeze().to_frame("n_cells_total")
+            szs_total = szs.groupby(self.sample_key)["n_cells"].sum().rename({self.sample_key: "n_cells_total"}})
             comps = szs.merge(szs_total, left_on=self.sample_key, right_index=True).assign(freqs=lambda x: x.n_cells / x.n_cells_total)
             freqs = comps.loc[:, [self.sample_key, self.subcluster_key, "freqs"]].set_index([self.sample_key, self.subcluster_key]).squeeze().unstack()
             freqs_all[unique_cluster] = freqs
