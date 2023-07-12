@@ -5,6 +5,7 @@ import scanpy as sc
 from anndata import AnnData
 from scvi.model import SCVI
 from sklearn.metrics import pairwise_distances
+from utils import set_breakpoint
 
 
 class CompositionBaseline:
@@ -92,9 +93,7 @@ class CompositionBaseline:
                 .reset_index()
             )
             szs_total = (
-                szs.groupby(self.sample_key)["n_cells"]
-                .sum()
-                .rename({self.sample_key: "n_cells_total"})
+                szs.groupby(self.sample_key)["n_cells"].sum().to_frame("n_cells_total")
             )
             comps = szs.merge(
                 szs_total, left_on=self.sample_key, right_index=True
