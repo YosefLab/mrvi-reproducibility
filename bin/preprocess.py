@@ -478,7 +478,9 @@ def _process_semisynth2(
         adata.obs_names
     ]["sample_assignments"]
     adata.obs = (
-        adata.obs.assign(sample_assignment=sample_assignments.values, cell_index=adata.obs_names)
+        adata.obs.assign(
+            sample_assignment=sample_assignments.values, cell_index=adata.obs_names
+        )
         .merge(sample_assignment_mapping_, on="sample_assignment", how="left")
         .assign(
             has_sample_stratification=lambda x: x.leiden == positive_cluster,
@@ -486,7 +488,13 @@ def _process_semisynth2(
             subcluster_assignment=lambda x: x.apply(
                 lambda y: y.sample_group if y.has_sample_stratification else "NA",
                 axis=1,
-            ).astype(str)
+            ),
+        )
+        .astype(
+            {
+                "sample_assignment": str,
+                "subcluster_assignment": str,
+            }
         )
         .set_index("cell_index")
     )
@@ -496,9 +504,7 @@ def _process_semisynth2(
             ["sample_assignment", "sample_group"]
         ]
         sample_assignment_mapping["subcluster_assignment"] = (
-            sample_assignment_mapping["sample_group"]
-            .astype(str)
-            .astype("category")
+            sample_assignment_mapping["sample_group"].astype(str).astype("category")
         )
         sample_assignment_mapping[
             "sample_assignment_int"
@@ -512,10 +518,21 @@ def _process_semisynth2(
         )
 
         subsampled_adatas = [adata[adata.obs.leiden != str(selected_subsample_cluster)]]
+        subsample_info_df = pd.DataFrame()
         for rank, subsample_rate in enumerate(subsample_rates, 1):
             samples_to_subsample = sample_assignment_mapping[
                 sample_assignment_mapping["rank"] == rank
             ]["sample_assignment"].to_list()
+
+            subsample_info_df = subsample_info_df.append(
+                pd.DataFrame(
+                    {
+                        "rank": rank,
+                        "subsample_rate": subsample_rate,
+                        "sample": samples_to_subsample,
+                    }
+                )
+            )
             for sample in samples_to_subsample:
                 subsample_adata = adata[
                     (adata.obs.sample_assignment == str(sample))
@@ -528,9 +545,14 @@ def _process_semisynth2(
                         replace=False,
                     )
                 ]
-                subsample_adata.obs["rank"] = rank
                 subsampled_adatas.append(subsample_adata)
+
         res = sc.concat(subsampled_adatas)
+        subsample_info_df = subsample_info_df.astype({"sample": str}).set_index("sample")
+        cell_to_sample = res.obs["sample_assignment"].values
+        res.obs.loc[:, f"subsample_rate_in_leiden{selected_subsample_cluster}"] = subsample_info_df.loc[cell_to_sample, "subsample_rate"].values
+        res.obs.loc[:, f"rank_in_leiden{selected_subsample_cluster}"] = subsample_info_df.loc[cell_to_sample, "rank"].values
+        res.obs.loc[:, "sample_metadata2"] = res.obs[f"subsample_rate_in_leiden{selected_subsample_cluster}"] <= 0.5
         res = sc.AnnData(
             X=res.X,
             obs=res.obs,

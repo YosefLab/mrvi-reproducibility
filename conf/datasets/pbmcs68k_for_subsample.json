@@ -2,7 +2,7 @@
     "batch_key": "Site",
     "labels_key": "leiden",
     "sample_key": "sample_assignment",
-    "covariate_key": "sample_metadata",
+    "covariate_key": "sample_metadata2",
     "mrvi_train_kwargs": {
         "max_epochs": 400
     },
