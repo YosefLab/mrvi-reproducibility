@@ -1,20 +1,22 @@
 include {
     fit_scviv2;
-    fit_scviv2 as fit_scviv2_mlp;
-    fit_scviv2 as fit_scviv2_mlp_smallu;
-    fit_scviv2 as fit_scviv2_attention;
-    fit_scviv2 as fit_scviv2_attention_smallu;
     fit_scviv2 as fit_scviv2_attention_noprior;
     fit_scviv2 as fit_scviv2_attention_no_prior_mog;
+    fit_scviv2 as fit_scviv2_z30;
+    fit_scviv2 as fit_scviv2_z20_u5;
+    fit_scviv2 as fit_scviv2_z20_u10;
+    fit_scviv2 as fit_scviv2_z30_u5;
+    fit_scviv2 as fit_scviv2_z30_u10;
 } from params.modules.fit_scviv2
 include {
     get_latent_scviv2;
-    get_latent_scviv2 as get_latent_scviv2_mlp;
-    get_latent_scviv2 as get_latent_scviv2_mlp_smallu;
-    get_latent_scviv2 as get_latent_scviv2_attention;
-    get_latent_scviv2 as get_latent_scviv2_attention_smallu;
     get_latent_scviv2 as get_latent_scviv2_attention_noprior;
     get_latent_scviv2 as get_latent_scviv2_attention_no_prior_mog;
+    get_latent_scviv2 as get_latent_scviv2_z30;
+    get_latent_scviv2 as get_latent_scviv2_z20_u5;
+    get_latent_scviv2 as get_latent_scviv2_z20_u10;
+    get_latent_scviv2 as get_latent_scviv2_z30_u5;
+    get_latent_scviv2 as get_latent_scviv2_z30_u10;
 } from params.modules.get_latent_scviv2
 include {
     fit_and_get_latent_composition_baseline as fit_and_get_latent_composition_scvi_clusterkey;
@@ -35,10 +37,10 @@ workflow run_models {
 
     // Step 1: Run models
     // Run base model
-    scvi_attention_noprior_outs = fit_scviv2_attention_noprior(adatas_in, false, false, false, false, true, false) | get_latent_scviv2_attention_noprior
+    scvi_attention_noprior_outs = fit_scviv2_attention_noprior(adatas_in, true, false, false, false, false, false, false) | get_latent_scviv2_attention_noprior
     scvi_attention_noprior_adata = scvi_attention_noprior_outs.adata
 
-    scvi_attention_no_prior_mog_outs = fit_scviv2_attention_no_prior_mog(adatas_in, false, false, false, false, false, true) | get_latent_scviv2_attention_no_prior_mog
+    scvi_attention_no_prior_mog_outs = fit_scviv2_attention_no_prior_mog(adatas_in, false, true, false, false, false, false, false) | get_latent_scviv2_attention_no_prior_mog
     scvi_attention_no_prior_mog_adata = scvi_attention_no_prior_mog_outs.adata
 
     distance_matrices = scvi_attention_noprior_outs.distance_matrices.concat(
@@ -52,46 +54,49 @@ workflow run_models {
 
     if ( params.runAllMRVIModels ) {
         // run old base model
-        scvi_outs = fit_scviv2(adatas_in, false, false, false, false, false, false) | get_latent_scviv2
+        scvi_outs = fit_scviv2(adatas_in, false, false, false, false, false, false, false) | get_latent_scviv2
         scvi_adata = scvi_outs.adata
 
-        // // Run scviv2 mlp
-        // scvi_mlp_outs = fit_scviv2_mlp(adatas_in, true, false, false, false, false, false) | get_latent_scviv2_mlp
-        // scvi_mlp_adata = scvi_mlp_outs.adata
+        scvi_z30_outs = fit_scviv2_z30(adatas_in, false, false, true, false, false, false, false) | get_latent_scviv2_z30
+        scvi_z30_adata = scvi_z30_outs.adata
 
-        // // Run scviv2 mlp smallu
-        // scvi_mlp_smallu_outs = fit_scviv2_mlp_smallu(adatas_in, false, true, false, false, false, false) | get_latent_scviv2_mlp_smallu
-        // scvi_mlp_smallu_adata = scvi_mlp_smallu_outs.adata
+        scvi_z20_u5_outs = fit_scviv2_z20_u5(adatas_in, false, false, false, true, false, false, false) | get_latent_scviv2_z20_u5
+        scvi_z20_u5_adata = scvi_z20_u5_outs.adata
 
-        // scvi_attention_outs = fit_scviv2_attention(adatas_in, false, false, true, false, false, false) | get_latent_scviv2_attention
-        // scvi_attention_adata = scvi_attention_outs.adata
+        scvi_z20_u10_outs = fit_scviv2_z20_u10(adatas_in, false, false, false, false, true, false, false) | get_latent_scviv2_z20_u10
+        scvi_z20_u10_adata = scvi_z20_u10_outs.adata
 
-        // scvi_attention_smallu_outs = fit_scviv2_attention_smallu(adatas_in, false, false, false, true, false, false) | get_latent_scviv2_attention_smallu
-        // scvi_attention_smallu_adata = scvi_attention_smallu_outs.adata
+        scvi_z30_u5_outs = fit_scviv2_z30_u5(adatas_in, false, false, false, false, false, true, false) | get_latent_scviv2_z30_u5
+        scvi_z30_u5_adata = scvi_z30_u5_outs.adata
+
+        scvi_z30_u10_outs = fit_scviv2_z30_u10(adatas_in, false, false, false, false, false, false, true) | get_latent_scviv2_z30_u10
+        scvi_z30_u10_adata = scvi_z30_u10_outs.adata
 
         distance_matrices = distance_matrices.concat(
             scvi_outs.distance_matrices,
             scvi_outs.normalized_distance_matrices,
-        //     scvi_mlp_outs.distance_matrices,
-        //     scvi_mlp_outs.normalized_distance_matrices,
-        //     scvi_mlp_smallu_outs.distance_matrices,
-        //     scvi_mlp_smallu_outs.normalized_distance_matrices,
-        //     scvi_attention_outs.distance_matrices,
-        //     scvi_attention_outs.normalized_distance_matrices,
-        //     scvi_attention_smallu_outs.distance_matrices,
-        //     scvi_attention_smallu_outs.normalized_distance_matrices,
-            scvi_attention_no_prior_mog_outs.distance_matrices,
-            scvi_attention_no_prior_mog_outs.normalized_distance_matrices,
+            scvi_z30_outs.distance_matrices,
+            scvi_z30_outs.normalized_distance_matrices,
+            scvi_z20_u5_outs.distance_matrices,
+            scvi_z20_u5_outs.normalized_distance_matrices,
+            scvi_z20_u10_outs.distance_matrices,
+            scvi_z20_u10_outs.normalized_distance_matrices,
+            scvi_z30_u5_outs.distance_matrices,
+            scvi_z30_u5_outs.normalized_distance_matrices,
+            scvi_z30_u10_outs.distance_matrices,
+            scvi_z30_u10_outs.normalized_distance_matrices
         )
 
         // Organize all outputs
         adatas = adatas.concat(
             scvi_adata,
-            // scvi_mlp_adata,
-            // scvi_mlp_smallu_adata,
-            // scvi_attention_adata,
-            // scvi_attention_smallu_adata,
+            scvi_attention_noprior_adata,
             scvi_attention_no_prior_mog_adata,
+            scvi_z30_adata,
+            scvi_z20_u5_adata,
+            scvi_z20_u10_adata,
+            scvi_z30_u5_adata,
+            scvi_z30_u10_adata
         )
     }
 

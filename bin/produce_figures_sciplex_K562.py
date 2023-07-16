@@ -82,7 +82,7 @@ pathway_color_map = {
 
 # %%
 # Representations
-dataset_name = "sciplex_A549_simple_filtered_all_phases"
+dataset_name = "sciplex_K562_simple_filtered_all_phases"
 basedir = Path(output_dir).parent.parent.absolute()
 all_results_files = glob.glob(os.path.join(basedir, "**"), recursive=True)
 rep_results_paths = [
@@ -103,7 +103,7 @@ if mde_reps.size >= 1:
         for color_by in ["pathway_level_1", "phase"]:
             rep_plots = mde_reps.query(f"representation_name == '{rep}'").sample(frac=1)
             # rep_plots = mde_reps.query(
-            #     f"representation_name == '{rep}' and A549_deg_product_dose == 'True'"
+            #     f"representation_name == '{rep}' and K562_deg_product_dose == 'True'"
             # )
             if color_by == "pathway_level_1":
                 palette = pathway_color_map
@@ -144,7 +144,6 @@ for dataset_name in sciplex_metrics_df["dataset_name"].unique():
         )  # Exclude normalized matrices
     ]
     for metric in [
-        "gt_silhouette_score",
         "in_product_all_dist_avg_percentile",
         "in_product_top_2_dist_avg_percentile",
     ]:
@@ -185,7 +184,6 @@ for dataset_name in sciplex_metrics_df["dataset_name"].unique():
         )
     ]
     for metric in [
-        "gt_silhouette_score",
         "in_product_all_dist_avg_percentile",
         "in_product_top_2_dist_avg_percentile",
     ]:
@@ -208,7 +206,7 @@ for dataset_name in sciplex_metrics_df["dataset_name"].unique():
 
 
 # %%
-cell_lines = ["A549"]
+cell_lines = ["K562"]
 method_names = [
     # "scviv2_attention_noprior",
     # "scviv2_attention_no_prior_mog",
@@ -478,8 +476,8 @@ for method_name in method_names:
 
 # %%
 # Final distance matrix and DE analysis
-cl = "A549"
-method_name = "scviv2_z20_u5"
+cl = "K562"
+method_name = "scviv2_z30_u5"
 
 dataset_name = f"sciplex_{cl}_simple_filtered_all_phases"
 dists_path = f"{dataset_name}.{method_name}.distance_matrices.nc"
@@ -571,7 +569,7 @@ save_figures(
 # DE analysis
 plt.rcParams["axes.grid"] = False
 
-n_clusters = 6
+n_clusters = 5
 
 clusters = fcluster(Z, t=n_clusters, criterion="maxclust")
 donor_info_ = pd.DataFrame({"cluster_id": clusters}, index=d1.sample_x.values)
@@ -614,7 +612,7 @@ sc.tl.rank_genes_groups(
 sc.pl.rank_genes_groups_dotplot(
     train_adata_log,
     n_genes=5,
-    min_logfoldchange=0.5,
+    min_logfoldchange=.75,
     swap_axes=True,
     save=f"{method_name}.clustered.svg",
 )
@@ -724,7 +722,9 @@ save_figures(f"{method_name}.total_admissible_hist", dataset_name)
 # %%
 # Multivariate analysis DE
 # (For this we create a column for each cluster since we require float values)
-train_adata.obs["donor_cluster"] = train_adata.obs["product_dose"].map(donor_info_["cluster_id"]).values.astype(int)
+train_adata.obs["donor_cluster"] = (
+    train_adata.obs["product_dose"].map(donor_info_["cluster_id"]).values.astype(int)
+)
 for cluster_i in range(1, n_clusters + 1):
     train_adata.obs[f"donor_cluster_{cluster_i}"] = (
         train_adata.obs["donor_cluster"] == cluster_i
@@ -737,14 +737,17 @@ sub_train_adata = train_adata[train_adata.obs["donor_cluster"] != "nan"]
 sub_train_adata.obs["_indices"] = np.arange(sub_train_adata.shape[0])
 multivar_res = model.perform_multivariate_analysis(
     sub_train_adata,
-    donor_keys = [f"donor_cluster_{cluster_i}" for cluster_i in range(1, n_clusters + 1)],
-    store_lfc = True,
+    donor_keys=[f"donor_cluster_{cluster_i}" for cluster_i in range(1, n_clusters + 1)],
+    store_lfc=True,
 )
 multivar_res
 # %%
 gene_properties = (sub_train_adata.X != 0).mean(axis=0).A1
-gene_properties = pd.DataFrame(gene_properties, index=sub_train_adata.var_names, columns=["sparsity"])
-top_genes = (multivar_res.lfc.mean("cell_name")
+gene_properties = pd.DataFrame(
+    gene_properties, index=sub_train_adata.var_names, columns=["sparsity"]
+)
+top_genes = (
+    multivar_res.lfc.mean("cell_name")
     .to_dataframe()
     .reset_index()
     .assign(
@@ -760,14 +763,19 @@ fig, ax = plt.subplots(figsize=(25 * INCH_TO_CM, 15 * INCH_TO_CM))
 sns.scatterplot(top_genes, x="lfc", y="sparsity", hue="covariate", ax=ax)
 plt.ylim(0, 0.9)
 plt.axvline(0, color="grey", linestyle="--")
+
+
 # annotate each point with gene name
 def label_point(x, y, val, ax):
-    a = pd.concat({'x': x, 'y': y, 'val': val}, axis=1)
+    a = pd.concat({"x": x, "y": y, "val": val}, axis=1)
     for i, point in a.iterrows():
-        ax.text(point['x']+.02, point['y'], str(point['val']), fontsize=7, rotation=45)
+        ax.text(
+            point["x"] + 0.02, point["y"], str(point["val"]), fontsize=7, rotation=45
+        )
+
 
 genes_to_label = top_genes.query("sparsity > 0.3")
-label_point(genes_to_label.lfc, genes_to_label.sparsity, genes_to_label.gene, ax)  
+label_point(genes_to_label.lfc, genes_to_label.sparsity, genes_to_label.gene, ax)
 
 plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
 save_figures(f"{method_name}.top_genes", dataset_name)
