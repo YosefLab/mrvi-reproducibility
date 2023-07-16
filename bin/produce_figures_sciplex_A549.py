@@ -17,7 +17,7 @@ from matplotlib.patches import Patch
 from utils import load_results
 from tree_utils import hierarchical_clustering
 from scipy.cluster.hierarchy import fcluster
-from plot_utils import INCH_TO_CM
+from plot_utils import INCH_TO_CM, SCIPLEX_PATHWAY_CMAP
 
 # Change to False if you want to run this script directly
 RUN_WITH_PARSER = False
@@ -60,25 +60,7 @@ def save_figures(filename, dataset_name):
 
 
 # %%
-pathway_color_map = {
-    "Antioxidant": "#00FFFF",  # aquamarine
-    "Apoptotic regulation": "#DAA520",  # goldenrod
-    "Cell cycle regulation": "#008080",  # teal
-    "DNA damage & DNA repair": "#808080",  # grey
-    "Epigenetic regulation": "#000080",  # navy
-    "Focal adhesion signaling": "#A52A2A",  # brown
-    "HIF signaling": "#FFC0CB",  # pink
-    "JAK/STAT signaling": "#008000",  # green
-    "Metabolic regulation": "#FFD700",  # gold
-    "Neuronal signaling": "#808000",  # olive
-    "Nuclear receptor signaling": "#7FFF00",  # chartreuse
-    "PKC signaling": "#DDA0DD",  # plum
-    "Protein folding & Protein degradation": "#4B0082",  # indigo
-    "TGF/BMP signaling": "#00FFFF",  # cyan
-    "Tyrosine kinase signaling": "#ADD8E6",  # lightblue
-    "Other": "#DA70D6",  # orchid
-    "Vehicle": "#FF0000",  # red
-}
+pathway_color_map = SCIPLEX_PATHWAY_CMAP
 
 # %%
 # Representations
@@ -575,6 +557,7 @@ n_clusters = 6
 
 clusters = fcluster(Z, t=n_clusters, criterion="maxclust")
 donor_info_ = pd.DataFrame({"cluster_id": clusters}, index=d1.sample_x.values)
+vehicle_cluster = f"Cluster {donor_info_.loc['Vehicle_0']['cluster_id']}"
 
 # %%
 train_adata_path = f"{dataset_name}.preprocessed.h5ad"
@@ -651,7 +634,6 @@ genes = dc.filter_by_expr(pdata, group="donor_status", min_count=20, min_total_c
 pdata = pdata[:, genes].copy()
 
 # %%
-vehicle_cluster = f"Cluster {donor_info_.loc['Vehicle_0']['cluster_id']}"
 dds = DeseqDataSet(
     adata=pdata,
     design_factors="donor_status",
@@ -678,6 +660,57 @@ dc.plot_volcano_df(
     top=20,
 )
 
+# %%
+# MDE with low opacity vehicle cluster
+vehicle_sim_thresh = 0.4
+vehicle_dists = (
+    dists.where(dists.values < vehicle_sim_thresh)
+    .sel(sample_x="Vehicle_0", _dummy_name=1)
+    .to_pandas()
+)
+vehicle_sim_samples = vehicle_dists[~vehicle_dists.isna()].index.to_list()
+sns.histplot(dists.sel(sample_x="Vehicle_0").to_numpy().flatten(), bins=50)
+plt.axvline(vehicle_sim_thresh, color="red")
+
+# %%
+rep = f"X_{method_name}_z_mde"
+rep_plots = mde_reps.query(f"representation_name == '{rep}'").sample(frac=1)
+color_by = "pathway_level_1"
+palette = pathway_color_map
+marker_size = 3
+fig, ax = plt.subplots(figsize=(15 * INCH_TO_CM, 15 * INCH_TO_CM))
+full_opacity_rep_plots = rep_plots[~rep_plots["product_dose"].isin(vehicle_sim_samples)]
+partial_opacity_rep_plots = rep_plots[
+    rep_plots["product_dose"].isin(vehicle_sim_samples)
+]
+sns.scatterplot(
+    partial_opacity_rep_plots,
+    x="x",
+    y="y",
+    hue=color_by,
+    palette=palette,
+    ax=ax,
+    s=marker_size,
+    alpha=0.1,
+)
+sns.scatterplot(
+    full_opacity_rep_plots,
+    x="x",
+    y="y",
+    hue=color_by,
+    palette=palette,
+    ax=ax,
+    s=marker_size,
+    legend=False,
+)
+ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
+ax.set_xlabel("MDE1")
+ax.set_ylabel("MDE2")
+
+save_figures(
+    f"{rep}_{color_by}_opacity_thresh_{vehicle_sim_thresh}",
+    dataset_name,
+)
 
 # %%
 # z mdes colored by cluster membership

@@ -17,7 +17,7 @@ from matplotlib.patches import Patch
 from utils import load_results
 from tree_utils import hierarchical_clustering
 from scipy.cluster.hierarchy import fcluster
-from plot_utils import INCH_TO_CM
+from plot_utils import INCH_TO_CM, SCIPLEX_PATHWAY_CMAP
 
 # Change to False if you want to run this script directly
 RUN_WITH_PARSER = False
@@ -60,25 +60,7 @@ def save_figures(filename, dataset_name):
 
 
 # %%
-pathway_color_map = {
-    "Antioxidant": "#00FFFF",  # aquamarine
-    "Apoptotic regulation": "#DAA520",  # goldenrod
-    "Cell cycle regulation": "#008080",  # teal
-    "DNA damage & DNA repair": "#808080",  # grey
-    "Epigenetic regulation": "#000080",  # navy
-    "Focal adhesion signaling": "#A52A2A",  # brown
-    "HIF signaling": "#FFC0CB",  # pink
-    "JAK/STAT signaling": "#008000",  # green
-    "Metabolic regulation": "#FFD700",  # gold
-    "Neuronal signaling": "#808000",  # olive
-    "Nuclear receptor signaling": "#7FFF00",  # chartreuse
-    "PKC signaling": "#DDA0DD",  # plum
-    "Protein folding & Protein degradation": "#4B0082",  # indigo
-    "TGF/BMP signaling": "#00FFFF",  # cyan
-    "Tyrosine kinase signaling": "#ADD8E6",  # lightblue
-    "Other": "#DA70D6",  # orchid
-    "Vehicle": "#FF0000",  # red
-}
+pathway_color_map = SCIPLEX_PATHWAY_CMAP
 
 # %%
 # Representations
