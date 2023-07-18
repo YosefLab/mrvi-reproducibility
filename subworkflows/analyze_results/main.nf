@@ -14,12 +14,8 @@ workflow analyze_results {
 
     // Dataset-specific scripts can be added here
     symsim_results = inputs.filter( { it =~ /symsim_new.*/ } ).collect()
-    sciplex_results = inputs.filter( { it =~ /sciplex.*/ } ).collect()
 
     if (symsim_results) {
         produce_figures_symsim_new(symsim_results)
-    }
-    if (sciplex_results) {
-        produce_figures_sciplex(sciplex_results)
     }
 }
