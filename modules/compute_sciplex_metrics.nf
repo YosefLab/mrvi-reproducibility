@@ -1,4 +1,6 @@
 process compute_sciplex_metrics {
+    cache false
+
     input:
     path distance_matrices_in
     path gt_clusters_in

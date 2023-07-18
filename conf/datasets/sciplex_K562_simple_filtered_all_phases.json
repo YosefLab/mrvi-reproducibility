@@ -8,8 +8,7 @@
     "scviv2_train_kwargs": {
         "max_epochs": 400,
         "batch_size": 256,
-        "early_stopping": true,
-        "early_stopping_patience": 30,
+        "early_stopping": false,
         "check_val_every_n_epoch": 1,
         "early_stopping_monitor": "validation_loss",
         "plan_kwargs": {

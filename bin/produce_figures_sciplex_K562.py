@@ -14,10 +14,12 @@ import seaborn as sns
 import scanpy as sc
 import plotnine as p9
 from matplotlib.patches import Patch
+from sklearn.metrics import silhouette_score
+from scipy.cluster.hierarchy import fcluster
+
 from utils import load_results
 from tree_utils import hierarchical_clustering
-from scipy.cluster.hierarchy import fcluster
-from plot_utils import INCH_TO_CM, SCIPLEX_PATHWAY_CMAP
+from plot_utils import INCH_TO_CM, SCIPLEX_PATHWAY_CMAP, BARPLOT_CMAP
 
 # Change to False if you want to run this script directly
 RUN_WITH_PARSER = False
@@ -84,9 +86,6 @@ if mde_reps.size >= 1:
     for rep in unique_reps:
         for color_by in ["pathway_level_1", "phase"]:
             rep_plots = mde_reps.query(f"representation_name == '{rep}'").sample(frac=1)
-            # rep_plots = mde_reps.query(
-            #     f"representation_name == '{rep}' and K562_deg_product_dose == 'True'"
-            # )
             if color_by == "pathway_level_1":
                 palette = pathway_color_map
             else:
@@ -296,7 +295,6 @@ for method_name in method_names:
                     sample_y=normalized_dists.sample_y,
                 )
                 .to_pandas(),
-                cmap="YlGnBu",
                 yticklabels=True,
                 xticklabels=True,
                 col_colors=full_col_colors_df,
@@ -336,7 +334,6 @@ for method_name in method_names:
                     sample_y=normalized_dists.sample_y,
                 )
                 .to_pandas(),
-                cmap="YlGnBu",
                 yticklabels=True,
                 xticklabels=True,
                 col_colors=full_col_colors_df,
@@ -380,7 +377,6 @@ for method_name in method_names:
                     sample_y=sig_samples,
                 )
                 .to_pandas(),
-                cmap="YlGnBu",
                 yticklabels=True,
                 xticklabels=True,
                 col_colors=full_col_colors_df,
@@ -423,7 +419,6 @@ for method_name in method_names:
                     sample_y=top_samples,
                 )
                 .to_pandas(),
-                cmap="YlGnBu",
                 yticklabels=True,
                 xticklabels=True,
                 col_colors=full_col_colors_df,
@@ -519,7 +514,6 @@ vmax = np.percentile(dists.values, 90)
 Z = hierarchical_clustering(d1.values, method="ward", return_ete=False)
 g = sns.clustermap(
     d1.to_pandas(),
-    cmap="YlGnBu",
     yticklabels=True,
     xticklabels=True,
     row_linkage=Z,
@@ -548,13 +542,80 @@ save_figures(
 # plt.clf()
 
 # %%
+# Metric plots
+all_results = load_results(results_paths)
+sciplex_metrics_df = all_results["sciplex_metrics"]
+
+plot_df = sciplex_metrics_df[
+    (sciplex_metrics_df["dataset_name"] == dataset_name)
+    & (sciplex_metrics_df["leiden_1.0"].isna())
+    & (
+        sciplex_metrics_df["distance_type"] == "distance_matrices"
+    )  # Exclude normalized matrices
+]
+model_to_method_name_mapping = {
+    method_name: "mrVI",
+    "composition_SCVI_clusterkey_subleiden1": "CompositionSCVI",
+    "composition_PCA_clusterkey_subleiden1": "CompositionPCA",
+}
+
+plot_df = plot_df[plot_df["model_name"].isin(model_to_method_name_mapping.keys())]
+plot_df["method_name"] = plot_df["model_name"].map(model_to_method_name_mapping)
+
+metric = "in_product_all_dist_avg_percentile"
+
+fig, ax = plt.subplots(figsize=(6 * INCH_TO_CM, 6 * INCH_TO_CM))
+sns.barplot(
+    data=plot_df,
+    y="method_name",
+    x=metric,
+    order=plot_df.sort_values(metric, ascending=True)["method_name"].values,
+    palette=BARPLOT_CMAP,
+    ax=ax,
+)
+min_lim = plot_df[metric].min() - 0.01
+max_lim = plot_df[metric].max() + 0.01
+ax.set_xlim(min_lim, max_lim)
+save_figures(f"{metric}_final", dataset_name)
+
+# %%
 # DE analysis
 plt.rcParams["axes.grid"] = False
 
-n_clusters = 5
+n_clusters = 7
 
 clusters = fcluster(Z, t=n_clusters, criterion="maxclust")
 donor_info_ = pd.DataFrame({"cluster_id": clusters}, index=d1.sample_x.values)
+vehicle_cluster = f"Cluster {donor_info_.loc['Vehicle_0']['cluster_id']}"
+
+# %%
+# Viz clusters
+cluster_colors = donor_info_.cluster_id.map(
+    {
+        1: "red",
+        2: "blue",
+        3: "green",
+        4: "orange",
+        5: "purple",
+        6: "yellow",
+        7: "pink",
+        8: "black",
+    }
+)
+g = sns.clustermap(
+    d1.to_pandas(),
+    yticklabels=True,
+    xticklabels=True,
+    row_linkage=Z,
+    col_linkage=Z,
+    row_colors=cluster_colors,
+    vmin=0,
+    vmax=vmax,
+)
+g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xmajorticklabels(), fontsize=5)
+g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_ymajorticklabels(), fontsize=5)
+
+save_figures(f"{method_name}.distances_fig.clustered", dataset_name)
 
 # %%
 train_adata_path = f"{dataset_name}.preprocessed.h5ad"
@@ -570,6 +631,7 @@ adata_path = f"{dataset_name}.{method_name}.final.h5ad"
 if not RUN_WITH_PARSER:
     adata_path = os.path.join("../results/sciplex_pipeline/data", adata_path)
 adata = sc.read(adata_path)
+train_adata_log.layers["counts"] = np.round(train_adata_log.X)
 sc.pp.normalize_total(train_adata_log)
 sc.pp.log1p(train_adata_log)
 train_adata_log.obs.loc[:, "donor_status"] = train_adata_log.obs.product_dose.map(
@@ -594,7 +656,7 @@ sc.tl.rank_genes_groups(
 sc.pl.rank_genes_groups_dotplot(
     train_adata_log,
     n_genes=5,
-    min_logfoldchange=0.75,
+    min_logfoldchange=1,
     swap_axes=True,
     save=f"{method_name}.clustered.svg",
 )
@@ -606,6 +668,97 @@ shutil.move(
 )
 if not os.listdir(f"figures/"):
     os.rmdir(f"figures/")
+
+# %%
+# MDE with low opacity vehicle cluster
+vehicle_sim_thresh = 0.4
+vehicle_dists = (
+    dists.where(dists.values < vehicle_sim_thresh)
+    .sel(sample_x="Vehicle_0", _dummy_name=1)
+    .to_pandas()
+)
+vehicle_sim_samples = vehicle_dists[~vehicle_dists.isna()].index.to_list()
+sns.histplot(dists.sel(sample_x="Vehicle_0").to_numpy().flatten(), bins=50)
+plt.axvline(vehicle_sim_thresh, color="red")
+
+# %%
+rep = f"X_{method_name}_z_mde"
+rep_plots = mde_reps.query(f"representation_name == '{rep}'").sample(frac=1)
+color_by = "pathway_level_1"
+palette = pathway_color_map
+marker_size = 3
+fig, ax = plt.subplots(figsize=(15 * INCH_TO_CM, 15 * INCH_TO_CM))
+full_opacity_rep_plots = rep_plots[~rep_plots["product_dose"].isin(vehicle_sim_samples)]
+partial_opacity_rep_plots = rep_plots[
+    rep_plots["product_dose"].isin(vehicle_sim_samples)
+]
+sns.scatterplot(
+    partial_opacity_rep_plots,
+    x="x",
+    y="y",
+    hue=color_by,
+    palette=palette,
+    ax=ax,
+    s=marker_size,
+    alpha=0.1,
+)
+sns.scatterplot(
+    full_opacity_rep_plots,
+    x="x",
+    y="y",
+    hue=color_by,
+    palette=palette,
+    ax=ax,
+    s=marker_size,
+    legend=False,
+)
+ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
+ax.set_xlabel("MDE1")
+ax.set_ylabel("MDE2")
+
+save_figures(
+    f"{rep}_{color_by}_opacity_thresh_{vehicle_sim_thresh}",
+    dataset_name,
+)
+# %%
+rep = f"X_{method_name}_u_mde"
+rep_plots = mde_reps.query(f"representation_name == '{rep}'").sample(frac=1)
+color_by = "pathway_level_1"
+palette = pathway_color_map
+marker_size = 3
+fig, ax = plt.subplots(figsize=(15 * INCH_TO_CM, 15 * INCH_TO_CM))
+full_opacity_rep_plots = rep_plots[~rep_plots["product_dose"].isin(vehicle_sim_samples)]
+partial_opacity_rep_plots = rep_plots[
+    rep_plots["product_dose"].isin(vehicle_sim_samples)
+]
+sns.scatterplot(
+    partial_opacity_rep_plots,
+    x="x",
+    y="y",
+    hue=color_by,
+    palette=palette,
+    ax=ax,
+    s=marker_size,
+    alpha=0.1,
+)
+sns.scatterplot(
+    full_opacity_rep_plots,
+    x="x",
+    y="y",
+    hue=color_by,
+    palette=palette,
+    ax=ax,
+    s=marker_size,
+    legend=False,
+)
+ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
+ax.set_xlabel("MDE1")
+ax.set_ylabel("MDE2")
+
+save_figures(
+    f"{rep}_{color_by}_opacity_thresh_{vehicle_sim_thresh}",
+    dataset_name,
+)
 
 # %%
 # z mdes colored by cluster membership
@@ -625,7 +778,7 @@ sns.scatterplot(
     hue="product_cluster",
     hue_order=[str(i) for i in range(1, n_clusters + 1)],
     ax=ax,
-    s=20,
+    s=marker_size,
 )
 ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
 ax.set_xlabel("MDE1")
@@ -654,7 +807,7 @@ sns.scatterplot(
     hue="product_cluster",
     hue_order=[str(i) for i in range(1, n_clusters + 1)],
     ax=ax,
-    s=20,
+    s=marker_size,
 )
 ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
 ax.set_xlabel("MDE1")
@@ -761,13 +914,3 @@ label_point(genes_to_label.lfc, genes_to_label.sparsity, genes_to_label.gene, ax
 
 plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
 save_figures(f"{method_name}.top_genes", dataset_name)
-
-# %%
-genes_to_label
-
-# %%
-# model.explore_stratifications(dists.sel(
-#     sample_x=sig_samples,
-#     sample_y=sig_samples,
-# ), show_figures=True)
-# %%

@@ -19,6 +19,13 @@ SHARED_THEME = p9.theme(
     axis_title=p9.element_text(family="sans-serif", size=8),
 )
 
+BARPLOT_CMAP = {
+    "mrVI": "#3274A1",
+    "CompositionSCVI": "#E1812C",
+    "CompositionPCA": "#3A923A",
+    "Random": "#808080",
+}
+
 SCIPLEX_PATHWAY_CMAP = {
     "Antioxidant": "#00FFFF",  # aqua
     "Apoptotic regulation": "#DAA520",  # goldenrod
