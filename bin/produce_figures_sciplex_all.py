@@ -216,9 +216,9 @@ method_names = [
     "scviv2_attention_noprior",
     "scviv2_attention_no_prior_mog",
     "scviv2_z20_u5",
-    "scviv2_z20_u10",
+    "scviv2_z50_u5",
     "scviv2_z30_u5",
-    "scviv2_z30_u10",
+    "scviv2_z100_u5",
 ]
 
 # Per dataset plots

@@ -5,9 +5,9 @@ process fit_scviv2 {
     val use_attention_no_prior_mog
     val z30
     val z20_u5
-    val z20_u10
+    val z50_u5
     val z30_u5
-    val z30_u10
+    val z100_u5
 
     script:
     adata_name = adata_in.getSimpleName()
@@ -25,14 +25,14 @@ process fit_scviv2 {
     else if (z20_u5) {
         method_name = "scviv2_z20_u5"
     }
-    else if (z20_u10) {
-        method_name = "scviv2_z20_u10"
+    else if (z50_u5) {
+        method_name = "scviv2_z50_u5"
     }
     else if (z30_u5) {
         method_name = "scviv2_z30_u5"
     }
-    else if (z30_u10) {
-        method_name = "scviv2_z30_u10"
+    else if (z100_u5) {
+        method_name = "scviv2_z100_u5"
     }
     else {
         method_name = "scviv2"
@@ -48,9 +48,9 @@ process fit_scviv2 {
         --use_attention_no_prior_mog ${use_attention_no_prior_mog} \\
         --z30 ${z30} \\
         --z20_u5 ${z20_u5} \\
-        --z20_u10 ${z20_u10} \\
+        --z50_u5 ${z50_u5} \\
         --z30_u5 ${z30_u5} \\
-        --z30_u10 ${z30_u10}
+        --z100_u5 ${z100_u5}
     """
 
     output:

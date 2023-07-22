@@ -4,9 +4,9 @@ include {
     fit_scviv2 as fit_scviv2_attention_no_prior_mog;
     fit_scviv2 as fit_scviv2_z30;
     fit_scviv2 as fit_scviv2_z20_u5;
-    fit_scviv2 as fit_scviv2_z20_u10;
+    fit_scviv2 as fit_scviv2_z50_u5;
     fit_scviv2 as fit_scviv2_z30_u5;
-    fit_scviv2 as fit_scviv2_z30_u10;
+    fit_scviv2 as fit_scviv2_z100_u5;
 } from params.modules.fit_scviv2
 include {
     get_latent_scviv2;
@@ -14,9 +14,9 @@ include {
     get_latent_scviv2 as get_latent_scviv2_attention_no_prior_mog;
     get_latent_scviv2 as get_latent_scviv2_z30;
     get_latent_scviv2 as get_latent_scviv2_z20_u5;
-    get_latent_scviv2 as get_latent_scviv2_z20_u10;
+    get_latent_scviv2 as get_latent_scviv2_z50_u5;
     get_latent_scviv2 as get_latent_scviv2_z30_u5;
-    get_latent_scviv2 as get_latent_scviv2_z30_u10;
+    get_latent_scviv2 as get_latent_scviv2_z100_u5;
 } from params.modules.get_latent_scviv2
 include {
     fit_and_get_latent_composition_baseline as fit_and_get_latent_composition_scvi_clusterkey;
@@ -63,14 +63,14 @@ workflow run_models {
         scvi_z20_u5_outs = fit_scviv2_z20_u5(adatas_in, false, false, false, true, false, false, false) | get_latent_scviv2_z20_u5
         scvi_z20_u5_adata = scvi_z20_u5_outs.adata
 
-        scvi_z20_u10_outs = fit_scviv2_z20_u10(adatas_in, false, false, false, false, true, false, false) | get_latent_scviv2_z20_u10
-        scvi_z20_u10_adata = scvi_z20_u10_outs.adata
+        scvi_z50_u5_outs = fit_scviv2_z50_u5(adatas_in, false, false, false, false, true, false, false) | get_latent_scviv2_z50_u5
+        scvi_z50_u5_adata = scvi_z50_u5_outs.adata
 
         scvi_z30_u5_outs = fit_scviv2_z30_u5(adatas_in, false, false, false, false, false, true, false) | get_latent_scviv2_z30_u5
         scvi_z30_u5_adata = scvi_z30_u5_outs.adata
 
-        scvi_z30_u10_outs = fit_scviv2_z30_u10(adatas_in, false, false, false, false, false, false, true) | get_latent_scviv2_z30_u10
-        scvi_z30_u10_adata = scvi_z30_u10_outs.adata
+        // scvi_z100_u5_outs = fit_scviv2_z100_u5(adatas_in, false, false, false, false, false, false, true) | get_latent_scviv2_z100_u5
+        // scvi_z100_u5_adata = scvi_z100_u5_outs.adata
 
         distance_matrices = distance_matrices.concat(
             scvi_outs.distance_matrices,
@@ -79,12 +79,12 @@ workflow run_models {
             scvi_z30_outs.normalized_distance_matrices,
             scvi_z20_u5_outs.distance_matrices,
             scvi_z20_u5_outs.normalized_distance_matrices,
-            scvi_z20_u10_outs.distance_matrices,
-            scvi_z20_u10_outs.normalized_distance_matrices,
+            scvi_z50_u5_outs.distance_matrices,
+            scvi_z50_u5_outs.normalized_distance_matrices,
             scvi_z30_u5_outs.distance_matrices,
             scvi_z30_u5_outs.normalized_distance_matrices,
-            scvi_z30_u10_outs.distance_matrices,
-            scvi_z30_u10_outs.normalized_distance_matrices
+            // scvi_z100_u5_outs.distance_matrices,
+            // scvi_z100_u5_outs.normalized_distance_matrices
         )
 
         // Organize all outputs
@@ -94,9 +94,9 @@ workflow run_models {
             scvi_attention_no_prior_mog_adata,
             scvi_z30_adata,
             scvi_z20_u5_adata,
-            scvi_z20_u10_adata,
+            scvi_z50_u5_adata,
             scvi_z30_u5_adata,
-            scvi_z30_u10_adata
+            // scvi_z100_u5_adata
         )
     }
 

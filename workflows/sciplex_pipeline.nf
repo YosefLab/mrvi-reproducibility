@@ -1,6 +1,7 @@
 include { preprocess_data } from params.subworkflows.preprocess_data
 include { run_models } from params.subworkflows.run_models
 include { compute_metrics } from params.subworkflows.compute_metrics
+include { compute_sciplex_metrics } from params.subworkflows.compute_sciplex_metrics
 include { analyze_results } from params.subworkflows.analyze_results
 
 

@@ -1,5 +1,4 @@
 include { produce_figures_symsim_new } from params.modules.produce_figures_symsim_new
-include { produce_figures_sciplex } from params.modules.produce_figures_sciplex
 include { conduct_generic_analysis } from params.modules.conduct_generic_analysis
 
 workflow analyze_results {

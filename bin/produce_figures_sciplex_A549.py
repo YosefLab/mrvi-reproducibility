@@ -16,8 +16,9 @@ import plotnine as p9
 from matplotlib.patches import Patch
 from sklearn.metrics import silhouette_score
 from scipy.cluster.hierarchy import fcluster
+import gseapy as gp
 
-from utils import load_results
+from utils import load_results, perform_gsea
 from tree_utils import hierarchical_clustering
 from plot_utils import INCH_TO_CM, SCIPLEX_PATHWAY_CMAP, BARPLOT_CMAP
 
@@ -95,7 +96,7 @@ if mde_reps.size >= 1:
                 palette = None
             fig, ax = plt.subplots(figsize=(15 * INCH_TO_CM, 15 * INCH_TO_CM))
             sns.scatterplot(
-                rep_plots, x="x", y="y", hue=color_by, palette=palette, ax=ax, s=20
+                rep_plots, x="x", y="y", hue=color_by, palette=palette, ax=ax, s=3
             )
             ax.legend(
                 bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5
@@ -202,10 +203,11 @@ method_names = [
     "scviv2_z20_u5",
     "scviv2_z30_u5",
     # "scviv2_z10_u10",
-    "scviv2_z20_u10",
-    "scviv2_z30_u10",
+    "scviv2_z50_u5",
+    # "scviv2_z100_u5",
 ]
 
+# %%
 # Per dataset plots
 use_normalized = False
 for method_name in method_names:
@@ -454,8 +456,34 @@ for method_name in method_names:
                 dataset_name,
             )
             plt.clf()
+# %%
+train_adata_path = f"{dataset_name}.preprocessed.h5ad"
+if not RUN_WITH_PARSER:
+    train_adata_path = os.path.join(
+        "../results/sciplex_pipeline/data", train_adata_path
+    )
+train_adata = sc.read(train_adata_path)
+train_adata_log = train_adata[train_adata.obs.product_dose.isin(sig_samples)].copy()
 
+# %%
+# ELBO validation comparison
+import scvi_v2
 
+elbo_validaton_scores = {}
+for compare_method_name in method_names:
+    model_path = f"{dataset_name}.{compare_method_name}"
+    if not RUN_WITH_PARSER:
+        model_path = os.path.join("../results/sciplex_pipeline/models", model_path)
+    model = scvi_v2.MrVI.load(model_path, adata=train_adata)
+    elbo_validaton_scores[compare_method_name] = model.history_["elbo_validation"].iloc[
+        -1
+    ]["elbo_validation"]
+# %%
+elbo_validation_df = pd.DataFrame.from_records(
+    [(k, v) for k, v in elbo_validaton_scores.items()],
+    columns=["Method", "Validation ELBO"],
+)
+sns.barplot(x="Method", y="Validation ELBO", data=elbo_validation_df)
 # %%
 # Final distance matrix and DE analysis
 cl = "A549"
@@ -516,7 +544,7 @@ d1 = dists.loc[1].sel(
     sample_y=sig_samples,
 )
 vmax = np.percentile(dists.values, 90)
-Z = hierarchical_clustering(d1.values, method="ward", return_ete=False)
+Z = hierarchical_clustering(d1.values, method="average", return_ete=False)
 g = sns.clustermap(
     d1.to_pandas(),
     yticklabels=True,
@@ -643,7 +671,7 @@ save_figures(f"{metric}_final", dataset_name)
 # DE analysis
 plt.rcParams["axes.grid"] = False
 
-n_clusters = 7
+n_clusters = 11
 
 clusters = fcluster(Z, t=n_clusters, criterion="maxclust")
 donor_info_ = pd.DataFrame({"cluster_id": clusters}, index=d1.sample_x.values)
@@ -661,6 +689,9 @@ cluster_colors = donor_info_.cluster_id.map(
         6: "yellow",
         7: "pink",
         8: "black",
+        9: "brown",
+        10: "grey",
+        11: "cyan",
     }
 )
 g = sns.clustermap(
@@ -677,15 +708,6 @@ g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xmajorticklabels(), fontsize=5)
 g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_ymajorticklabels(), fontsize=5)
 
 save_figures(f"{method_name}.distances_fig.clustered", dataset_name)
-
-# %%
-train_adata_path = f"{dataset_name}.preprocessed.h5ad"
-if not RUN_WITH_PARSER:
-    train_adata_path = os.path.join(
-        "../results/sciplex_pipeline/data", train_adata_path
-    )
-train_adata = sc.read(train_adata_path)
-train_adata_log = train_adata[train_adata.obs.product_dose.isin(sig_samples)].copy()
 
 # %%
 adata_path = f"{dataset_name}.{method_name}.final.h5ad"
@@ -729,6 +751,45 @@ shutil.move(
 )
 if not os.listdir(f"figures/"):
     os.rmdir(f"figures/")
+
+# %%
+# GSEA for DE genes
+sc.tl.filter_rank_genes_groups(
+    train_adata_log,
+    min_fold_change=1,
+    min_in_group_fraction=0.25,
+    max_out_group_fraction=0.5,
+)
+# Load gene sets
+gene_set_names = [
+    "MSigDB_Hallmark_2020",
+    "WikiPathway_2021_Human",
+    "KEGG_2021_Human",
+    "Reactome_2022",
+    "GO_Biological_Process_2023",
+    "GO_Cellular_Component_2023",
+    "GO_Molecular_Function_2023",
+]
+gene_sets = [
+    gp.parser.download_library(gene_set_name, "human")
+    for gene_set_name in gene_set_names
+]
+
+# %%
+for i in range(1, n_clusters + 1):
+    de_genes = train_adata_log.uns["rank_genes_groups_filtered"]["names"][
+        f"Cluster {i}"
+    ].tolist()
+    de_genes = [gene for gene in de_genes if str(gene) != "nan"]
+    try:
+        enr_results, fig = perform_gsea(de_genes, plot=True, use_server=False)
+    except ValueError:
+        continue
+    fig = fig + p9.theme(
+        figure_size=(6 * INCH_TO_CM, 6 * INCH_TO_CM),
+    )
+    dataset_dir = os.path.join(output_dir, dataset_name)
+    fig.save(os.path.join(dataset_dir, f"gsea_cluster_{i}.svg"))
 
 # %%
 # MDE with low opacity vehicle cluster
@@ -876,6 +937,7 @@ ax.set_ylabel("MDE2")
 ax.set_title(method_name)
 save_figures(f"{method_name}.u_mdes_colored_by_cluster", dataset_name)
 
+
 # %%
 # admissibility check
 import scvi_v2
@@ -903,7 +965,7 @@ plot_df = pd.DataFrame(adata.obsm[f"X_{method_name}_u_mde"], columns=["x", "y"])
 plot_df["total_admissible"] = adata.obs.total_admissible.values
 
 fig, ax = plt.subplots(figsize=(15 * INCH_TO_CM, 15 * INCH_TO_CM))
-sns.scatterplot(plot_df, x="x", y="y", hue="total_admissible", ax=ax, s=20)
+sns.scatterplot(plot_df, x="x", y="y", hue="total_admissible", ax=ax, s=3)
 ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
 ax.set_xlabel("MDE1")
 ax.set_ylabel("MDE2")
@@ -975,3 +1037,5 @@ label_point(genes_to_label.lfc, genes_to_label.sparsity, genes_to_label.gene, ax
 
 plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
 save_figures(f"{method_name}.top_genes", dataset_name)
+
+# %%

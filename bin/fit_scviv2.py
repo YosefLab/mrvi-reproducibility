@@ -20,7 +20,7 @@ BASE_MOG_DICT = {
     },
     "learn_z_u_prior_scale": False,
     "z_u_prior": False,
-    "u_prior_mixture": True,
+    "u_prior_mixture": False,
     "u_prior_mixture_k": 20,
 }
 
@@ -35,9 +35,9 @@ def fit_scviv2(
     use_attention_no_prior_mog: str = "false",
     z30: str = "false",
     z20_u5: str = "false",
-    z20_u10: str = "false",
+    z50_u5: str = "false",
     z30_u5: str = "false",
-    z30_u10: str = "false",
+    z100_u5: str = "false",
 ) -> scvi_v2.MrVI:
     """
     Train a MrVI model.
@@ -55,9 +55,9 @@ def fit_scviv2(
     use_attention_no_prior_mog = use_attention_no_prior_mog.lower() == "true"
     z30 = z30.lower() == "true"
     z20_u5 = z20_u5.lower() == "true"
-    z20_u10 = z20_u10.lower() == "true"
+    z50_u5 = z50_u5.lower() == "true"
     z30_u5 = z30_u5.lower() == "true"
-    z30_u10 = z30_u10.lower() == "true"
+    z100_u5 = z100_u5.lower() == "true"
 
     config = load_config(config_in)
     batch_key = config.get("batch_key", None)
@@ -100,12 +100,12 @@ def fit_scviv2(
         model_kwargs.update({**BASE_MOG_DICT, "n_latent": 30})
     if z20_u5:
         model_kwargs.update({**BASE_MOG_DICT, "n_latent": 20, "n_latent_u": 5})
-    if z20_u10:
-        model_kwargs.update({**BASE_MOG_DICT, "n_latent": 20, "n_latent_u": 10})
+    if z50_u5:
+        model_kwargs.update({**BASE_MOG_DICT, "n_latent": 50, "n_latent_u": 5})
     if z30_u5:
         model_kwargs.update({**BASE_MOG_DICT, "n_latent": 30, "n_latent_u": 5})
-    if z30_u10:
-        model_kwargs.update({**BASE_MOG_DICT, "n_latent": 30, "n_latent_u": 10})
+    if z100_u5:
+        model_kwargs.update({**BASE_MOG_DICT, "n_latent": 100, "n_latent_u": 5})
 
     model = scvi_v2.MrVI(adata, **model_kwargs)
     model.train(**train_kwargs)
