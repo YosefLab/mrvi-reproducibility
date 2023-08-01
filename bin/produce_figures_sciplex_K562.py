@@ -82,6 +82,7 @@ rep_results = load_results(rep_results_paths)
 
 # %%
 mde_reps = rep_results["representations"].query("representation_type == 'MDE'")
+# %%
 if mde_reps.size >= 1:
     unique_reps = mde_reps.representation_name.unique()
     for rep in unique_reps:
@@ -453,7 +454,9 @@ for method_name in method_names:
 
 
 # %%
+#######################################
 # Final distance matrix and DE analysis
+#######################################
 cl = "K562"
 method_name = "scviv2_z30_u5"
 
@@ -512,7 +515,7 @@ d1 = dists.loc[1].sel(
     sample_y=sig_samples,
 )
 vmax = np.percentile(dists.values, 90)
-Z = hierarchical_clustering(d1.values, method="average", return_ete=False)
+Z = hierarchical_clustering(d1.values, method="ward", return_ete=False)
 g = sns.clustermap(
     d1.to_pandas(),
     yticklabels=True,
@@ -543,6 +546,60 @@ save_figures(
 # plt.clf()
 
 # %%
+# compute random baseline for percentile
+# %%
+import scipy
+
+all_products = set()
+all_doses = set()
+for sample_name in dists.sample_x.data:
+    product_name, dose = sample_name.split("_")
+    if product_name != "Vehicle":
+        all_products.add(product_name)
+    if dose != "0":
+        all_doses.add(dose)
+in_product_all_dist_avg_percentile = []
+top_two_doses = ["1000", "10000"]
+cluster_dists = dists.loc[1]
+cluster_dists_arr = cluster_dists.data
+non_diag_mask = (
+    np.ones(shape=cluster_dists_arr.shape) - np.identity(cluster_dists_arr.shape[0])
+).astype(bool)
+in_prod_mask = np.zeros(shape=cluster_dists_arr.shape, dtype=bool)
+for product_name in all_products:
+    for dosex in all_doses:
+        for dosey in all_doses:
+            if dosex == dosey:
+                continue
+            dosex_idx = np.where(
+                cluster_dists.sample_x.data == f"{product_name}_{dosex}"
+            )[0]
+            if len(dosex_idx) == 0:
+                continue
+            dosey_idx = np.where(
+                cluster_dists.sample_y.data == f"{product_name}_{dosey}"
+            )[0]
+            if len(dosey_idx) == 0:
+                continue
+            in_prod_mask[dosex_idx[0], dosey_idx[0]] = True
+# %%
+# shuffle the mask
+np.random.seed(45)
+shuffled_in_prod_mask = np.zeros(shape=in_prod_mask.shape, dtype=bool)
+shuffled_in_prod_mask[np.triu_indices(in_prod_mask.shape[0])] = np.random.permutation(
+    in_prod_mask[np.triu_indices(in_prod_mask.shape[0])]
+)
+shuffled_in_prod_mask = shuffled_in_prod_mask + shuffled_in_prod_mask.T
+
+adjusted_ranks = (
+    scipy.stats.rankdata(cluster_dists_arr).reshape(cluster_dists_arr.shape)
+    - cluster_dists_arr.shape[0]
+)
+shuffled_in_prod_all_dist_avg_percentile = (
+    adjusted_ranks[shuffled_in_prod_mask].mean() / non_diag_mask.sum()
+)
+print(shuffled_in_prod_all_dist_avg_percentile)
+# %%
 # Metric plots
 all_results = load_results(results_paths)
 sciplex_metrics_df = all_results["sciplex_metrics"]
@@ -562,6 +619,16 @@ model_to_method_name_mapping = {
 
 plot_df = plot_df[plot_df["model_name"].isin(model_to_method_name_mapping.keys())]
 plot_df["method_name"] = plot_df["model_name"].map(model_to_method_name_mapping)
+plot_df = plot_df.append(
+    pd.DataFrame(
+        {
+            "method_name": ["Random"],
+            "in_product_all_dist_avg_percentile": [
+                shuffled_in_prod_all_dist_avg_percentile
+            ],
+        }
+    )
+)
 
 metric = "in_product_all_dist_avg_percentile"
 
@@ -574,9 +641,10 @@ sns.barplot(
     palette=BARPLOT_CMAP,
     ax=ax,
 )
-min_lim = plot_df[metric].min() - 0.01
-max_lim = plot_df[metric].max() + 0.01
+min_lim = plot_df[metric].min() - 0.03
+max_lim = plot_df[metric].max() + 0.03
 ax.set_xlim(min_lim, max_lim)
+ax.set_xticks([0.3, 0.35, 0.4, 0.45, 0.5])
 save_figures(f"{metric}_final", dataset_name)
 
 # %%
@@ -591,18 +659,8 @@ vehicle_cluster = f"Cluster {donor_info_.loc['Vehicle_0']['cluster_id']}"
 
 # %%
 # Viz clusters
-cluster_colors = donor_info_.cluster_id.map(
-    {
-        1: "red",
-        2: "blue",
-        3: "green",
-        4: "orange",
-        5: "purple",
-        6: "yellow",
-        7: "pink",
-        8: "black",
-    }
-)
+cluster_color_map = {i: c for i, c in enumerate(sns.color_palette("tab10", 10))}
+cluster_colors = donor_info_.cluster_id.map(cluster_color_map)
 g = sns.clustermap(
     d1.to_pandas(),
     yticklabels=True,
@@ -815,6 +873,7 @@ sns.scatterplot(
     y="y",
     hue="product_cluster",
     hue_order=[str(i) for i in range(1, n_clusters + 1)],
+    palette={str(k): v for k, v in cluster_color_map.items()},
     ax=ax,
     s=marker_size,
 )
@@ -844,6 +903,7 @@ sns.scatterplot(
     y="y",
     hue="product_cluster",
     hue_order=[str(i) for i in range(1, n_clusters + 1)],
+    palette={str(k): v for k, v in cluster_color_map.items()},
     ax=ax,
     s=marker_size,
 )
