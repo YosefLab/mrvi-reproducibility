@@ -1,4 +1,4 @@
-name: run-models-jax
+name: run-models-test
 channels:
     - conda-forge
     - bioconda
@@ -21,6 +21,6 @@ dependencies:
     - numpy<=1.24
     - pip
     - pip:
-          - git+ssh://git@github.com/YosefLab/scvi-v2.git@main
+          - git+ssh://git@github.com/YosefLab/scvi-v2.git@lfc_batch
           - numpy<=1.24
           - remote-pdb==2.1.0

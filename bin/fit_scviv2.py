@@ -160,12 +160,12 @@ def fit_scviv2(
     if use_attention_no_prior_mog_large:
         model_kwargs.update(
             {
-                "n_latent": 100,
-                "n_latent_u": 10,
+                "n_latent": 30,
+                "n_latent_u": 5,
                 "qz_nn_flavor": "attention",
                 "px_nn_flavor": "attention",
                 "qz_kwargs": {
-                    "use_map": False,
+                    "use_map": True,
                     "stop_gradients": False,
                     "stop_gradients_mlp": True,
                     "dropout_rate": 0.03,
@@ -186,8 +186,8 @@ def fit_scviv2(
     if use_attention_mog:
         model_kwargs.update(
             {
-                "n_latent": 100,
-                "n_latent_u": 10,
+                "n_latent": 30,
+                "n_latent_u": 5,
                 "qz_nn_flavor": "attention",
                 "px_nn_flavor": "attention",
                 "qz_kwargs": {

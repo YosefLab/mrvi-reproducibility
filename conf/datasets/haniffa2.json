@@ -15,7 +15,7 @@
         "early_stopping": true,
         "early_stopping_patience": 30,
         "check_val_every_n_epoch": 1,
-        "early_stopping_monitor": "validation_loss",
+        "early_stopping_monitor": "elbo_validation",
         "plan_kwargs": {
             "n_epochs_kl_warmup": 50,
             "lr": 3e-3

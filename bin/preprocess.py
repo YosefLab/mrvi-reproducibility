@@ -7,6 +7,7 @@ import pandas as pd
 import scanpy as sc
 import scipy.cluster.hierarchy as sch
 import xarray as xr
+from sklearn.decomposition import PCA, SparsePCA
 from anndata import AnnData
 from scipy.spatial.distance import squareform
 from sklearn.metrics import pairwise_distances
@@ -552,7 +553,7 @@ def _process_semisynth2(
         cell_to_sample = res.obs["sample_assignment"].values
         res.obs.loc[:, f"subsample_rate_in_leiden{selected_subsample_cluster}"] = subsample_info_df.loc[cell_to_sample, "subsample_rate"].values
         res.obs.loc[:, f"rank_in_leiden{selected_subsample_cluster}"] = subsample_info_df.loc[cell_to_sample, "rank"].values
-        res.obs.loc[:, "sample_metadata2"] = res.obs[f"subsample_rate_in_leiden{selected_subsample_cluster}"] <= 0.5
+        res.obs.loc[:, "sample_metadata2"] = res.obs[f"subsample_rate_in_leiden{selected_subsample_cluster}"] <= 0.8
         res = sc.AnnData(
             X=res.X,
             obs=res.obs,
@@ -569,7 +570,7 @@ def construct_sample_stratifications_from_subcelltypes(
 ):
     """Construct semisynthetic dataset"""
     dmat = pairwise_distances(latent_reps)
-    dmat = squareform(dmat)
+    dmat = squareform(dmat, checks=False)
     Z = sch.linkage(dmat, method=linkage_method)
     subclusters = sch.fcluster(Z, n_subclusters, criterion="maxclust")
     metadata1 = sch.fcluster(Z, 2, criterion="maxclust")

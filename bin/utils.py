@@ -7,6 +7,7 @@ import warnings
 from inspect import signature
 from pathlib import Path
 from typing import Callable
+import time
 
 import click
 import numpy as np
@@ -269,7 +270,9 @@ def perform_gsea(
                 outdir=None,
                 verbose=False,
             )
+            is_done = True
         except:
+            time.sleep(3)
             continue
     if not is_done:
         raise ValueError(
