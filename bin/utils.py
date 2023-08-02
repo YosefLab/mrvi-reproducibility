@@ -202,3 +202,139 @@ def save_figures(fig, output_dir, filename, save_svg=True):
     fig.save(basename + ".png", dpi=300)
     if save_svg:
         fig.save(basename + ".svg")
+
+def perform_gsea(
+    genes: list,
+    gene_sets: list = None,
+    organism: str = "human",
+    n_trials_max: int = 20,
+    plot: bool = False,
+    plot_sortby: str = "Adjusted P-value",
+    plot_ntop: int = 5,
+    use_server: bool = True,
+):
+    """
+    Perform GSEA using Enrichr.
+
+    Parameters
+    ----------
+    genes :
+        List of gene symbols to perform GSEA on.
+    gene_sets :
+        List of gene sets to use for GSEA.
+        An exhaustive list of gene sets can be found using `gp.get_library_name()`
+    organism :
+        Considered organism.
+    n_trials_max :
+        Maximum number of trials to perform GSEA. Consider increasing if GSEA fails.
+    plot :
+        Whether to plot the results.
+    plot_sortby :
+        Key to sort the results by, only used if `plot` is True.
+    plot_ntop :
+        Number of top results to plot, only used if `plot` is True.
+    use_server :
+        Whether to use the web server.
+
+    Returns
+    -------
+    A pandas DataFrame containing the GSEA results.
+    If `plot` is True, also returns a plotnine figure.
+    """
+    try:
+        import gseapy as gp
+    except ImportError:
+        raise ImportError(
+            "GSEApy is not installed. Please install it via pip or conda."
+        )
+
+    if gene_sets is None:
+        gene_sets = [
+            "MSigDB_Hallmark_2020",
+            "WikiPathway_2021_Human",
+            "KEGG_2021_Human",
+            "Reactome_2022",
+            "GO_Biological_Process_2023",
+            "GO_Cellular_Component_2023",
+            "GO_Molecular_Function_2023",
+        ]
+        if not use_server:
+            gene_set_dicts = [
+                gp.parser.download_library(gene_set_name, "human")
+                for gene_set_name in gene_sets
+            ]
+            gene_set_names = gene_sets
+            gene_sets = gene_set_dicts
+
+    if use_server:
+        is_done = False
+        for _ in range(n_trials_max):
+            if is_done:
+                break
+
+            try:
+                enr = gp.enrichr(
+                    gene_list=genes,
+                    gene_sets=gene_sets,
+                    organism=organism,
+                    outdir=None,
+                    verbose=False,
+                )
+                is_done = True
+            except:
+                time.sleep(3)
+                continue
+        if not is_done:
+            raise ValueError(
+                "GSEA failed; please consider increasing `n_trials_max` or try running enrichr manually."
+            )
+    else:
+        enr = gp.enrich(
+            gene_list=genes,
+            gene_sets=gene_sets,
+            outdir=None,
+            verbose=False,
+        )
+    enr_results = enr.results.copy().sort_values("Adjusted P-value")
+    enr_results.loc[:, "Significance score"] = -np.log10(
+        enr_results.loc[:, "Adjusted P-value"]
+    )
+    if not use_server:
+        gene_set_mapping = {
+            f"gs_ind_{i}": gene_set_name
+            for i, gene_set_name in enumerate(gene_set_names)
+        }
+        enr_results.loc[:, "Gene_set"] = enr_results.loc[:, "Gene_set"].map(
+            gene_set_mapping
+        )
+    if not plot:
+        return enr_results
+
+    try:
+        import plotnine as p9
+    except ImportError:
+        raise ImportError(
+            "Plotnine is not installed. Please install it via pip or conda."
+        )
+    plot_df = (
+        enr_results.loc[lambda x: x["Adjusted P-value"] < 0.1, :]
+        .sort_values(plot_sortby)
+        .head(plot_ntop)
+        .sort_values("Gene_set")
+    )
+    fig = (
+        p9.ggplot(plot_df, p9.aes(x="Term", y="Significance score", fill="Gene_set"))
+        + p9.geom_col()
+        + p9.scale_x_discrete(limits=plot_df.Term.tolist())
+        + p9.labs(
+            x="",
+        )
+        + p9.theme_classic()
+        + p9.theme(
+            strip_background=p9.element_blank(),
+            axis_text_x=p9.element_text(rotation=45, hjust=1),
+            axis_text=p9.element_text(family="sans-serif", size=5),
+            axis_title=p9.element_text(family="sans-serif", size=6),
+        )
+    )
+    return enr_results, fig
