@@ -3,6 +3,7 @@ import json
 import os
 import pathlib
 import pickle
+import time
 import warnings
 from inspect import signature
 from pathlib import Path
@@ -202,6 +203,7 @@ def save_figures(fig, output_dir, filename, save_svg=True):
     fig.save(basename + ".png", dpi=300)
     if save_svg:
         fig.save(basename + ".svg")
+
 
 def perform_gsea(
     genes: list,
