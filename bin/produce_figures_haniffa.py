@@ -3,28 +3,23 @@ import glob
 import os
 
 import matplotlib.pyplot as plt
-from matplotlib.colors import rgb2hex, hex2color
 import numpy as np
 import pandas as pd
-from scipy.special import logsumexp
-from scipy.spatial import distance_matrix
-from sklearn.metrics import pairwise_distances
 import plotnine as p9
 import scanpy as sc
-import time
-from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE, MDS
-from sklearn.cluster import KMeans
 import seaborn as sns
-from biothings_client import get_client
 import xarray as xr
-from scib_metrics.benchmark import Benchmarker
-from scib_metrics.nearest_neighbors import NeighborsOutput
-from scipy.cluster.hierarchy import fcluster
-from tree_utils import hierarchical_clustering
 from biothings_client import get_client
-import gseapy as gp
-
+from matplotlib.colors import hex2color, rgb2hex
+from scib_metrics.benchmark import Benchmarker
+from scipy.cluster.hierarchy import fcluster
+from scipy.special import logsumexp
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+from sklearn.manifold import MDS
+from sklearn.metrics import pairwise_distances
+from tree_utils import hierarchical_clustering
+from utils import perform_gsea
 
 INCH_TO_CM = 1 / 2.54
 
@@ -101,7 +96,9 @@ ensembl_gene = (
     .first()
 )
 
-adata.var.loc[:, "ensembl_gene"] = ensembl_gene.reindex(adata.var_names)["ensembl.gene"].values
+adata.var.loc[:, "ensembl_gene"] = ensembl_gene.reindex(adata.var_names)[
+    "ensembl.gene"
+].values
 
 # %%
 from scvi_v2 import MrVI
@@ -133,16 +130,6 @@ donor_info = (
 )
 donor_embeds = np.array(model.module.params["qz"]["Embed_0"]["embedding"])
 
-
-# tsne = TSNE(n_components=2, random_state=42, metric="cosine")
-# donor_embeds_tsne = tsne.fit_transform(donor_embeds)
-# donor_info.loc[:, ["tsne_1", "tsne_2"]] = donor_embeds_tsne
-
-# (
-#     p9.ggplot(donor_info, p9.aes(x="tsne_1", y="tsne_2", color="Status"))
-#     + p9.geom_point()
-# )
-
 # %%
 pca = PCA(n_components=2, random_state=42)
 donor_embeds_pca = pca.fit_transform(donor_embeds)
@@ -155,36 +142,6 @@ donor_info.loc[:, "pc_2"] = donor_embeds_pca[:, 1]
 # %%
 (p9.ggplot(donor_info, p9.aes(x="pc_1", y="pc_2", color="age_int")) + p9.geom_point())
 
-# %%
-# (p9.ggplot(donor_info, p9.aes(x="pc_1", y="pc_2", color="DFO")) + p9.geom_point())
-
-# %%
-# sc.set_figure_params(dpi_save=200)
-# for adata_file in adata_files:
-#     try:
-#         adata_ = sc.read_h5ad(adata_file)
-#     except:
-#         continue
-#     print(adata_.shape)
-#     for obsm_key in adata_.obsm.keys():
-#         print(obsm_key)
-#         if obsm_key.endswith("mde") & ("scviv2" in obsm_key):
-#             print(obsm_key)
-#             rdm_perm = np.random.permutation(adata.shape[0])[:2000]
-#             # sc.pl.embedding(
-#             #     adata_[rdm_perm],
-#             #     basis=obsm_key,
-#             #     color=["initial_clustering", "Status", "sample_id"],
-#             #     ncols=1,
-#             #     save="_haniffa_legend.svg",
-#             # )
-#             sc.pl.embedding(
-#                 adata_[rdm_perm],
-#                 basis=obsm_key,
-#                 color=["initial_clustering", "Status", "sample_id"],
-#                 ncols=1,
-#                 save="_haniffa.png",
-#             )
 
 # %%
 # adata_file =  '../results/aws_pipeline/data/haniffa.scviv2_attention_noprior.final.h5ad'
@@ -355,7 +312,9 @@ dists = model.get_local_sample_distances(
 axis = 0
 dmats = dists["cell"].values
 dmats = np.array([dmat[np.triu_indices(dmat.shape[0], k=1)] for dmat in dmats])
-dmats = (dmats - dmats.mean(axis=axis, keepdims=True)) / dmats.std(axis=axis, keepdims=True)
+dmats = (dmats - dmats.mean(axis=axis, keepdims=True)) / dmats.std(
+    axis=axis, keepdims=True
+)
 # dmats = np.argsort(dmats, axis=1)
 dmats_ = PCA(n_components=50).fit_transform(dmats)
 latent_ = pymde.preserve_neighbors(dmats_, **mde_kwargs).embed().cpu().numpy()
@@ -370,10 +329,8 @@ sc.pl.embedding(adata, basis="dmat_mde", color=["initial_clustering", "leiden_dm
 
 # %%
 props_per_cluster = (
-    adata.obs
-    .groupby("leiden_dmats")
-    .initial_clustering
-    .value_counts(normalize=True)
+    adata.obs.groupby("leiden_dmats")
+    .initial_clustering.value_counts(normalize=True)
     .to_frame("prop")
     .reset_index()
 )
@@ -381,13 +338,17 @@ props_per_cluster
 
 # %%
 (
-    p9.ggplot(props_per_cluster, p9.aes(x="leiden_dmats", y="prop", fill="initial_clustering"))
+    p9.ggplot(
+        props_per_cluster, p9.aes(x="leiden_dmats", y="prop", fill="initial_clustering")
+    )
     + p9.geom_col(position="fill")
 )
 
 # %%
 (
-    p9.ggplot(props_per_cluster, p9.aes(x="initial_clustering", y="prop", fill="leiden_dmats"))
+    p9.ggplot(
+        props_per_cluster, p9.aes(x="initial_clustering", y="prop", fill="leiden_dmats")
+    )
     + p9.geom_col(position="dodge")
     + p9.coord_flip()
 )
@@ -634,228 +595,12 @@ fig = (
 fig.save(os.path.join(FIGURE_DIR, "haniffa_multivariate.svg"))
 fig
 
-# %%
-adata.obs["donor_clusters_CD14"]
-
-
-# %%
-# donor_keys = [
-#     "Sex",
-#     "Status",
-#     "age_group",
-# ]
 
 donor_keys = [
     "Sex",
     "Status",
     "age_group",
 ]
-
-# %%
-# selected_cluster = "CD14"
-# adata.obsm = adata_embs.obsm
-# adata_ = adata[adata.obs.initial_clustering == selected_cluster].copy()
-# sc.pp.subsample(adata_, n_obs=50000, random_state=0)
-# adata_.obs.loc[:, "_indices"] = np.arange(adata_.shape[0])
-
-# res = model.perform_multivariate_analysis(
-#     donor_keys=donor_keys,
-#     adata=adata_,
-#     batch_size=128,
-#     normalize_design_matrix=True,
-#     offset_design_matrix=False,
-#     store_lfc=True,
-#     mc_samples=10,
-# )
-# gene_properties = (adata_.X != 0).mean(axis=0).A1
-# gene_properties = pd.DataFrame(
-#     gene_properties, index=adata_.var_names, columns=["sparsity"]
-# )
-
-# betas_ = res.lfc.transpose("cell_name", "covariate", "gene")
-# betas_ = betas_.loc[{"covariate": "StatusHealthy"}].values
-# plt.hist(betas_.mean(0), bins=100)
-
-# # %%
-# lfc_df = pd.DataFrame(
-#     {
-#         "LFC": betas_.mean(0),
-#         "gene": adata_.var_names,
-#         "gene_index": np.arange(adata_.shape[1]),
-#         "ensembl_gene": adata_.var["ensembl_gene"],
-#     }
-# ).assign(absLFC=lambda x: np.abs(x.LFC))
-
-# (p9.ggplot(lfc_df, p9.aes(x="absLFC")) + p9.stat_ecdf() + p9.scale_x_log10())
-
-# # %%
-# thresh = np.quantile(lfc_df.absLFC, 0.75)
-# cond = lfc_df.absLFC > thresh
-# # cond = np.ones_like(cond, dtype=bool)
-# # cond = cond & (lfc_df.LFC > 0)
-# betas_de = betas_[:, cond]
-# obs_de = lfc_df.loc[cond, :].reset_index(drop=True)
-
-# adata_t = sc.AnnData(
-#     X=betas_de.T,
-#     obs=obs_de,
-# )
-# sc.pp.neighbors(adata_t, n_neighbors=10, metric="cosine", use_rep="X")
-# sc.tl.umap(adata_t)
-# sc.tl.leiden(adata_t, resolution=0.2)
-# fig = sc.pl.umap(
-#     adata_t,
-#     color=["LFC", "leiden"],
-#     vmin=-0.1,
-#     vmax=0.1,
-#     cmap="coolwarm",
-#     return_fig=True,
-# )
-# plt.tight_layout()
-# fig.savefig(
-#     os.path.join(FIGURE_DIR, f"haniffa.{selected_cluster}.gene_umap.svg"),
-# )
-
-# # %%
-# samples_a = model.donor_info.query("Status == 'Healthy'").patient_id.tolist()
-# samples_b = model.donor_info.query("Status!= 'Healthy'").patient_id.tolist()
-# # %%
-# res_de = model.differential_expression(
-#     # donor_keys=donor_keys,
-#     # adata=None,
-#     # batch_size=256,
-#     # normalize_design_matrix=True,
-#     # offset_design_matrix=False,
-#     # filter_donors=True,
-#     # subsample_size=500,
-#     # quantile_threshold=0.05,
-#         adata=adata_,
-#         samples_a=samples_a,
-#         samples_b=samples_b,
-#         delta=0.5,
-#         return_dist=False,
-#         batch_size=128,
-#         # mc_samples_total: int = 10000,
-#         # max_mc_samples_per_pass: int = 50,
-#         # mc_samples_for_permutation: int = 30000,
-#         # use_vmap: bool = False,
-#         # eps: float = 1e-4,
-# )
-
-
-
-# # %%
-# import gseapy as gp
-
-# gp.get_library_name()
-# # below mimicks hallmark, CP, and ontology
-
-# # %%
-# gene_info_ = adata_t.obs
-
-# beta_module_keys = []
-# all_enrichr_results = []
-# for leiden_cluster in np.arange(gene_info_.leiden.nunique()):
-#     beta_module_name = f"beta_module_leiden_{leiden_cluster}"
-#     gene_info_module = gene_info_.loc[
-#         gene_info_.leiden == str(leiden_cluster)
-#     ].sort_values("absLFC", ascending=False)
-#     genes = (
-#         # gene_info_module.loc[lambda x: ~x["ensembl_gene"].isna(), "gene"]
-#         gene_info_module.loc[:, "gene"]
-#         .str.strip()
-#         .str.split(".", expand=True)
-#         .loc[:, 0]
-#         .str.upper()
-#         .tolist()
-#     )
-#     gene_indices = gene_info_module.loc[:, "gene_index"].tolist()
-
-#     beta_module = betas_[:, gene_indices].mean(1)
-#     adata_.obs.loc[:, beta_module_name] = beta_module
-#     beta_module_keys.append(beta_module_name)
-
-#     is_done = False
-#     print(leiden_cluster)
-#     print()
-#     for _ in range(10):
-#         if is_done:
-#             break
-
-#         try:
-#             enr = gp.enrichr(
-#                 gene_list=genes,
-#                 gene_sets=gene_sets,
-#                 organism="human",
-#                 outdir=None,
-#                 verbose=False,
-#             )
-#         except:
-#             print(f"Error with cluster {leiden_cluster}; retry")
-#             continue
-
-#         enr_results = enr.results.copy().sort_values("Adjusted P-value")
-#         enr_results.loc[:, "Significance score"] = -np.log10(
-#             enr_results.loc[:, "Adjusted P-value"]
-#         )
-#         # for _, term in enr.results.iloc[:10].iterrows():
-#         #     print(term.Term)
-#         # print()
-#         is_done = True
-#         all_enrichr_results.append(enr_results.assign(leiden_cluster=leiden_cluster))
-# all_enrichr_results = pd.concat(all_enrichr_results).astype({"Gene_set": "category"})
-
-# fig = sc.pl.embedding(
-#     adata_,
-#     basis="X_scviv2_attention_mog_u_mde",
-#     color=["full_clustering"] + beta_module_keys,
-#     vmin=-0.1,
-#     vmax=0.1,
-#     cmap="coolwarm",
-#     ncols=1,
-#     return_fig=True,
-# )
-# fig.savefig(os.path.join(FIGURE_DIR, f"haniffa.{selected_cluster}.beta_modules.svg"))
-
-# # %%
-# for idx, leiden_cluster in enumerate(all_enrichr_results.leiden_cluster.unique()):
-#     plot_df = (
-#         all_enrichr_results.loc[lambda x: x.leiden_cluster == leiden_cluster, :]
-#         .loc[lambda x: x["Adjusted P-value"] < 0.05, :]
-#         # .groupby("Gene_set")
-#         .sort_values("Adjusted P-value")
-#         .head(5)
-#         .sort_values("Gene_set")
-#     )
-#     scaler = len(plot_df)
-#     fig = (
-#         p9.ggplot(plot_df, p9.aes(x="Term", y="Significance score", fill="Gene_set"))
-#         + p9.geom_col()
-#         # + p9.coord_flip()
-#         + p9.scale_x_discrete(limits=plot_df.Term.tolist())
-#         + p9.labs(
-#             x="",
-#         )
-#         + p9.theme_classic()
-#         + p9.theme(
-#             strip_background=p9.element_blank(),
-#             subplots_adjust={"wspace": 0.3},
-#             # panel_background=p9.element_blank(),
-#             axis_text_x=p9.element_text(rotation=45, hjust=1),
-#             axis_text=p9.element_text(family="sans-serif", size=5),
-#             axis_title=p9.element_text(family="sans-serif", size=6),
-#             figure_size=(4 * INCH_TO_CM, 0.5 * scaler * INCH_TO_CM),
-#         )
-#     )
-#     if idx != 0:
-#         fig = fig + p9.theme(legend_position="none")
-#     fig.save(
-#         os.path.join(
-#             FIGURE_DIR,
-#             f"haniffa.{selected_cluster}.gsea.beta_modules.{leiden_cluster}.svg",
-#         )
-#     )
-#     fig.draw(show=True)
 
 # %%
 de_res = model.perform_multivariate_analysis(
@@ -884,7 +629,9 @@ log_ratios = log_p1 - log_p2
 log_p_general = logsumexp(da_res.log_probs, axis=1) - np.log(da_res.log_probs.shape[1])
 adata.obs.loc[:, "log_p"] = log_p_general
 admissibility_threshold = 0.05
-adata.obs.loc[:, "is_admissible"] = log_p_general > np.quantile(log_p_general, admissibility_threshold)
+adata.obs.loc[:, "is_admissible"] = log_p_general > np.quantile(
+    log_p_general, admissibility_threshold
+)
 adata.obs.loc[:, "is_admissible_"] = adata.obs.loc[:, "is_admissible"].astype(str)
 
 de_es = de_res["effect_size"].loc[{"covariate": "StatusHealthy"}].values
@@ -938,7 +685,9 @@ sc.pl.embedding(
 )
 
 # %%
-((adata.obs.Status == "Healthy") & (adata.obs.initial_clustering == "Plasmablast")).mean()
+(
+    (adata.obs.Status == "Healthy") & (adata.obs.initial_clustering == "Plasmablast")
+).mean()
 
 # %%
 ((adata.obs.Status == "Healthy") & (adata.obs.initial_clustering == "RBC")).mean()
@@ -968,21 +717,16 @@ fig.savefig(os.path.join(FIGURE_DIR, f"haniffa.DE_mde.svg"))
 # %%
 
 # %%
-cross_df = (
-    adata.obs
-    .assign(
-        da_es=log_ratios,
-        de_es=de_es,
-    )
+cross_df = adata.obs.assign(
+    da_es=log_ratios,
+    de_es=de_es,
 )
 
 # cross_df_key = "initial_clustering"
 # cross_df_key = "leiden_dmats"
 cross_df_key = "leiden_names"
 cross_df_avg = (
-    cross_df
-    .groupby(cross_df_key)
-    [["da_es", "de_es"]]
+    cross_df.groupby(cross_df_key)[["da_es", "de_es"]]
     .median()
     .reset_index()
     .merge(
@@ -1019,11 +763,13 @@ donor_keys = [
     "Status",
     "age_group",
 ]
-adata.obs.loc[:, "is_covid1"] = (adata.obs["donor_clusters_CD14"] == "cluster 2").astype(int)
-adata.obs.loc[:, "is_covid2"] = (adata.obs["donor_clusters_CD14"] == "cluster 3").astype(int)
-donor_keys_bis = [
-    "is_covid1", "is_covid2"
-]
+adata.obs.loc[:, "is_covid1"] = (
+    adata.obs["donor_clusters_CD14"] == "cluster 2"
+).astype(int)
+adata.obs.loc[:, "is_covid2"] = (
+    adata.obs["donor_clusters_CD14"] == "cluster 3"
+).astype(int)
+donor_keys_bis = ["is_covid1", "is_covid2"]
 
 obs_df = adata.obs.copy()
 obs_df = obs_df.loc[~obs_df._scvi_sample.duplicated("first")]
@@ -1053,12 +799,17 @@ res = model.perform_multivariate_analysis(
     eps_lfc=1e-4,
 )
 gene_properties = (adata_.X != 0).mean(axis=0).A1
-gene_properties = pd.DataFrame(gene_properties, index=adata_.var_names, columns=["sparsity"])
+gene_properties = pd.DataFrame(
+    gene_properties, index=adata_.var_names, columns=["sparsity"]
+)
 
 
 # %%
 betas_ = res.lfc.transpose("cell_name", "covariate", "gene")
-betas_ = betas_.loc[{"covariate": "is_covid2"}].values - betas_.loc[{"covariate": "is_covid1"}].values
+betas_ = (
+    betas_.loc[{"covariate": "is_covid2"}].values
+    - betas_.loc[{"covariate": "is_covid1"}].values
+)
 betas_ = betas_ / np.log(2)
 plt.hist(betas_.mean(0), bins=100)
 plt.xlabel("LFC")
@@ -1078,7 +829,7 @@ thresh = np.quantile(lfc_df.absLFC, 0.95)
 lfc_df.absLFC.hist(bins=100)
 plt.axvline(thresh, color="red")
 plt.xlabel("AbsLFC")
-plt.show();
+plt.show()
 print((lfc_df.absLFC > thresh).sum())
 
 # %%
@@ -1132,11 +883,15 @@ clusters = KMeans(n_clusters=10).fit_predict(X_pca)
 # dissimilarity = 1 - cov_mat
 # dissimilarity = pairwise_distances(adata_t.X, metric="cosine")
 
-gene_reps = MDS(n_components=2, dissimilarity="precomputed").fit_transform(dissimilarity)
+gene_reps = MDS(n_components=2, dissimilarity="precomputed").fit_transform(
+    dissimilarity
+)
 # gene_reps = TSNE(n_components=2, metric="precomputed", init="random", perplexity=50).fit_transform(dissimilarity)
 adata_t.obsm["gene_reps"] = gene_reps
 adata_t.obs.loc[:, "KMeans_clusters"] = clusters
-adata_t.obs.loc[:, "KMeans_clusters"] = adata_t.obs.loc[:, "KMeans_clusters"].astype(str)
+adata_t.obs.loc[:, "KMeans_clusters"] = adata_t.obs.loc[:, "KMeans_clusters"].astype(
+    str
+)
 sc.pl.embedding(
     adata_t,
     basis="gene_reps",
@@ -1179,32 +934,8 @@ for cluster in np.arange(gene_info_[clustering_key].nunique()):
     adata_.obs.loc[:, beta_module_name] = beta_module
     beta_module_keys.append(beta_module_name)
 
-    is_done = False
-    print(cluster)
-    print()
-    for _ in range(10):
-        if is_done:
-            break
-
-        try:
-            enr = gp.enrichr(
-                gene_list=genes,
-                gene_sets=gene_sets,
-                organism="human",
-                outdir=None,
-                verbose=False,
-            )
-        except:
-            print(f"Error with cluster {cluster}; retry")
-            time.sleep(1)
-            continue
-
-        enr_results = enr.results.copy().sort_values("Adjusted P-value")
-        enr_results.loc[:, "Significance score"] = -np.log10(
-            enr_results.loc[:, "Adjusted P-value"]
-        )
-        is_done = True
-        all_enrichr_results.append(enr_results.assign(cluster=cluster))
+    enr = perform_gsea(genes).assign(cluster=cluster)
+    all_enrichr_results.append(enr)
 all_enrichr_results = pd.concat(all_enrichr_results).astype({"Gene_set": "category"})
 
 
@@ -1217,7 +948,9 @@ fig = sc.pl.embedding(
     cmap="coolwarm",
     return_fig=True,
 )
-fig.savefig(os.path.join(FIGURE_DIR, f"haniffa.{selected_cluster}.beta_modules_cts.svg"))
+fig.savefig(
+    os.path.join(FIGURE_DIR, f"haniffa.{selected_cluster}.beta_modules_cts.svg")
+)
 
 for beta_module_key in beta_module_keys:
     cluster = int(beta_module_key.split("_")[-1])
@@ -1241,7 +974,8 @@ for beta_module_key in beta_module_keys:
     plt.tight_layout()
     fig.savefig(
         os.path.join(
-            FIGURE_DIR, f"haniffa.{selected_cluster}.beta_modules_cts.{beta_module_key}.svg"
+            FIGURE_DIR,
+            f"haniffa.{selected_cluster}.beta_modules_cts.{beta_module_key}.svg",
         )
     )
 
@@ -1250,7 +984,9 @@ for beta_module_key in beta_module_keys:
     adata_log_1 = adata_log_[cond, :]
     adata_log_1 = adata_log_1[:, genes].copy()
     adata_log_1.X = adata_log_1.X.toarray()
-    adata_log_1.X = (adata_log_1.X - adata_log_1.X.mean(0)) / (1e-6 + adata_log_1.X.std(0))
+    adata_log_1.X = (adata_log_1.X - adata_log_1.X.mean(0)) / (
+        1e-6 + adata_log_1.X.std(0)
+    )
     adata_log_1.X = adata_log_1.X.clip(-5, 5)
     adata_log_1.obs["is_covid2"] = adata_log_1.obs["is_covid2"].astype(str)
     fig = sc.pl.heatmap(
@@ -1280,7 +1016,7 @@ for beta_module_key in beta_module_keys:
         .head(5)
         .sort_values("Gene_set")
         .assign(
-            Term=lambda x: x.Term.str.split(" \(GO", expand=True).loc[:, 0],
+            Term=lambda x: x.Term.str.split(r" \(GO", expand=True).loc[:, 0],
         )
     )
     scaler = len(plot_df)
@@ -1311,7 +1047,6 @@ for beta_module_key in beta_module_keys:
     )
     plt.tight_layout()
     fig.draw(show=True)
-
 
 
 # %%

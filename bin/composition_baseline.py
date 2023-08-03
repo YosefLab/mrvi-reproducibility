@@ -5,7 +5,6 @@ import scanpy as sc
 from anndata import AnnData
 from scvi.model import SCVI
 from sklearn.metrics import pairwise_distances
-from utils import set_breakpoint
 
 
 class CompositionBaseline:

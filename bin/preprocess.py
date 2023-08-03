@@ -7,13 +7,12 @@ import pandas as pd
 import scanpy as sc
 import scipy.cluster.hierarchy as sch
 import xarray as xr
-from sklearn.decomposition import PCA, SparsePCA
 from anndata import AnnData
 from scipy.spatial.distance import squareform
 from sklearn.metrics import pairwise_distances
 from tqdm import tqdm
 from tree_utils import linkage_to_ete
-from utils import load_config, make_parents, wrap_kwargs, set_breakpoint
+from utils import load_config, make_parents, wrap_kwargs
 
 
 @wrap_kwargs
@@ -549,11 +548,19 @@ def _process_semisynth2(
                 subsampled_adatas.append(subsample_adata)
 
         res = sc.concat(subsampled_adatas)
-        subsample_info_df = subsample_info_df.astype({"sample": str}).set_index("sample")
+        subsample_info_df = subsample_info_df.astype({"sample": str}).set_index(
+            "sample"
+        )
         cell_to_sample = res.obs["sample_assignment"].values
-        res.obs.loc[:, f"subsample_rate_in_leiden{selected_subsample_cluster}"] = subsample_info_df.loc[cell_to_sample, "subsample_rate"].values
-        res.obs.loc[:, f"rank_in_leiden{selected_subsample_cluster}"] = subsample_info_df.loc[cell_to_sample, "rank"].values
-        res.obs.loc[:, "sample_metadata2"] = res.obs[f"subsample_rate_in_leiden{selected_subsample_cluster}"] <= 0.8
+        res.obs.loc[
+            :, f"subsample_rate_in_leiden{selected_subsample_cluster}"
+        ] = subsample_info_df.loc[cell_to_sample, "subsample_rate"].values
+        res.obs.loc[
+            :, f"rank_in_leiden{selected_subsample_cluster}"
+        ] = subsample_info_df.loc[cell_to_sample, "rank"].values
+        res.obs.loc[:, "sample_metadata2"] = (
+            res.obs[f"subsample_rate_in_leiden{selected_subsample_cluster}"] <= 0.8
+        )
         res = sc.AnnData(
             X=res.X,
             obs=res.obs,
