@@ -3,11 +3,11 @@ import json
 import os
 import pathlib
 import pickle
+import time
 import warnings
 from inspect import signature
 from pathlib import Path
 from typing import Callable
-import time
 
 import click
 import numpy as np
@@ -213,6 +213,7 @@ def perform_gsea(
     plot: bool = False,
     plot_sortby: str = "Adjusted P-value",
     plot_ntop: int = 5,
+    use_server: bool = True,
 ):
     """
     Perform GSEA using Enrichr.
@@ -234,6 +235,8 @@ def perform_gsea(
         Key to sort the results by, only used if `plot` is True.
     plot_ntop :
         Number of top results to plot, only used if `plot` is True.
+    use_server :
+        Whether to use the web server.
 
     Returns
     -------
@@ -257,31 +260,55 @@ def perform_gsea(
             "GO_Cellular_Component_2023",
             "GO_Molecular_Function_2023",
         ]
-    is_done = False
-    for _ in range(n_trials_max):
-        if is_done:
-            break
+        if not use_server:
+            gene_set_dicts = [
+                gp.parser.download_library(gene_set_name, "human")
+                for gene_set_name in gene_sets
+            ]
+            gene_set_names = gene_sets
+            gene_sets = gene_set_dicts
 
-        try:
-            enr = gp.enrichr(
-                gene_list=genes,
-                gene_sets=gene_sets,
-                organism=organism,
-                outdir=None,
-                verbose=False,
+    if use_server:
+        is_done = False
+        for _ in range(n_trials_max):
+            if is_done:
+                break
+
+            try:
+                enr = gp.enrichr(
+                    gene_list=genes,
+                    gene_sets=gene_sets,
+                    organism=organism,
+                    outdir=None,
+                    verbose=False,
+                )
+                is_done = True
+            except:
+                time.sleep(3)
+                continue
+        if not is_done:
+            raise ValueError(
+                "GSEA failed; please consider increasing `n_trials_max` or try running enrichr manually."
             )
-            is_done = True
-        except:
-            time.sleep(3)
-            continue
-    if not is_done:
-        raise ValueError(
-            "GSEA failed; please consider increasing `n_trials_max` or try running enrichr manually."
+    else:
+        enr = gp.enrich(
+            gene_list=genes,
+            gene_sets=gene_sets,
+            outdir=None,
+            verbose=False,
         )
     enr_results = enr.results.copy().sort_values("Adjusted P-value")
     enr_results.loc[:, "Significance score"] = -np.log10(
         enr_results.loc[:, "Adjusted P-value"]
     )
+    if not use_server:
+        gene_set_mapping = {
+            f"gs_ind_{i}": gene_set_name
+            for i, gene_set_name in enumerate(gene_set_names)
+        }
+        enr_results.loc[:, "Gene_set"] = enr_results.loc[:, "Gene_set"].map(
+            gene_set_mapping
+        )
     if not plot:
         return enr_results
 
