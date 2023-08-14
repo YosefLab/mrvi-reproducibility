@@ -1,21 +1,21 @@
 {
     "batch_key": "Site",
-    "labels_key": "leiden",
-    "sample_key": "sample_assignment",
+    "labels_key": "initial_clustering",
+    "sample_key": "patient_id",
     "mrvi_train_kwargs": {
         "max_epochs": 400
     },
     "hvg_kwargs": {
-        "n_top_genes": 3000,
+        "n_top_genes": 10000,
         "flavor": "seurat_v3"
     },
     "scviv2_train_kwargs": {
         "max_epochs": 400,
         "batch_size": 1024,
-        "check_val_every_n_epoch": 1,
         "early_stopping": true,
         "early_stopping_patience": 30,
-        "early_stopping_monitor": "validation_loss",
+        "check_val_every_n_epoch": 1,
+        "early_stopping_monitor": "elbo_validation",
         "plan_kwargs": {
             "n_epochs_kl_warmup": 50,
             "lr": 3e-3
@@ -25,11 +25,6 @@
         "max_epochs": 400
     },
     "clustering_method": "ward",
-    "dataset_config": {
-        "resolution": 0.1,
-        "n_subclusters": 8,
-        "n_replicates_per_subcluster": 4,
-        "selected_cluster": 0,
-        "n_genes_for_subclustering": 500
-    }
+    "compute_local_representations": false,
+    "subset_site": "Ncl"
 }

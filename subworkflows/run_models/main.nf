@@ -6,6 +6,8 @@ include {
     fit_scviv2 as fit_scviv2_attention_smallu;
     fit_scviv2 as fit_scviv2_attention_noprior;
     fit_scviv2 as fit_scviv2_attention_no_prior_mog;
+    fit_scviv2 as fit_scviv2_attention_mog;
+    fit_scviv2 as fit_scviv2_attention_no_prior_mog_large;
 } from params.modules.fit_scviv2
 include {
     get_latent_scviv2;
@@ -15,6 +17,8 @@ include {
     get_latent_scviv2 as get_latent_scviv2_attention_smallu;
     get_latent_scviv2 as get_latent_scviv2_attention_noprior;
     get_latent_scviv2 as get_latent_scviv2_attention_no_prior_mog;
+    get_latent_scviv2 as get_latent_scviv2_attention_mog;
+    get_latent_scviv2 as get_latent_scviv2_attention_no_prior_mog_large;
 } from params.modules.get_latent_scviv2
 include {
     fit_and_get_latent_composition_baseline as fit_and_get_latent_composition_scvi_clusterkey;
@@ -22,6 +26,8 @@ include {
     fit_and_get_latent_composition_baseline as fit_and_get_latent_composition_scvi_leiden;
     fit_and_get_latent_composition_baseline as fit_and_get_latent_composition_pca_leiden;
 } from params.modules.fit_and_get_latent_composition_baseline
+include { run_milo } from params.modules.run_milo
+include { run_milode } from params.modules.run_milode
 include { compute_rf } from params.modules.compute_rf
 include { compute_2dreps } from params.modules.compute_2dreps
 
@@ -35,38 +41,59 @@ workflow run_models {
 
     // Step 1: Run models
     // Run base model
-    scvi_attention_noprior_outs = fit_scviv2_attention_noprior(adatas_in, false, false, false, false, true, false) | get_latent_scviv2_attention_noprior
+    scvi_attention_noprior_outs = fit_scviv2_attention_noprior(adatas_in, false, false, false, false, true, false, false, false) | get_latent_scviv2_attention_noprior
     scvi_attention_noprior_adata = scvi_attention_noprior_outs.adata
 
-    scvi_attention_no_prior_mog_outs = fit_scviv2_attention_no_prior_mog(adatas_in, false, false, false, false, false, true) | get_latent_scviv2_attention_no_prior_mog
+    scvi_attention_no_prior_mog_outs = fit_scviv2_attention_no_prior_mog(adatas_in, false, false, false, false, false, true, false, false) | get_latent_scviv2_attention_no_prior_mog
     scvi_attention_no_prior_mog_adata = scvi_attention_no_prior_mog_outs.adata
+
+    scvi_attention_mog_outs = fit_scviv2_attention_mog(adatas_in, false, false, false, false, false, false, true, false) | get_latent_scviv2_attention_mog
+    scvi_attention_mog_adata = scvi_attention_mog_outs.adata
+
+    scvi_attention_no_prior_mog_large_outs = fit_scviv2_attention_no_prior_mog_large(adatas_in, false, false, false, false, false, false, false, true) | get_latent_scviv2_attention_no_prior_mog_large
+    scvi_attention_no_prior_mog_large_adata = scvi_attention_no_prior_mog_large_outs.adata
+
+    distance_matrices = scvi_attention_no_prior_mog_large_outs.distance_matrices.concat(
+        scvi_attention_no_prior_mog_large_outs.normalized_distance_matrices,
+    )
+    // adatas = scvi_attention_no_prior_mog_large_adata
 
     distance_matrices = scvi_attention_noprior_outs.distance_matrices.concat(
         scvi_attention_noprior_outs.normalized_distance_matrices,
         scvi_attention_no_prior_mog_outs.distance_matrices,
         scvi_attention_no_prior_mog_outs.normalized_distance_matrices,
+        scvi_attention_mog_outs.distance_matrices,
+        scvi_attention_mog_outs.normalized_distance_matrices,
+        scvi_attention_no_prior_mog_large_outs.distance_matrices,
+        scvi_attention_no_prior_mog_large_outs.normalized_distance_matrices,
     )
     adatas = scvi_attention_noprior_adata.concat(
         scvi_attention_no_prior_mog_adata,
+        scvi_attention_mog_adata,
+        scvi_attention_no_prior_mog_large_adata,
     )
 
+    if ( params.runMILO ) {
+        run_milo(adatas_in)
+        run_milode(adatas_in)
+    }
 
     if ( params.runAllMRVIModels ) {
-        scvi_outs = fit_scviv2(adatas_in, false, false, false, false, false, false) | get_latent_scviv2
+        scvi_outs = fit_scviv2(adatas_in, false, false, false, false, false, false, false) | get_latent_scviv2
         scvi_adata = scvi_outs.adata
 
         // Run scviv2 mlp
-        scvi_mlp_outs = fit_scviv2_mlp(adatas_in, true, false, false, false, false, false) | get_latent_scviv2_mlp
+        scvi_mlp_outs = fit_scviv2_mlp(adatas_in, true, false, false, false, false, false, false) | get_latent_scviv2_mlp
         scvi_mlp_adata = scvi_mlp_outs.adata
 
         // Run scviv2 mlp smallu
-        scvi_mlp_smallu_outs = fit_scviv2_mlp_smallu(adatas_in, false, true, false, false, false, false) | get_latent_scviv2_mlp_smallu
+        scvi_mlp_smallu_outs = fit_scviv2_mlp_smallu(adatas_in, false, true, false, false, false, false, false) | get_latent_scviv2_mlp_smallu
         scvi_mlp_smallu_adata = scvi_mlp_smallu_outs.adata
 
-        scvi_attention_outs = fit_scviv2_attention(adatas_in, false, false, true, false, false, false) | get_latent_scviv2_attention
+        scvi_attention_outs = fit_scviv2_attention(adatas_in, false, false, true, false, false, false, false) | get_latent_scviv2_attention
         scvi_attention_adata = scvi_attention_outs.adata
 
-        scvi_attention_smallu_outs = fit_scviv2_attention_smallu(adatas_in, false, false, false, true, false, false) | get_latent_scviv2_attention_smallu
+        scvi_attention_smallu_outs = fit_scviv2_attention_smallu(adatas_in, false, false, false, true, false, false, false) | get_latent_scviv2_attention_smallu
         scvi_attention_smallu_adata = scvi_attention_smallu_outs.adata
 
         distance_matrices = distance_matrices.concat(
