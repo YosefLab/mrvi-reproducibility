@@ -178,7 +178,7 @@ def fit_scviv2(
                     "dropout_rate": 0.03,
                 },
                 "learn_z_u_prior_scale": False,
-                "z_u_prior": True,
+                "z_u_prior": False,
                 "u_prior_mixture": True,
                 "u_prior_mixture_k": 20,
             }
@@ -204,7 +204,7 @@ def fit_scviv2(
                     "dropout_rate": 0.03,
                 },
                 "learn_z_u_prior_scale": False,
-                "z_u_prior": False,
+                "z_u_prior": True,
                 "u_prior_mixture": True,
                 "u_prior_mixture_k": 20,
             }
