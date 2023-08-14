@@ -256,7 +256,9 @@ for dmat_file in dmat_files:
             vmax=d_foreground[dmat_name].values.max(),
         )
         plt.suptitle(f"{modelname}_{distname} CT {ct}")
-        plt.savefig(os.path.join(FIGURE_DIR, f"{modelname}_{distname}_ct{ct}_heatmap.svg"))
+        plt.savefig(
+            os.path.join(FIGURE_DIR, f"{modelname}_{distname}_ct{ct}_heatmap.svg")
+        )
         plt.show()
         plt.close()
 
@@ -474,7 +476,7 @@ fig, ax = plt.subplots(1, 1, figsize=(12 * INCH_TO_CM, 1 * INCH_TO_CM))
 ss_ratio_df = pd.DataFrame(
     {
         "sample": [str(i) for i in range(1, 33)],
-        "subsample rate": [0.1, 0.3, 0.6, 1.0] * 8,
+        "subsample rate": [0.7, 0.8, 0.9, 1.0] * 8,
     }
 )
 sns.heatmap(
@@ -672,11 +674,25 @@ gt_de_analysis.loc[:, "is_gene_for_subclustering"] = gt_de_analysis.padj < 0.05
 
 
 # %%
-lfc_gp1 = pd.DataFrame({"LFC": lfcs_in_one, "Group": "Group 1", "gene": adata.var_names,})
-lfc_other = pd.DataFrame({"LFC": lfcs_in_others, "Group": "Other", "gene": adata.var_names,})
+lfc_gp1 = pd.DataFrame(
+    {
+        "LFC": lfcs_in_one,
+        "Group": "Group 1",
+        "gene": adata.var_names,
+    }
+)
+lfc_other = pd.DataFrame(
+    {
+        "LFC": lfcs_in_others,
+        "Group": "Other",
+        "gene": adata.var_names,
+    }
+)
 lfcs_ = (
     pd.concat([lfc_gp1, lfc_other])
-    .assign(abs_lfc=lambda x: np.abs(x.LFC),)
+    .assign(
+        abs_lfc=lambda x: np.abs(x.LFC),
+    )
     # .merge(gt_de_analysis, left_on="gene", right_index=True)
     .merge(gt_de_analysis, on="gene")
     .assign(
@@ -690,19 +706,12 @@ lfcs_ = (
 )
 lfcs_
 
-(
-    p9.ggplot(
-        lfcs_, p9.aes(x="LFC", y="statistic", fill="Group")
-    )
-    + p9.geom_point()
-)
+(p9.ggplot(lfcs_, p9.aes(x="LFC", y="statistic", fill="Group")) + p9.geom_point())
 
 
 # %%
 fig = (
-    p9.ggplot(
-        lfcs_, p9.aes(x="Group", y="abs_lfc", fill="gene_type")
-    )
+    p9.ggplot(lfcs_, p9.aes(x="Group", y="abs_lfc", fill="gene_type"))
     + p9.geom_boxplot(
         outlier_alpha=0.0,
     )
@@ -710,7 +719,6 @@ fig = (
     + p9.labs(
         x="",
         y="Absolute LFC",
-
     )
     + p9.theme_classic()
     + p9.theme(
@@ -721,10 +729,7 @@ fig = (
 )
 fig.save(os.path.join(FIGURE_DIR, "semisynth_DEGs_legend.svg"))
 
-fig = (
-    fig
-    + p9.theme(legend_position="none")
-)
+fig = fig + p9.theme(legend_position="none")
 fig.save(os.path.join(FIGURE_DIR, "semisynth_DEGs.svg"))
 
 # %%
@@ -1035,8 +1040,7 @@ df_ = pd.DataFrame(
     }
 )
 df_ = (
-    df_
-    .assign(
+    df_.assign(
         is_cell_affected=lambda x: x["population"] == "1",
     )
     # .query("population != '1'")
@@ -1044,12 +1048,17 @@ df_ = (
 )
 
 (
-    p9.ggplot(df_.sample(frac=1.0), p9.aes(x="lib_size", y="log_ratios", fill="is_cell_affected"))
+    p9.ggplot(
+        df_.sample(frac=1.0),
+        p9.aes(x="lib_size", y="log_ratios", fill="is_cell_affected"),
+    )
     + p9.geom_point()
 )
 
 # %%
-df_.query("~is_cell_affected").sort_values("log_ratios").assign(rank_=lambda x: np.arange(len(x))).plot.scatter("rank_", "lib_size")
+df_.query("~is_cell_affected").sort_values("log_ratios").assign(
+    rank_=lambda x: np.arange(len(x))
+).plot.scatter("rank_", "lib_size")
 
 
 # %%
