@@ -765,9 +765,12 @@ train_adata_log = train_adata_log[:, ~train_adata_log.var_names.str.startswith("
 print(train_adata_log)
 
 method = "t-test"
+# Set vehicle as own donor status to use as reference
+train_adata_log.obs.loc[train_adata_log.obs.product_dose == "Vehicle_0", "donor_status"] = "Vehicle"
 sc.tl.rank_genes_groups(
     train_adata_log,
     "donor_status",
+    reference="Vehicle",
     method=method,
     n_genes=1000,
     # rankby_abs=False,
@@ -798,13 +801,14 @@ sc.tl.filter_rank_genes_groups(
 )
 # Load gene sets
 gene_set_names = [
+    # "MSigDB_Oncogenic_Signatures",
     "MSigDB_Hallmark_2020",
-    "WikiPathway_2021_Human",
-    "KEGG_2021_Human",
-    "Reactome_2022",
-    "GO_Biological_Process_2023",
-    "GO_Cellular_Component_2023",
-    "GO_Molecular_Function_2023",
+    # "WikiPathway_2021_Human",
+    # "KEGG_2021_Human",
+    # "Reactome_2022",
+    # "GO_Biological_Process_2023",
+    # "GO_Cellular_Component_2023",
+    # "GO_Molecular_Function_2023",
 ]
 gene_sets = [
     gp.parser.download_library(gene_set_name, "human")
@@ -812,20 +816,47 @@ gene_sets = [
 ]
 
 # %%
+enr_result_dict = {}
 for i in range(1, n_clusters + 1):
+    cluster_name = f"Cluster {i}"
     de_genes = train_adata_log.uns["rank_genes_groups_filtered"]["names"][
-        f"Cluster {i}"
+        cluster_name 
     ].tolist()
     de_genes = [gene for gene in de_genes if str(gene) != "nan"]
     try:
-        enr_results, fig = perform_gsea(de_genes, plot=True, use_server=False)
-    except ValueError:
+        enr_results, fig = perform_gsea(de_genes, gene_sets=gene_sets, plot=True, use_server=False)
+        enr_result_dict[i] = enr_results
+        print(i)
+    except ValueError as e:
+        print(e)
         continue
     fig = fig + p9.theme(
         figure_size=(6 * INCH_TO_CM, 6 * INCH_TO_CM),
     )
     dataset_dir = os.path.join(output_dir, dataset_name)
-    fig.save(os.path.join(dataset_dir, f"gsea_cluster_{i}.svg"))
+    # fig.draw()
+    # fig.save(os.path.join(dataset_dir, f"gsea_cluster_{i}.svg"))
+
+# %%
+enr_pval_df_records = []
+for cluster_idx in range(1, n_clusters + 1):
+    if cluster_idx not in enr_result_dict:
+        enr_pval_df_records.append({"cluster_idx": cluster_idx})
+    else:
+        enr_cluster_results = enr_result_dict[cluster_idx]
+        enr_pval_df_records.append(
+            {"cluster_idx": cluster_idx, **enr_cluster_results.pivot(index="Gene_set", columns="Term", values="Significance score").iloc[0].to_dict()}
+        )
+enr_pval_df = pd.DataFrame.from_records(enr_pval_df_records, index="cluster_idx")
+enr_pval_df.fillna(0, inplace=True)
+
+# %%
+# Plot GSEA heatmap
+sns.clustermap(enr_pval_df.T, col_cluster=False, yticklabels=True, xticklabels=True, vmin=0, vmax=2, cmap="coolwarm")
+save_figures(
+    f"gsea_heatmap",
+    dataset_name,
+)
 
 # %%
 # MDE with low opacity vehicle cluster

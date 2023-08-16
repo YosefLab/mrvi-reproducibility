@@ -457,34 +457,26 @@ for method_name in method_names:
                 dataset_name,
             )
             plt.clf()
-# %%
-train_adata_path = f"{dataset_name}.preprocessed.h5ad"
-if not RUN_WITH_PARSER:
-    train_adata_path = os.path.join(
-        "../results/sciplex_pipeline/data", train_adata_path
-    )
-train_adata = sc.read(train_adata_path)
-train_adata_log = train_adata[train_adata.obs.product_dose.isin(sig_samples)].copy()
 
 # %%
 # ELBO validation comparison
-import scvi_v2
+# import scvi_v2
 
-elbo_validaton_scores = {}
-for compare_method_name in method_names:
-    model_path = f"{dataset_name}.{compare_method_name}"
-    if not RUN_WITH_PARSER:
-        model_path = os.path.join("../results/sciplex_pipeline/models", model_path)
-    model = scvi_v2.MrVI.load(model_path, adata=train_adata)
-    elbo_validaton_scores[compare_method_name] = model.history_["elbo_validation"].iloc[
-        -1
-    ]["elbo_validation"]
-# %%
-elbo_validation_df = pd.DataFrame.from_records(
-    [(k, v) for k, v in elbo_validaton_scores.items()],
-    columns=["Method", "Validation ELBO"],
-)
-sns.barplot(x="Method", y="Validation ELBO", data=elbo_validation_df)
+# elbo_validaton_scores = {}
+# for compare_method_name in method_names:
+#     model_path = f"{dataset_name}.{compare_method_name}"
+#     if not RUN_WITH_PARSER:
+#         model_path = os.path.join("../results/sciplex_pipeline/models", model_path)
+#     model = scvi_v2.MrVI.load(model_path, adata=train_adata)
+#     elbo_validaton_scores[compare_method_name] = model.history_["elbo_validation"].iloc[
+#         -1
+#     ]["elbo_validation"]
+# # %%
+# elbo_validation_df = pd.DataFrame.from_records(
+#     [(k, v) for k, v in elbo_validaton_scores.items()],
+#     columns=["Method", "Validation ELBO"],
+# )
+# sns.barplot(x="Method", y="Validation ELBO", data=elbo_validation_df)
 # %%
 #######################################
 # Final distance matrix and DE analysis
@@ -576,6 +568,14 @@ save_figures(
     dataset_name,
 )
 # plt.clf()
+# %%
+train_adata_path = f"{dataset_name}.preprocessed.h5ad"
+if not RUN_WITH_PARSER:
+    train_adata_path = os.path.join(
+        "../results/sciplex_pipeline/data", train_adata_path
+    )
+train_adata = sc.read(train_adata_path)
+train_adata_log = train_adata[train_adata.obs.product_dose.isin(sig_samples)].copy()
 
 # %%
 # Metric plots
@@ -784,10 +784,16 @@ train_adata_log.obs.loc[:, "donor_status"] = "Cluster " + train_adata_log.obs.lo
 train_adata_log = train_adata_log[:, ~train_adata_log.var_names.str.startswith("MT-")]
 print(train_adata_log)
 
+# %%
 method = "t-test"
+# Set vehicle as own donor status to use as reference
+train_adata_log.obs.loc[
+    train_adata_log.obs.product_dose == "Vehicle_0", "donor_status"
+] = "Vehicle"
 sc.tl.rank_genes_groups(
     train_adata_log,
     "donor_status",
+    reference="Vehicle",
     method=method,
     n_genes=1000,
     # rankby_abs=False,
@@ -818,13 +824,14 @@ sc.tl.filter_rank_genes_groups(
 )
 # Load gene sets
 gene_set_names = [
+    # "MSigDB_Oncogenic_Signatures",
     "MSigDB_Hallmark_2020",
-    "WikiPathway_2021_Human",
-    "KEGG_2021_Human",
-    "Reactome_2022",
-    "GO_Biological_Process_2023",
-    "GO_Cellular_Component_2023",
-    "GO_Molecular_Function_2023",
+    # "WikiPathway_2021_Human",
+    # "KEGG_2021_Human",
+    # "Reactome_2022",
+    # "GO_Biological_Process_2023",
+    # "GO_Cellular_Component_2023",
+    # "GO_Molecular_Function_2023",
 ]
 gene_sets = [
     gp.parser.download_library(gene_set_name, "human")
@@ -832,20 +839,64 @@ gene_sets = [
 ]
 
 # %%
+enr_result_dict = {}
 for i in range(1, n_clusters + 1):
+    cluster_name = f"Cluster {i}"
     de_genes = train_adata_log.uns["rank_genes_groups_filtered"]["names"][
-        f"Cluster {i}"
+        cluster_name
     ].tolist()
     de_genes = [gene for gene in de_genes if str(gene) != "nan"]
     try:
-        enr_results, fig = perform_gsea(de_genes, plot=True, use_server=False)
-    except ValueError:
+        enr_results, fig = perform_gsea(
+            de_genes, gene_sets=gene_sets, plot=True, use_server=False
+        )
+        enr_result_dict[i] = enr_results
+        print(i)
+    except ValueError as e:
+        print(e)
         continue
     fig = fig + p9.theme(
         figure_size=(6 * INCH_TO_CM, 6 * INCH_TO_CM),
     )
     dataset_dir = os.path.join(output_dir, dataset_name)
-    fig.save(os.path.join(dataset_dir, f"gsea_cluster_{i}.svg"))
+    # fig.draw()
+    # fig.save(os.path.join(dataset_dir, f"gsea_cluster_{i}.svg"))
+
+# %%
+enr_pval_df_records = []
+for cluster_idx in range(1, n_clusters + 1):
+    if cluster_idx not in enr_result_dict:
+        enr_pval_df_records.append({"cluster_idx": cluster_idx})
+    else:
+        enr_cluster_results = enr_result_dict[cluster_idx]
+        enr_pval_df_records.append(
+            {
+                "cluster_idx": cluster_idx,
+                **enr_cluster_results.pivot(
+                    index="Gene_set", columns="Term", values="Significance score"
+                )
+                .iloc[0]
+                .to_dict(),
+            }
+        )
+enr_pval_df = pd.DataFrame.from_records(enr_pval_df_records, index="cluster_idx")
+enr_pval_df.fillna(0, inplace=True)
+
+# %%
+# Plot GSEA heatmap
+sns.clustermap(
+    enr_pval_df.T,
+    col_cluster=False,
+    yticklabels=True,
+    xticklabels=True,
+    vmin=0,
+    vmax=2,
+    cmap="coolwarm",
+)
+save_figures(
+    f"gsea_heatmap",
+    dataset_name,
+)
 
 # %%
 # MDE with low opacity vehicle cluster
@@ -1038,9 +1089,21 @@ save_figures(f"{method_name}.total_admissible_hist", dataset_name)
 # %%
 # Multivariate analysis DE
 # (For this we create a column for each cluster since we require float values)
+import scvi_v2
+
+model_path = f"{dataset_name}.{method_name}"
+if not RUN_WITH_PARSER:
+    model_path = os.path.join("../results/sciplex_pipeline/models", model_path)
+# Register adata to get scvi sample assignment
+model = scvi_v2.MrVI.load(model_path, adata=train_adata)
+
+# %%
 train_adata.obs["donor_cluster"] = (
     train_adata.obs["product_dose"].map(donor_info_["cluster_id"]).values.astype(int)
 )
+train_adata.obs.loc[
+    train_adata.obs.product_dose == "Vehicle_0", "donor_cluster"
+] = -1
 for cluster_i in range(1, n_clusters + 1):
     train_adata.obs[f"donor_cluster_{cluster_i}"] = (
         train_adata.obs["donor_cluster"] == cluster_i
@@ -1049,51 +1112,210 @@ obs_df = train_adata.obs.copy()
 obs_df = obs_df.loc[~obs_df._scvi_sample.duplicated("first")]
 model.donor_info = obs_df.set_index("_scvi_sample").sort_index()
 sub_train_adata = train_adata[train_adata.obs["donor_cluster"] != "nan"]
-# sub_train_adata = sub_train_adata[np.random.choice(sub_train_adata.shape[0], 1000, replace=False)].copy()
 sub_train_adata.obs["_indices"] = np.arange(sub_train_adata.shape[0])
-multivar_res = model.perform_multivariate_analysis(
-    sub_train_adata,
-    donor_keys=[f"donor_cluster_{cluster_i}" for cluster_i in range(1, n_clusters + 1)],
-    store_lfc=True,
-)
-multivar_res
-# %%
-gene_properties = (sub_train_adata.X != 0).mean(axis=0).A1
-gene_properties = pd.DataFrame(
-    gene_properties, index=sub_train_adata.var_names, columns=["sparsity"]
-)
-top_genes = (
-    multivar_res.lfc.mean("cell_name")
-    .to_dataframe()
-    .reset_index()
-    .assign(
-        abs_lfc=lambda x: np.abs(x.lfc),
+
+cluster_wise_multivar_res = {}
+for cluster_i in range(1, n_clusters + 1):
+    cluster_sub_train_adata = sub_train_adata[
+        (sub_train_adata.obs["donor_cluster"] == cluster_i) | (sub_train_adata.obs["donor_cluster"] == -1)
+    ].copy()
+    # cluster_sub_train_adata = cluster_sub_train_adata[np.random.choice(cluster_sub_train_adata.shape[0], 50)]
+    cluster_multivar_res = model.perform_multivariate_analysis(
+        cluster_sub_train_adata,
+        donor_keys=[f"donor_cluster_{cluster_i}"],
+        batch_size=32,
+        store_lfc=True,
     )
-    .merge(gene_properties, left_on="gene", right_index=True, how="left")
-    .sort_values("abs_lfc", ascending=False)
-    .query("abs_lfc > 0.1")
-)
-top_genes
+    cluster_wise_multivar_res[cluster_i] = cluster_multivar_res
+
 # %%
-fig, ax = plt.subplots(figsize=(25 * INCH_TO_CM, 15 * INCH_TO_CM))
-sns.scatterplot(top_genes, x="lfc", y="sparsity", hue="covariate", ax=ax)
-plt.ylim(0, 0.9)
-plt.axvline(0, color="grey", linestyle="--")
+# GSEA for DE genes
+# Load gene sets
+gene_set_names = [
+    "MSigDB_Hallmark_2020",
+]
+gene_sets = [
+    gp.parser.download_library(gene_set_name, "human")
+    for gene_set_name in gene_set_names
+]
 
+enr_result_dict = {}
+full_dfs = {}
+de_dfs = {}
+for cluster_i in cluster_wise_multivar_res:
+# cluster_i = 1
+    cluster_multivar_res = cluster_wise_multivar_res[cluster_i]
+    betas_ = cluster_multivar_res["lfc"].transpose("cell_name", "covariate", "gene").loc[{"covariate": f"donor_cluster_{cluster_i}"}].values
+    betas_ = betas_ / np.log(2) # change to log 2
+    # plt.hist(betas_.mean(0), bins=100)
+    # plt.xlabel("LFC")
+    # plt.show()
 
-# annotate each point with gene name
-def label_point(x, y, val, ax):
-    a = pd.concat({"x": x, "y": y, "val": val}, axis=1)
-    for i, point in a.iterrows():
-        ax.text(
-            point["x"] + 0.02, point["y"], str(point["val"]), fontsize=7, rotation=45
+    lfc_df = pd.DataFrame(
+        {
+            "LFC": betas_.mean(0),
+            "LFC_std": betas_.std(0),
+            "gene": sub_train_adata.var_names,
+            "gene_index": np.arange(sub_train_adata.shape[1]),
+        }
+    ).assign(absLFC=lambda x: np.abs(x.LFC))
+    full_dfs[cluster_i] = lfc_df
+
+    # thresh = np.quantile(lfc_df.absLFC, 0.95)
+    # lfc_df.absLFC.hist(bins=100)
+    # plt.axvline(thresh, color="red")
+    # plt.xlabel("AbsLFC")
+    # plt.show()
+    # print((lfc_df.absLFC > thresh).sum())
+
+    cond = lfc_df.absLFC > 1
+    betas_de = betas_[:, cond]
+    obs_de = lfc_df.loc[cond, :].reset_index(drop=True)
+    obs_de.LFC.hist(bins=100)
+    de_dfs[cluster_i] = obs_de
+
+    de_genes = obs_de.gene.values 
+    de_genes = [gene for gene in de_genes if str(gene) != "nan"]
+    try:
+        enr_results, fig = perform_gsea(
+            de_genes, gene_sets=gene_sets, plot=True, use_server=False
         )
+        enr_result_dict[cluster_i] = enr_results
+    except ValueError as e:
+        print(e)
+        continue
+    # fig = fig + p9.theme(
+    #     figure_size=(6 * INCH_TO_CM, 6 * INCH_TO_CM),
+    # )
+    # dataset_dir = os.path.join(output_dir, dataset_name)
+    # fig.draw()
+    # fig.save(os.path.join(dataset_dir, f"gsea_cluster_{i}.svg"))
+
+# %%
+enr_pval_df_records = []
+for cluster_idx in range(1, n_clusters + 1):
+    if cluster_idx not in enr_result_dict:
+        enr_pval_df_records.append({"cluster_idx": cluster_idx})
+    else:
+        enr_cluster_results = enr_result_dict[cluster_idx]
+        enr_pval_df_records.append(
+            {
+                "cluster_idx": cluster_idx,
+                **enr_cluster_results.pivot(
+                    index="Gene_set", columns="Term", values="Significance score"
+                )
+                .iloc[0]
+                .to_dict(),
+            }
+        )
+enr_pval_df = pd.DataFrame.from_records(enr_pval_df_records, index="cluster_idx")
+enr_pval_df.fillna(0, inplace=True)
+
+# %%
+# Plot GSEA heatmap
+sns.clustermap(
+    enr_pval_df.T,
+    col_cluster=False,
+    yticklabels=True,
+    xticklabels=True,
+    vmin=0,
+    vmax=2,
+    cmap="Reds",
+)
+save_figures(
+    f"multivar_gsea_heatmap",
+    dataset_name,
+)
+
+# %%
+# Cluster wise barplots
+top_de_genes_per_cluster = {}
+for cluster_i, de_df in de_dfs.items():
+    if de_df.shape[0] == 0:
+        continue
+    de_df.sort_values("absLFC", ascending=False, inplace=True)
+    abr_de_df = de_df[:20]
+    top_de_genes_per_cluster[cluster_i] = abr_de_df[:50].gene.values
+    abr_de_df.sort_values("LFC", ascending=False, inplace=True)
+    fig, ax = plt.subplots(figsize=(15 * INCH_TO_CM, 15 * INCH_TO_CM))
+    sns.barplot(
+        x="gene",
+        y="LFC",
+        color="blue",
+        data=abr_de_df,
+        ax=ax,
+    )
+    ax.axhline(y=0,color="black" )
+    # rotate x labels
+    ax.set_title(f"Cluster {cluster_i} Top LFC DE Genes")
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
+    ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
+    save_figures(
+        f"cluster_{cluster_i}_top_lfc_de_genes",
+        dataset_name,
+    )
+
+# %%
+# matrixplot of top de genes
+from functools import reduce
+top_de_genes = reduce(np.union1d, top_de_genes_per_cluster.values())
+
+# get lfcs for each cluster for top de genes
+top_de_lfcs_cols = []
+for cluster_i, full_df in full_dfs.items():
+    print(cluster_i)
+    top_des_df = full_df[full_df["gene"].isin(top_de_genes)][["gene", "LFC"]].set_index("gene")
+    top_de_lfcs_cols.append(top_des_df.loc[top_de_genes]["LFC"].values.reshape(-1, 1))
+
+top_de_lfcs_df = pd.DataFrame(np.hstack(top_de_lfcs_cols), index=top_de_genes, columns=full_dfs.keys())
+top_de_lfcs_df
+
+# %%
+sns.clustermap(top_de_lfcs_df, col_cluster=False, yticklabels=True, xticklabels=True,
+               center=0, cmap="seismic")
+save_figures(
+    "top_de_lfcs_clustermap",
+    dataset_name,
+)
+
+# %%
+# # %%
+# gene_properties = (sub_train_adata.X != 0).mean(axis=0).A1
+# gene_properties = pd.DataFrame(
+#     gene_properties, index=sub_train_adata.var_names, columns=["sparsity"]
+# )
+# top_genes = (
+#     multivar_res.lfc.mean("cell_name")
+#     .to_dataframe()
+#     .reset_index()
+#     .assign(
+#         abs_lfc=lambda x: np.abs(x.lfc),
+#     )
+#     .merge(gene_properties, left_on="gene", right_index=True, how="left")
+#     .sort_values("abs_lfc", ascending=False)
+#     .query("abs_lfc > 0.1")
+# )
+# top_genes
+# # %%
+# fig, ax = plt.subplots(figsize=(25 * INCH_TO_CM, 15 * INCH_TO_CM))
+# sns.scatterplot(top_genes, x="lfc", y="sparsity", hue="covariate", ax=ax)
+# plt.ylim(0, 0.9)
+# plt.axvline(0, color="grey", linestyle="--")
 
 
-genes_to_label = top_genes.query("sparsity > 0.3")
-label_point(genes_to_label.lfc, genes_to_label.sparsity, genes_to_label.gene, ax)
+# # annotate each point with gene name
+# def label_point(x, y, val, ax):
+#     a = pd.concat({"x": x, "y": y, "val": val}, axis=1)
+#     for i, point in a.iterrows():
+#         ax.text(
+#             point["x"] + 0.02, point["y"], str(point["val"]), fontsize=7, rotation=45
+#         )
 
-plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
-save_figures(f"{method_name}.top_genes", dataset_name)
+
+# genes_to_label = top_genes.query("sparsity > 0.3")
+# label_point(genes_to_label.lfc, genes_to_label.sparsity, genes_to_label.gene, ax)
+
+# plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
+# save_figures(f"{method_name}.top_genes", dataset_name)
 
 # %%

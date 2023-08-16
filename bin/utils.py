@@ -250,7 +250,8 @@ def perform_gsea(
             "GSEApy is not installed. Please install it via pip or conda."
         )
 
-    if gene_sets is None:
+    provided_gene_sets = gene_sets is not None
+    if not provided_gene_sets:
         gene_sets = [
             "MSigDB_Hallmark_2020",
             "WikiPathway_2021_Human",
@@ -301,7 +302,7 @@ def perform_gsea(
     enr_results.loc[:, "Significance score"] = -np.log10(
         enr_results.loc[:, "Adjusted P-value"]
     )
-    if not use_server:
+    if not use_server and not provided_gene_sets:
         gene_set_mapping = {
             f"gs_ind_{i}": gene_set_name
             for i, gene_set_name in enumerate(gene_set_names)
