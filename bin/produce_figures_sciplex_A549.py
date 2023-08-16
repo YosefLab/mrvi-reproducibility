@@ -770,133 +770,133 @@ adata_path = f"{dataset_name}.{method_name}.final.h5ad"
 if not RUN_WITH_PARSER:
     adata_path = os.path.join("../results/sciplex_pipeline/data", adata_path)
 adata = sc.read(adata_path)
-train_adata_log.layers["counts"] = np.round(train_adata_log.X)
-sc.pp.normalize_total(train_adata_log)
-sc.pp.log1p(train_adata_log)
-train_adata_log.obs.loc[:, "donor_status"] = train_adata_log.obs.product_dose.map(
-    donor_info_.loc[:, "cluster_id"]
-).values
-train_adata_log.obs.loc[:, "donor_status"] = "Cluster " + train_adata_log.obs.loc[
-    :, "donor_status"
-].astype(str)
+# train_adata_log.layers["counts"] = np.round(train_adata_log.X)
+# sc.pp.normalize_total(train_adata_log)
+# sc.pp.log1p(train_adata_log)
+# train_adata_log.obs.loc[:, "donor_status"] = train_adata_log.obs.product_dose.map(
+#     donor_info_.loc[:, "cluster_id"]
+# ).values
+# train_adata_log.obs.loc[:, "donor_status"] = "Cluster " + train_adata_log.obs.loc[
+#     :, "donor_status"
+# ].astype(str)
 
-# remove mt genes
-train_adata_log = train_adata_log[:, ~train_adata_log.var_names.str.startswith("MT-")]
-print(train_adata_log)
-
-# %%
-method = "t-test"
-# Set vehicle as own donor status to use as reference
-train_adata_log.obs.loc[
-    train_adata_log.obs.product_dose == "Vehicle_0", "donor_status"
-] = "Vehicle"
-sc.tl.rank_genes_groups(
-    train_adata_log,
-    "donor_status",
-    reference="Vehicle",
-    method=method,
-    n_genes=1000,
-    # rankby_abs=False,
-)
-sc.pl.rank_genes_groups_dotplot(
-    train_adata_log,
-    n_genes=5,
-    min_logfoldchange=1,
-    swap_axes=True,
-    save=f"{method_name}.clustered.svg",
-)
-# move file to correct place
-dataset_dir = os.path.join(output_dir, dataset_name)
-shutil.move(
-    f"figures/dotplot_{method_name}.clustered.svg",
-    os.path.join(dataset_dir, f"dotplot_{method_name}.clustered.svg"),
-)
-if not os.listdir(f"figures/"):
-    os.rmdir(f"figures/")
+# # remove mt genes
+# train_adata_log = train_adata_log[:, ~train_adata_log.var_names.str.startswith("MT-")]
+# print(train_adata_log)
 
 # %%
-# GSEA for DE genes
-sc.tl.filter_rank_genes_groups(
-    train_adata_log,
-    min_fold_change=1,
-    min_in_group_fraction=0.25,
-    max_out_group_fraction=0.5,
-)
-# Load gene sets
-gene_set_names = [
-    # "MSigDB_Oncogenic_Signatures",
-    "MSigDB_Hallmark_2020",
-    # "WikiPathway_2021_Human",
-    # "KEGG_2021_Human",
-    # "Reactome_2022",
-    # "GO_Biological_Process_2023",
-    # "GO_Cellular_Component_2023",
-    # "GO_Molecular_Function_2023",
-]
-gene_sets = [
-    gp.parser.download_library(gene_set_name, "human")
-    for gene_set_name in gene_set_names
-]
+# method = "t-test"
+# # Set vehicle as own donor status to use as reference
+# train_adata_log.obs.loc[
+#     train_adata_log.obs.product_dose == "Vehicle_0", "donor_status"
+# ] = "Vehicle"
+# sc.tl.rank_genes_groups(
+#     train_adata_log,
+#     "donor_status",
+#     reference="Vehicle",
+#     method=method,
+#     n_genes=1000,
+#     # rankby_abs=False,
+# )
+# sc.pl.rank_genes_groups_dotplot(
+#     train_adata_log,
+#     n_genes=5,
+#     min_logfoldchange=1,
+#     swap_axes=True,
+#     save=f"{method_name}.clustered.svg",
+# )
+# # move file to correct place
+# dataset_dir = os.path.join(output_dir, dataset_name)
+# shutil.move(
+#     f"figures/dotplot_{method_name}.clustered.svg",
+#     os.path.join(dataset_dir, f"dotplot_{method_name}.clustered.svg"),
+# )
+# if not os.listdir(f"figures/"):
+#     os.rmdir(f"figures/")
 
-# %%
-enr_result_dict = {}
-for i in range(1, n_clusters + 1):
-    cluster_name = f"Cluster {i}"
-    de_genes = train_adata_log.uns["rank_genes_groups_filtered"]["names"][
-        cluster_name
-    ].tolist()
-    de_genes = [gene for gene in de_genes if str(gene) != "nan"]
-    try:
-        enr_results, fig = perform_gsea(
-            de_genes, gene_sets=gene_sets, plot=True, use_server=False
-        )
-        enr_result_dict[i] = enr_results
-        print(i)
-    except ValueError as e:
-        print(e)
-        continue
-    fig = fig + p9.theme(
-        figure_size=(6 * INCH_TO_CM, 6 * INCH_TO_CM),
-    )
-    dataset_dir = os.path.join(output_dir, dataset_name)
-    # fig.draw()
-    # fig.save(os.path.join(dataset_dir, f"gsea_cluster_{i}.svg"))
+# # %%
+# # GSEA for DE genes
+# sc.tl.filter_rank_genes_groups(
+#     train_adata_log,
+#     min_fold_change=1,
+#     min_in_group_fraction=0.25,
+#     max_out_group_fraction=0.5,
+# )
+# # Load gene sets
+# gene_set_names = [
+#     # "MSigDB_Oncogenic_Signatures",
+#     "MSigDB_Hallmark_2020",
+#     # "WikiPathway_2021_Human",
+#     # "KEGG_2021_Human",
+#     # "Reactome_2022",
+#     # "GO_Biological_Process_2023",
+#     # "GO_Cellular_Component_2023",
+#     # "GO_Molecular_Function_2023",
+# ]
+# gene_sets = [
+#     gp.parser.download_library(gene_set_name, "human")
+#     for gene_set_name in gene_set_names
+# ]
 
-# %%
-enr_pval_df_records = []
-for cluster_idx in range(1, n_clusters + 1):
-    if cluster_idx not in enr_result_dict:
-        enr_pval_df_records.append({"cluster_idx": cluster_idx})
-    else:
-        enr_cluster_results = enr_result_dict[cluster_idx]
-        enr_pval_df_records.append(
-            {
-                "cluster_idx": cluster_idx,
-                **enr_cluster_results.pivot(
-                    index="Gene_set", columns="Term", values="Significance score"
-                )
-                .iloc[0]
-                .to_dict(),
-            }
-        )
-enr_pval_df = pd.DataFrame.from_records(enr_pval_df_records, index="cluster_idx")
-enr_pval_df.fillna(0, inplace=True)
+# # %%
+# enr_result_dict = {}
+# for i in range(1, n_clusters + 1):
+#     cluster_name = f"Cluster {i}"
+#     de_genes = train_adata_log.uns["rank_genes_groups_filtered"]["names"][
+#         cluster_name
+#     ].tolist()
+#     de_genes = [gene for gene in de_genes if str(gene) != "nan"]
+#     try:
+#         enr_results, fig = perform_gsea(
+#             de_genes, gene_sets=gene_sets, plot=True, use_server=False
+#         )
+#         enr_result_dict[i] = enr_results
+#         print(i)
+#     except ValueError as e:
+#         print(e)
+#         continue
+#     fig = fig + p9.theme(
+#         figure_size=(6 * INCH_TO_CM, 6 * INCH_TO_CM),
+#     )
+#     dataset_dir = os.path.join(output_dir, dataset_name)
+#     # fig.draw()
+#     # fig.save(os.path.join(dataset_dir, f"gsea_cluster_{i}.svg"))
 
-# %%
-# Plot GSEA heatmap
-sns.clustermap(
-    enr_pval_df.T,
-    col_cluster=False,
-    yticklabels=True,
-    xticklabels=True,
-    vmin=0,
-    vmax=2,
-    cmap="coolwarm",
-)
-save_figures(
-    f"gsea_heatmap",
-    dataset_name,
-)
+# # %%
+# enr_pval_df_records = []
+# for cluster_idx in range(1, n_clusters + 1):
+#     if cluster_idx not in enr_result_dict:
+#         enr_pval_df_records.append({"cluster_idx": cluster_idx})
+#     else:
+#         enr_cluster_results = enr_result_dict[cluster_idx]
+#         enr_pval_df_records.append(
+#             {
+#                 "cluster_idx": cluster_idx,
+#                 **enr_cluster_results.pivot(
+#                     index="Gene_set", columns="Term", values="Significance score"
+#                 )
+#                 .iloc[0]
+#                 .to_dict(),
+#             }
+#         )
+# enr_pval_df = pd.DataFrame.from_records(enr_pval_df_records, index="cluster_idx")
+# enr_pval_df.fillna(0, inplace=True)
+
+# # %%
+# # Plot GSEA heatmap
+# sns.clustermap(
+#     enr_pval_df.T,
+#     col_cluster=False,
+#     yticklabels=True,
+#     xticklabels=True,
+#     vmin=0,
+#     vmax=2,
+#     cmap="coolwarm",
+# )
+# save_figures(
+#     f"gsea_heatmap",
+#     dataset_name,
+# )
 
 # %%
 # MDE with low opacity vehicle cluster
@@ -1048,43 +1048,43 @@ save_figures(f"{method_name}.u_mdes_colored_by_cluster", dataset_name)
 
 
 # %%
-# admissibility check
-import scvi_v2
+# # admissibility check
+# import scvi_v2
 
-model_path = f"{dataset_name}.{method_name}"
-if not RUN_WITH_PARSER:
-    model_path = os.path.join("../results/sciplex_pipeline/models", model_path)
-model = scvi_v2.MrVI.load(model_path, adata=train_adata)
-# %%
-outlier_res = model.get_outlier_cell_sample_pairs(
-    flavor="ball",
-    subsample_size=5000,
-    quantile_threshold=0.03,
-)
-outlier_res
-# %%
-outlier_res.to_netcdf(
-    os.path.join(output_dir, f"{dataset_name}.{method_name}.outlier_res.nc")
-)
-# %%
-adata.obs.loc[
-    outlier_res.cell_name.values, "total_admissible"
-] = outlier_res.is_admissible.sum(axis=1).values
-plot_df = pd.DataFrame(adata.obsm[f"X_{method_name}_u_mde"], columns=["x", "y"])
-plot_df["total_admissible"] = adata.obs.total_admissible.values
+# model_path = f"{dataset_name}.{method_name}"
+# if not RUN_WITH_PARSER:
+#     model_path = os.path.join("../results/sciplex_pipeline/models", model_path)
+# model = scvi_v2.MrVI.load(model_path, adata=train_adata)
+# # %%
+# outlier_res = model.get_outlier_cell_sample_pairs(
+#     flavor="ball",
+#     subsample_size=5000,
+#     quantile_threshold=0.03,
+# )
+# outlier_res
+# # %%
+# outlier_res.to_netcdf(
+#     os.path.join(output_dir, f"{dataset_name}.{method_name}.outlier_res.nc")
+# )
+# # %%
+# adata.obs.loc[
+#     outlier_res.cell_name.values, "total_admissible"
+# ] = outlier_res.is_admissible.sum(axis=1).values
+# plot_df = pd.DataFrame(adata.obsm[f"X_{method_name}_u_mde"], columns=["x", "y"])
+# plot_df["total_admissible"] = adata.obs.total_admissible.values
 
-fig, ax = plt.subplots(figsize=(15 * INCH_TO_CM, 15 * INCH_TO_CM))
-sns.scatterplot(plot_df, x="x", y="y", hue="total_admissible", ax=ax, s=3)
-ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
-ax.set_xlabel("MDE1")
-ax.set_ylabel("MDE2")
-ax.set_title(method_name)
-save_figures(f"{method_name}.u_total_admissible", dataset_name)
+# fig, ax = plt.subplots(figsize=(15 * INCH_TO_CM, 15 * INCH_TO_CM))
+# sns.scatterplot(plot_df, x="x", y="y", hue="total_admissible", ax=ax, s=3)
+# ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
+# ax.set_xlabel("MDE1")
+# ax.set_ylabel("MDE2")
+# ax.set_title(method_name)
+# save_figures(f"{method_name}.u_total_admissible", dataset_name)
 
-# %%
-fig, ax = plt.subplots(figsize=(15 * INCH_TO_CM, 15 * INCH_TO_CM))
-sns.histplot(plot_df, x="total_admissible", ax=ax)
-save_figures(f"{method_name}.total_admissible_hist", dataset_name)
+# # %%
+# fig, ax = plt.subplots(figsize=(15 * INCH_TO_CM, 15 * INCH_TO_CM))
+# sns.histplot(plot_df, x="total_admissible", ax=ax)
+# save_figures(f"{method_name}.total_admissible_hist", dataset_name)
 
 # %%
 # Multivariate analysis DE
@@ -1277,6 +1277,88 @@ save_figures(
     "top_de_lfcs_clustermap",
     dataset_name,
 )
+
+# %%
+# cell-wise dist matrix analysis
+dists_sub_adata = model.adata[np.random.choice(model.adata.shape[0], 20000)]
+cell_dists = model.get_local_sample_distances(dists_sub_adata)
+
+# %%
+# PCA of upper triangular matrix of distance matrices
+from sklearn.decomposition import PCA
+
+cell_dists_array = cell_dists.cell.data
+triu_i, triu_j = np.triu_indices(cell_dists_array.shape[1], k=1)
+triu_cell_dists_array = cell_dists_array[:, triu_i, triu_j]
+
+# %%
+pca = PCA(n_components=20)
+pca.fit(triu_cell_dists_array)
+
+# %%
+# Plot variance explained
+plt.bar(range(1, 21), np.cumsum(pca.explained_variance_ratio_))
+# Show all x tick marks
+plt.xticks(range(1, 21))
+plt.xlabel("Number of Principal Components")
+plt.ylabel("Proportion of Variance Explained")
+save_figures("triu_dist_pca_variance_explained", dataset_name)
+
+# %%
+pca_xy = pd.DataFrame(pca.transform(triu_cell_dists_array)[:, :2], columns=["x", "y"])
+pca_xy.loc[:, "phase"] = model.adata.obs.loc[cell_dists.cell_name.values, "phase"].astype(str).values
+pca_xy
+
+# %%
+sns.scatterplot(pca_xy, x="x", y="y", hue="phase", legend=False, s=3)
+plt.xlabel("PC1")
+plt.ylabel("PC2")
+save_figures("triu_dist_pca_phase", dataset_name)
+
+# %%
+sns.scatterplot(pca_xy, x="x", y="y", s=3)
+plt.xlabel("PC1")
+plt.ylabel("PC2")
+save_figures("triu_dist_pca", dataset_name)
+
+# %%
+import scvi
+
+pca_all = pca.transform(triu_cell_dists_array)
+triu_mde = scvi.model.utils.mde(pca_all)
+triu_mde
+
+# %%
+# umap of pca comps
+from umap import UMAP
+
+umap = UMAP(n_components=2)
+umap.fit(pca_all)
+umap_xy = pd.DataFrame(umap.transform(pca_all), columns=["x", "y"])
+
+# %%
+sns.scatterplot(umap_xy, x="x", y="y")
+save_figures("triu_dist_umap", dataset_name)
+
+# %%
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+
+silhouette_scores = []
+for n_clusters in range(2, 11):
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+    cluster_labels = kmeans.fit_predict(pca_all)
+    silhouette_avg = silhouette_score(pca_all, cluster_labels)
+    silhouette_scores.append(silhouette_avg)
+
+# %%
+# Plot silhouette scores
+plt.figure(figsize=(10, 6))
+plt.plot(range(2, 11), silhouette_scores, marker='o')
+plt.xlabel('Number of Clusters')
+plt.ylabel('Silhouette Score')
+plt.title('Silhouette Scores for Different Cluster Numbers')
+save_figures("triu_dist_silhouette_scores", dataset_name)
 
 # %%
 # # %%
