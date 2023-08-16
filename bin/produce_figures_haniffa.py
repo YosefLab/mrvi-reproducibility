@@ -490,6 +490,124 @@ joined = n_donors_with_atleast.join(n_pred_donors)
 )
 
 # %%
+# Admissibility vs Counterfactual Reconstruction
+import pynndescent
+import jax.numpy as jnp
+from scvi import REGISTRY_KEYS
+from scvi_v2._constants import MRVI_REGISTRY_KEYS
+from scvi.distributions import JaxNegativeBinomialMeanDisp as NegativeBinomial
+    
+# module level function
+def compute_px_from_x(self, x, sample_index, batch_index, cf_sample=None, continuous_covs=None, mc_samples=10):
+    """Compute normalized gene expression from observations"""
+    log_library = 7.0 * jnp.ones_like(sample_index)  # placeholder, will be replaced by observed library sizes.
+    inference_outputs = self.inference(x, sample_index, mc_samples=mc_samples, cf_sample=cf_sample, use_mean=False)
+    generative_inputs = {
+        "z": inference_outputs["z"],
+        "library": log_library,
+        "batch_index": batch_index,
+        "continuous_covs": continuous_covs,
+    }
+    generative_outputs = self.generative(**generative_inputs)
+    return generative_outputs["px"], inference_outputs["u"], log_library
+
+
+def compute_sample_cf_reconstruction_scores(self, sample_idx, adata=None, indices=None, batch_size=256, inner_batch_size=8, mc_samples=10, n_top_neighbors=5):
+    self._check_if_trained(warn=False)
+    adata = self._validate_anndata(adata)
+    sample_name = self.sample_order[sample_idx]
+    sample_adata = adata[adata.obs[self.sample_key] == sample_name]
+    if sample_adata.shape[0] == 0:
+        raise ValueError(f"Sample {sample_name} missing from AnnData.")
+    sample_u = self.get_latent_representation(sample_adata, give_z=False)
+    sample_index = pynndescent.NNDescent(sample_u)
+    
+    scdl = self._make_data_loader(adata=adata, batch_size=batch_size, indices=indices, iter_ndarray=True)
+
+    def _get_all_inputs(
+        inputs,
+    ):
+        x = jnp.array(inputs[REGISTRY_KEYS.X_KEY])
+        sample_index = jnp.array(inputs[MRVI_REGISTRY_KEYS.SAMPLE_KEY])
+        batch_index = jnp.array(inputs[REGISTRY_KEYS.BATCH_KEY])
+        continuous_covs = inputs.get(REGISTRY_KEYS.CONT_COVS_KEY, None)
+        if continuous_covs is not None:
+            continuous_covs = jnp.array(continuous_covs)
+        return {
+            "x": x,
+            "sample_index": sample_index,
+            "batch_index": batch_index,
+            "continuous_covs": continuous_covs,
+        }
+    
+    scores = []
+    top_idxs = []
+    for array_dict in scdl:
+        vars_in = {"params": self.module.params, **self.module.state}
+        rngs = self.module.rngs
+        
+        inputs = _get_all_inputs(array_dict)
+        px, u, log_library_placeholder = self.module.apply(
+                vars_in,
+                rngs=rngs,
+                method=compute_px_from_x,
+                x=inputs["x"],
+                sample_index=inputs["sample_index"],
+                batch_index=inputs["batch_index"],
+                cf_sample=np.ones(inputs["x"].shape[0]) * sample_idx,
+                continuous_covs=inputs["continuous_covs"],
+                mc_samples=mc_samples,
+            )
+        px_m, px_d = px.mean, px.inverse_dispersion
+        if px_m.ndim == 2:
+            px_m, px_d = np.expand_dims(px_m, axis=0), np.expand_dims(px_d, axis=0)
+        px_m, px_d = np.expand_dims(px_m, axis=2), np.expand_dims(px_d, axis=2) # for inner_batch_size dim
+            
+        mc_log_probs = []
+        batch_top_idxs = []
+        for mc_sample_i in range(u.shape[0]):
+            nearest_sample_idxs = sample_index.query(u[mc_sample_i], k=n_top_neighbors)[0]
+            top_neighbor_counts = sample_adata.X[nearest_sample_idxs.reshape(-1), :].toarray().reshape((nearest_sample_idxs.shape[0],nearest_sample_idxs.shape[1], -1))
+            new_lib_size = top_neighbor_counts.sum(axis=-1) # batch_size x n_top_neighbors
+            corrected_px_m = px_m[mc_sample_i] / np.exp(log_library_placeholder[:, :, None]) * new_lib_size[:, :, None]
+            corrected_px = NegativeBinomial(mean=corrected_px_m, inverse_dispersion=px_d) # mc_samples x batch_size x inner_batch_size x genes
+            log_probs = corrected_px.log_prob(top_neighbor_counts).sum(-1).mean(-1) # 1 x batch_size
+            mc_log_probs.append(log_probs)
+            batch_top_idxs.append(nearest_sample_idxs)
+        full_batch_log_probs = np.concatenate(mc_log_probs, axis=0).mean(0)
+        top_idxs.append(np.concatenate(batch_top_idxs, axis=1))
+        
+        scores.append(full_batch_log_probs)
+    
+    all_scores = np.hstack(scores) 
+    all_top_idxs = np.vstack(top_idxs)
+    return pd.Series(all_scores, index=adata[indices].obs_names.to_numpy(), name=f"{sample_name}_score"), all_top_idxs
+
+# %%
+sample_name = "newcastle74"
+sample_idx = model.sample_order.tolist().index(sample_name)
+sample_scores, top_idxs = compute_sample_cf_reconstruction_scores(model, sample_idx)
+# %%
+sample_ball_res = ood_res.sel(cell_name=adata.obs_names).sel(sample=model.sample_order[sample_idx])
+sample_adm_log_probs = sample_ball_res.log_probs.to_series()
+sample_adm_bool = sample_ball_res.is_admissible.to_series()
+is_sample = pd.Series(adata.obs["sample_id"] == model.sample_order[sample_idx], name="is_sample", dtype=bool)
+sample_log_lib_size = pd.Series(np.log(adata.X.toarray().sum(axis=1)), index=adata.obs_names, name="log_lib_size")
+cell_category = pd.Series(["Not Admissible"] * adata.shape[0], dtype=str, name="cell_category", index=adata.obs_names)
+cell_category[sample_adm_bool.to_numpy()] = "Admissible"
+cell_category[is_sample.to_numpy()] = "In Sample"
+cell_category = cell_category.astype("category")
+
+rec_score_plot_df = pd.concat((sample_adm_log_probs, sample_adm_bool, is_sample, cell_category, sample_scores,  sample_log_lib_size), axis=1)
+# %%
+sns.scatterplot(rec_score_plot_df, x="log_probs", y=f"{sample_name}_score", hue="cell_category")
+plt.xlabel("Admissibility Score")
+plt.ylabel("Reconstruction Log Prob of In-Sample NN")
+handles, labels = plt.gca().get_legend_handles_labels()
+order = [1, 2, 0]
+plt.legend([handles[idx] for idx in order],[labels[idx] for idx in order]) 
+fig.save(os.path.join(FIGURE_DIR, f"haniffa_{sample_name}_admissibility_vs_reconstruction_w_category.svg"))
+
 # %%
 # adata_embs.obs.loc[:, "n_valid_donors"] = res["is_admissible"].values.sum(axis=1)
 # for obsm_key in adata_embs.obsm.keys():
