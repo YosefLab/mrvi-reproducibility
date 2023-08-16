@@ -1101,9 +1101,7 @@ model = scvi_v2.MrVI.load(model_path, adata=train_adata)
 train_adata.obs["donor_cluster"] = (
     train_adata.obs["product_dose"].map(donor_info_["cluster_id"]).values.astype(int)
 )
-train_adata.obs.loc[
-    train_adata.obs.product_dose == "Vehicle_0", "donor_cluster"
-] = -1
+train_adata.obs.loc[train_adata.obs.product_dose == "Vehicle_0", "donor_cluster"] = -1
 for cluster_i in range(1, n_clusters + 1):
     train_adata.obs[f"donor_cluster_{cluster_i}"] = (
         train_adata.obs["donor_cluster"] == cluster_i
@@ -1117,7 +1115,8 @@ sub_train_adata.obs["_indices"] = np.arange(sub_train_adata.shape[0])
 cluster_wise_multivar_res = {}
 for cluster_i in range(1, n_clusters + 1):
     cluster_sub_train_adata = sub_train_adata[
-        (sub_train_adata.obs["donor_cluster"] == cluster_i) | (sub_train_adata.obs["donor_cluster"] == -1)
+        (sub_train_adata.obs["donor_cluster"] == cluster_i)
+        | (sub_train_adata.obs["donor_cluster"] == -1)
     ].copy()
     # cluster_sub_train_adata = cluster_sub_train_adata[np.random.choice(cluster_sub_train_adata.shape[0], 50)]
     cluster_multivar_res = model.perform_multivariate_analysis(
@@ -1143,10 +1142,15 @@ enr_result_dict = {}
 full_dfs = {}
 de_dfs = {}
 for cluster_i in cluster_wise_multivar_res:
-# cluster_i = 1
+    # cluster_i = 1
     cluster_multivar_res = cluster_wise_multivar_res[cluster_i]
-    betas_ = cluster_multivar_res["lfc"].transpose("cell_name", "covariate", "gene").loc[{"covariate": f"donor_cluster_{cluster_i}"}].values
-    betas_ = betas_ / np.log(2) # change to log 2
+    betas_ = (
+        cluster_multivar_res["lfc"]
+        .transpose("cell_name", "covariate", "gene")
+        .loc[{"covariate": f"donor_cluster_{cluster_i}"}]
+        .values
+    )
+    betas_ = betas_ / np.log(2)  # change to log 2
     # plt.hist(betas_.mean(0), bins=100)
     # plt.xlabel("LFC")
     # plt.show()
@@ -1174,7 +1178,7 @@ for cluster_i in cluster_wise_multivar_res:
     obs_de.LFC.hist(bins=100)
     de_dfs[cluster_i] = obs_de
 
-    de_genes = obs_de.gene.values 
+    de_genes = obs_de.gene.values
     de_genes = [gene for gene in de_genes if str(gene) != "nan"]
     try:
         enr_results, fig = perform_gsea(
@@ -1245,7 +1249,7 @@ for cluster_i, de_df in de_dfs.items():
         data=abr_de_df,
         ax=ax,
     )
-    ax.axhline(y=0,color="black" )
+    ax.axhline(y=0, color="black")
     # rotate x labels
     ax.set_title(f"Cluster {cluster_i} Top LFC DE Genes")
     ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
@@ -1258,21 +1262,32 @@ for cluster_i, de_df in de_dfs.items():
 # %%
 # matrixplot of top de genes
 from functools import reduce
+
 top_de_genes = reduce(np.union1d, top_de_genes_per_cluster.values())
 
 # get lfcs for each cluster for top de genes
 top_de_lfcs_cols = []
 for cluster_i, full_df in full_dfs.items():
     print(cluster_i)
-    top_des_df = full_df[full_df["gene"].isin(top_de_genes)][["gene", "LFC"]].set_index("gene")
+    top_des_df = full_df[full_df["gene"].isin(top_de_genes)][["gene", "LFC"]].set_index(
+        "gene"
+    )
     top_de_lfcs_cols.append(top_des_df.loc[top_de_genes]["LFC"].values.reshape(-1, 1))
 
-top_de_lfcs_df = pd.DataFrame(np.hstack(top_de_lfcs_cols), index=top_de_genes, columns=full_dfs.keys())
+top_de_lfcs_df = pd.DataFrame(
+    np.hstack(top_de_lfcs_cols), index=top_de_genes, columns=full_dfs.keys()
+)
 top_de_lfcs_df
 
 # %%
-sns.clustermap(top_de_lfcs_df, col_cluster=False, yticklabels=True, xticklabels=True,
-               center=0, cmap="seismic")
+sns.clustermap(
+    top_de_lfcs_df,
+    col_cluster=False,
+    yticklabels=True,
+    xticklabels=True,
+    center=0,
+    cmap="seismic",
+)
 save_figures(
     "top_de_lfcs_clustermap",
     dataset_name,
@@ -1306,7 +1321,9 @@ save_figures("triu_dist_pca_variance_explained", dataset_name)
 
 # %%
 pca_xy = pd.DataFrame(pca.transform(triu_cell_dists_array)[:, :2], columns=["x", "y"])
-pca_xy.loc[:, "phase"] = model.adata.obs.loc[cell_dists.cell_name.values, "phase"].astype(str).values
+pca_xy.loc[:, "phase"] = (
+    model.adata.obs.loc[cell_dists.cell_name.values, "phase"].astype(str).values
+)
 pca_xy
 
 # %%
@@ -1322,16 +1339,10 @@ plt.ylabel("PC2")
 save_figures("triu_dist_pca", dataset_name)
 
 # %%
-import scvi
-
-pca_all = pca.transform(triu_cell_dists_array)
-triu_mde = scvi.model.utils.mde(pca_all)
-triu_mde
-
-# %%
 # umap of pca comps
 from umap import UMAP
 
+pca_all = pca.transform(triu_cell_dists_array)
 umap = UMAP(n_components=2)
 umap.fit(pca_all)
 umap_xy = pd.DataFrame(umap.transform(pca_all), columns=["x", "y"])
@@ -1354,10 +1365,10 @@ for n_clusters in range(2, 11):
 # %%
 # Plot silhouette scores
 plt.figure(figsize=(10, 6))
-plt.plot(range(2, 11), silhouette_scores, marker='o')
-plt.xlabel('Number of Clusters')
-plt.ylabel('Silhouette Score')
-plt.title('Silhouette Scores for Different Cluster Numbers')
+plt.plot(range(2, 11), silhouette_scores, marker="o")
+plt.xlabel("Number of Clusters")
+plt.ylabel("Silhouette Score")
+plt.title("Silhouette Scores for Different Cluster Numbers")
 save_figures("triu_dist_silhouette_scores", dataset_name)
 
 # %%

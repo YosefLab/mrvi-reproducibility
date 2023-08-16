@@ -743,120 +743,120 @@ if not RUN_WITH_PARSER:
         "../results/sciplex_pipeline/data", train_adata_path
     )
 train_adata = sc.read(train_adata_path)
-train_adata_log = train_adata[train_adata.obs.product_dose.isin(sig_samples)].copy()
+# train_adata_log = train_adata[train_adata.obs.product_dose.isin(sig_samples)].copy()
 
 # %%
 adata_path = f"{dataset_name}.{method_name}.final.h5ad"
 if not RUN_WITH_PARSER:
     adata_path = os.path.join("../results/sciplex_pipeline/data", adata_path)
 adata = sc.read(adata_path)
-train_adata_log.layers["counts"] = np.round(train_adata_log.X)
-sc.pp.normalize_total(train_adata_log)
-sc.pp.log1p(train_adata_log)
-train_adata_log.obs.loc[:, "donor_status"] = train_adata_log.obs.product_dose.map(
-    donor_info_.loc[:, "cluster_id"]
-).values
-train_adata_log.obs.loc[:, "donor_status"] = "Cluster " + train_adata_log.obs.loc[
-    :, "donor_status"
-].astype(str)
+# train_adata_log.layers["counts"] = np.round(train_adata_log.X)
+# sc.pp.normalize_total(train_adata_log)
+# sc.pp.log1p(train_adata_log)
+# train_adata_log.obs.loc[:, "donor_status"] = train_adata_log.obs.product_dose.map(
+#     donor_info_.loc[:, "cluster_id"]
+# ).values
+# train_adata_log.obs.loc[:, "donor_status"] = "Cluster " + train_adata_log.obs.loc[
+#     :, "donor_status"
+# ].astype(str)
 
-# remove mt genes
-train_adata_log = train_adata_log[:, ~train_adata_log.var_names.str.startswith("MT-")]
-print(train_adata_log)
+# # remove mt genes
+# train_adata_log = train_adata_log[:, ~train_adata_log.var_names.str.startswith("MT-")]
+# print(train_adata_log)
 
-method = "t-test"
-# Set vehicle as own donor status to use as reference
-train_adata_log.obs.loc[train_adata_log.obs.product_dose == "Vehicle_0", "donor_status"] = "Vehicle"
-sc.tl.rank_genes_groups(
-    train_adata_log,
-    "donor_status",
-    reference="Vehicle",
-    method=method,
-    n_genes=1000,
-    # rankby_abs=False,
-)
-sc.pl.rank_genes_groups_dotplot(
-    train_adata_log,
-    n_genes=5,
-    min_logfoldchange=1,
-    swap_axes=True,
-    save=f"{method_name}.clustered.svg",
-)
-# move file to correct place
-dataset_dir = os.path.join(output_dir, dataset_name)
-shutil.move(
-    f"figures/dotplot_{method_name}.clustered.svg",
-    os.path.join(dataset_dir, f"dotplot_{method_name}.clustered.svg"),
-)
-if not os.listdir(f"figures/"):
-    os.rmdir(f"figures/")
+# method = "t-test"
+# # Set vehicle as own donor status to use as reference
+# train_adata_log.obs.loc[train_adata_log.obs.product_dose == "Vehicle_0", "donor_status"] = "Vehicle"
+# sc.tl.rank_genes_groups(
+#     train_adata_log,
+#     "donor_status",
+#     reference="Vehicle",
+#     method=method,
+#     n_genes=1000,
+#     # rankby_abs=False,
+# )
+# sc.pl.rank_genes_groups_dotplot(
+#     train_adata_log,
+#     n_genes=5,
+#     min_logfoldchange=1,
+#     swap_axes=True,
+#     save=f"{method_name}.clustered.svg",
+# )
+# # move file to correct place
+# dataset_dir = os.path.join(output_dir, dataset_name)
+# shutil.move(
+#     f"figures/dotplot_{method_name}.clustered.svg",
+#     os.path.join(dataset_dir, f"dotplot_{method_name}.clustered.svg"),
+# )
+# if not os.listdir(f"figures/"):
+#     os.rmdir(f"figures/")
 
-# %%
-# GSEA for DE genes
-sc.tl.filter_rank_genes_groups(
-    train_adata_log,
-    min_fold_change=1,
-    min_in_group_fraction=0.25,
-    max_out_group_fraction=0.5,
-)
-# Load gene sets
-gene_set_names = [
-    # "MSigDB_Oncogenic_Signatures",
-    "MSigDB_Hallmark_2020",
-    # "WikiPathway_2021_Human",
-    # "KEGG_2021_Human",
-    # "Reactome_2022",
-    # "GO_Biological_Process_2023",
-    # "GO_Cellular_Component_2023",
-    # "GO_Molecular_Function_2023",
-]
-gene_sets = [
-    gp.parser.download_library(gene_set_name, "human")
-    for gene_set_name in gene_set_names
-]
+# # %%
+# # GSEA for DE genes
+# sc.tl.filter_rank_genes_groups(
+#     train_adata_log,
+#     min_fold_change=1,
+#     min_in_group_fraction=0.25,
+#     max_out_group_fraction=0.5,
+# )
+# # Load gene sets
+# gene_set_names = [
+#     # "MSigDB_Oncogenic_Signatures",
+#     "MSigDB_Hallmark_2020",
+#     # "WikiPathway_2021_Human",
+#     # "KEGG_2021_Human",
+#     # "Reactome_2022",
+#     # "GO_Biological_Process_2023",
+#     # "GO_Cellular_Component_2023",
+#     # "GO_Molecular_Function_2023",
+# ]
+# gene_sets = [
+#     gp.parser.download_library(gene_set_name, "human")
+#     for gene_set_name in gene_set_names
+# ]
 
-# %%
-enr_result_dict = {}
-for i in range(1, n_clusters + 1):
-    cluster_name = f"Cluster {i}"
-    de_genes = train_adata_log.uns["rank_genes_groups_filtered"]["names"][
-        cluster_name 
-    ].tolist()
-    de_genes = [gene for gene in de_genes if str(gene) != "nan"]
-    try:
-        enr_results, fig = perform_gsea(de_genes, gene_sets=gene_sets, plot=True, use_server=False)
-        enr_result_dict[i] = enr_results
-        print(i)
-    except ValueError as e:
-        print(e)
-        continue
-    fig = fig + p9.theme(
-        figure_size=(6 * INCH_TO_CM, 6 * INCH_TO_CM),
-    )
-    dataset_dir = os.path.join(output_dir, dataset_name)
-    # fig.draw()
-    # fig.save(os.path.join(dataset_dir, f"gsea_cluster_{i}.svg"))
+# # %%
+# enr_result_dict = {}
+# for i in range(1, n_clusters + 1):
+#     cluster_name = f"Cluster {i}"
+#     de_genes = train_adata_log.uns["rank_genes_groups_filtered"]["names"][
+#         cluster_name 
+#     ].tolist()
+#     de_genes = [gene for gene in de_genes if str(gene) != "nan"]
+#     try:
+#         enr_results, fig = perform_gsea(de_genes, gene_sets=gene_sets, plot=True, use_server=False)
+#         enr_result_dict[i] = enr_results
+#         print(i)
+#     except ValueError as e:
+#         print(e)
+#         continue
+#     fig = fig + p9.theme(
+#         figure_size=(6 * INCH_TO_CM, 6 * INCH_TO_CM),
+#     )
+#     dataset_dir = os.path.join(output_dir, dataset_name)
+#     # fig.draw()
+#     # fig.save(os.path.join(dataset_dir, f"gsea_cluster_{i}.svg"))
 
-# %%
-enr_pval_df_records = []
-for cluster_idx in range(1, n_clusters + 1):
-    if cluster_idx not in enr_result_dict:
-        enr_pval_df_records.append({"cluster_idx": cluster_idx})
-    else:
-        enr_cluster_results = enr_result_dict[cluster_idx]
-        enr_pval_df_records.append(
-            {"cluster_idx": cluster_idx, **enr_cluster_results.pivot(index="Gene_set", columns="Term", values="Significance score").iloc[0].to_dict()}
-        )
-enr_pval_df = pd.DataFrame.from_records(enr_pval_df_records, index="cluster_idx")
-enr_pval_df.fillna(0, inplace=True)
+# # %%
+# enr_pval_df_records = []
+# for cluster_idx in range(1, n_clusters + 1):
+#     if cluster_idx not in enr_result_dict:
+#         enr_pval_df_records.append({"cluster_idx": cluster_idx})
+#     else:
+#         enr_cluster_results = enr_result_dict[cluster_idx]
+#         enr_pval_df_records.append(
+#             {"cluster_idx": cluster_idx, **enr_cluster_results.pivot(index="Gene_set", columns="Term", values="Significance score").iloc[0].to_dict()}
+#         )
+# enr_pval_df = pd.DataFrame.from_records(enr_pval_df_records, index="cluster_idx")
+# enr_pval_df.fillna(0, inplace=True)
 
-# %%
-# Plot GSEA heatmap
-sns.clustermap(enr_pval_df.T, col_cluster=False, yticklabels=True, xticklabels=True, vmin=0, vmax=2, cmap="coolwarm")
-save_figures(
-    f"gsea_heatmap",
-    dataset_name,
-)
+# # %%
+# # Plot GSEA heatmap
+# sns.clustermap(enr_pval_df.T, col_cluster=False, yticklabels=True, xticklabels=True, vmin=0, vmax=2, cmap="coolwarm")
+# save_figures(
+#     f"gsea_heatmap",
+#     dataset_name,
+# )
 
 # %%
 # MDE with low opacity vehicle cluster
@@ -1048,9 +1048,21 @@ save_figures(f"{method_name}.total_admissible_hist", dataset_name)
 # %%
 # Multivariate analysis DE
 # (For this we create a column for each cluster since we require float values)
+import scvi_v2
+
+model_path = f"{dataset_name}.{method_name}"
+if not RUN_WITH_PARSER:
+    model_path = os.path.join("../results/sciplex_pipeline/models", model_path)
+# Register adata to get scvi sample assignment
+model = scvi_v2.MrVI.load(model_path, adata=train_adata)
+
+# %%
 train_adata.obs["donor_cluster"] = (
     train_adata.obs["product_dose"].map(donor_info_["cluster_id"]).values.astype(int)
 )
+train_adata.obs.loc[
+    train_adata.obs.product_dose == "Vehicle_0", "donor_cluster"
+] = -1
 for cluster_i in range(1, n_clusters + 1):
     train_adata.obs[f"donor_cluster_{cluster_i}"] = (
         train_adata.obs["donor_cluster"] == cluster_i
@@ -1059,49 +1071,245 @@ obs_df = train_adata.obs.copy()
 obs_df = obs_df.loc[~obs_df._scvi_sample.duplicated("first")]
 model.donor_info = obs_df.set_index("_scvi_sample").sort_index()
 sub_train_adata = train_adata[train_adata.obs["donor_cluster"] != "nan"]
-# sub_train_adata = sub_train_adata[np.random.choice(sub_train_adata.shape[0], 1000, replace=False)].copy()
 sub_train_adata.obs["_indices"] = np.arange(sub_train_adata.shape[0])
-multivar_res = model.perform_multivariate_analysis(
-    sub_train_adata,
-    donor_keys=[f"donor_cluster_{cluster_i}" for cluster_i in range(1, n_clusters + 1)],
-    store_lfc=True,
-)
-multivar_res
-# %%
-gene_properties = (sub_train_adata.X != 0).mean(axis=0).A1
-gene_properties = pd.DataFrame(
-    gene_properties, index=sub_train_adata.var_names, columns=["sparsity"]
-)
-top_genes = (
-    multivar_res.lfc.mean("cell_name")
-    .to_dataframe()
-    .reset_index()
-    .assign(
-        abs_lfc=lambda x: np.abs(x.lfc),
+
+cluster_wise_multivar_res = {}
+for cluster_i in range(1, n_clusters + 1):
+    cluster_sub_train_adata = sub_train_adata[
+        (sub_train_adata.obs["donor_cluster"] == cluster_i) | (sub_train_adata.obs["donor_cluster"] == -1)
+    ].copy()
+    # cluster_sub_train_adata = cluster_sub_train_adata[np.random.choice(cluster_sub_train_adata.shape[0], 50)]
+    cluster_multivar_res = model.perform_multivariate_analysis(
+        cluster_sub_train_adata,
+        donor_keys=[f"donor_cluster_{cluster_i}"],
+        batch_size=32,
+        store_lfc=True,
     )
-    .merge(gene_properties, left_on="gene", right_index=True, how="left")
-    .sort_values("abs_lfc", ascending=False)
-    .query("abs_lfc > 0.1")
-)
-top_genes
+    cluster_wise_multivar_res[cluster_i] = cluster_multivar_res
+
 # %%
-fig, ax = plt.subplots(figsize=(25 * INCH_TO_CM, 15 * INCH_TO_CM))
-sns.scatterplot(top_genes, x="lfc", y="sparsity", hue="covariate", ax=ax)
-plt.ylim(0, 0.9)
-plt.axvline(0, color="grey", linestyle="--")
+# GSEA for DE genes
+# Load gene sets
+gene_set_names = [
+    "MSigDB_Hallmark_2020",
+]
+gene_sets = [
+    gp.parser.download_library(gene_set_name, "human")
+    for gene_set_name in gene_set_names
+]
 
+enr_result_dict = {}
+full_dfs = {}
+de_dfs = {}
+for cluster_i in cluster_wise_multivar_res:
+# cluster_i = 1
+    cluster_multivar_res = cluster_wise_multivar_res[cluster_i]
+    betas_ = cluster_multivar_res["lfc"].transpose("cell_name", "covariate", "gene").loc[{"covariate": f"donor_cluster_{cluster_i}"}].values
+    betas_ = betas_ / np.log(2) # change to log 2
+    # plt.hist(betas_.mean(0), bins=100)
+    # plt.xlabel("LFC")
+    # plt.show()
 
-# annotate each point with gene name
-def label_point(x, y, val, ax):
-    a = pd.concat({"x": x, "y": y, "val": val}, axis=1)
-    for i, point in a.iterrows():
-        ax.text(
-            point["x"] + 0.02, point["y"], str(point["val"]), fontsize=7, rotation=45
+    lfc_df = pd.DataFrame(
+        {
+            "LFC": betas_.mean(0),
+            "LFC_std": betas_.std(0),
+            "gene": sub_train_adata.var_names,
+            "gene_index": np.arange(sub_train_adata.shape[1]),
+        }
+    ).assign(absLFC=lambda x: np.abs(x.LFC))
+    full_dfs[cluster_i] = lfc_df
+
+    # thresh = np.quantile(lfc_df.absLFC, 0.95)
+    # lfc_df.absLFC.hist(bins=100)
+    # plt.axvline(thresh, color="red")
+    # plt.xlabel("AbsLFC")
+    # plt.show()
+    # print((lfc_df.absLFC > thresh).sum())
+
+    cond = lfc_df.absLFC > 1
+    betas_de = betas_[:, cond]
+    obs_de = lfc_df.loc[cond, :].reset_index(drop=True)
+    obs_de.LFC.hist(bins=100)
+    de_dfs[cluster_i] = obs_de
+
+    de_genes = obs_de.gene.values 
+    de_genes = [gene for gene in de_genes if str(gene) != "nan"]
+    try:
+        enr_results, fig = perform_gsea(
+            de_genes, gene_sets=gene_sets, plot=True, use_server=False
         )
+        enr_result_dict[cluster_i] = enr_results
+    except ValueError as e:
+        print(e)
+        continue
+    # fig = fig + p9.theme(
+    #     figure_size=(6 * INCH_TO_CM, 6 * INCH_TO_CM),
+    # )
+    # dataset_dir = os.path.join(output_dir, dataset_name)
+    # fig.draw()
+    # fig.save(os.path.join(dataset_dir, f"gsea_cluster_{i}.svg"))
 
+# %%
+enr_pval_df_records = []
+for cluster_idx in range(1, n_clusters + 1):
+    if cluster_idx not in enr_result_dict:
+        enr_pval_df_records.append({"cluster_idx": cluster_idx})
+    else:
+        enr_cluster_results = enr_result_dict[cluster_idx]
+        enr_pval_df_records.append(
+            {
+                "cluster_idx": cluster_idx,
+                **enr_cluster_results.pivot(
+                    index="Gene_set", columns="Term", values="Significance score"
+                )
+                .iloc[0]
+                .to_dict(),
+            }
+        )
+enr_pval_df = pd.DataFrame.from_records(enr_pval_df_records, index="cluster_idx")
+enr_pval_df.fillna(0, inplace=True)
 
-genes_to_label = top_genes.query("sparsity > 0.3")
-label_point(genes_to_label.lfc, genes_to_label.sparsity, genes_to_label.gene, ax)
+# %%
+# Plot GSEA heatmap
+sns.clustermap(
+    enr_pval_df.T,
+    col_cluster=False,
+    yticklabels=True,
+    xticklabels=True,
+    vmin=0,
+    vmax=2,
+    cmap="Reds",
+)
+save_figures(
+    f"multivar_gsea_heatmap",
+    dataset_name,
+)
 
-plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
-save_figures(f"{method_name}.top_genes", dataset_name)
+# %%
+# Cluster wise barplots
+top_de_genes_per_cluster = {}
+for cluster_i, de_df in de_dfs.items():
+    if de_df.shape[0] == 0:
+        continue
+    de_df.sort_values("absLFC", ascending=False, inplace=True)
+    abr_de_df = de_df[:20]
+    top_de_genes_per_cluster[cluster_i] = abr_de_df[:50].gene.values
+    abr_de_df.sort_values("LFC", ascending=False, inplace=True)
+    fig, ax = plt.subplots(figsize=(15 * INCH_TO_CM, 15 * INCH_TO_CM))
+    sns.barplot(
+        x="gene",
+        y="LFC",
+        color="blue",
+        data=abr_de_df,
+        ax=ax,
+    )
+    ax.axhline(y=0,color="black" )
+    # rotate x labels
+    ax.set_title(f"Cluster {cluster_i} Top LFC DE Genes")
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
+    ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
+    save_figures(
+        f"cluster_{cluster_i}_top_lfc_de_genes",
+        dataset_name,
+    )
+
+# %%
+# matrixplot of top de genes
+from functools import reduce
+top_de_genes = reduce(np.union1d, top_de_genes_per_cluster.values())
+
+# get lfcs for each cluster for top de genes
+top_de_lfcs_cols = []
+for cluster_i, full_df in full_dfs.items():
+    print(cluster_i)
+    top_des_df = full_df[full_df["gene"].isin(top_de_genes)][["gene", "LFC"]].set_index("gene")
+    top_de_lfcs_cols.append(top_des_df.loc[top_de_genes]["LFC"].values.reshape(-1, 1))
+
+top_de_lfcs_df = pd.DataFrame(np.hstack(top_de_lfcs_cols), index=top_de_genes, columns=full_dfs.keys())
+top_de_lfcs_df
+
+# %%
+sns.clustermap(top_de_lfcs_df, col_cluster=False, yticklabels=True, xticklabels=True,
+               center=0, cmap="seismic")
+save_figures(
+    "top_de_lfcs_clustermap",
+    dataset_name,
+)
+
+# %%
+# cell-wise dist matrix analysis
+dists_sub_adata = model.adata[np.random.choice(model.adata.shape[0], 20000)]
+cell_dists = model.get_local_sample_distances(dists_sub_adata)
+
+# %%
+# PCA of upper triangular matrix of distance matrices
+from sklearn.decomposition import PCA
+
+cell_dists_array = cell_dists.cell.data
+triu_i, triu_j = np.triu_indices(cell_dists_array.shape[1], k=1)
+triu_cell_dists_array = cell_dists_array[:, triu_i, triu_j]
+
+# %%
+pca = PCA(n_components=20)
+pca.fit(triu_cell_dists_array)
+
+# %%
+# Plot variance explained
+plt.bar(range(1, 21), np.cumsum(pca.explained_variance_ratio_))
+# Show all x tick marks
+plt.xticks(range(1, 21))
+plt.xlabel("Number of Principal Components")
+plt.ylabel("Proportion of Variance Explained")
+save_figures("triu_dist_pca_variance_explained", dataset_name)
+
+# %%
+pca_xy = pd.DataFrame(pca.transform(triu_cell_dists_array)[:, :2], columns=["x", "y"])
+pca_xy.loc[:, "phase"] = model.adata.obs.loc[cell_dists.cell_name.values, "phase"].astype(str).values
+pca_xy
+
+# %%
+sns.scatterplot(pca_xy, x="x", y="y", hue="phase", legend=False, s=3)
+plt.xlabel("PC1")
+plt.ylabel("PC2")
+save_figures("triu_dist_pca_phase", dataset_name)
+
+# %%
+sns.scatterplot(pca_xy, x="x", y="y", s=3)
+plt.xlabel("PC1")
+plt.ylabel("PC2")
+save_figures("triu_dist_pca", dataset_name)
+
+# %%
+# umap of pca comps
+from umap import UMAP
+
+pca_all = pca.transform(triu_cell_dists_array)
+umap = UMAP(n_components=2)
+umap.fit(pca_all)
+umap_xy = pd.DataFrame(umap.transform(pca_all), columns=["x", "y"])
+
+# %%
+sns.scatterplot(umap_xy, x="x", y="y")
+save_figures("triu_dist_umap", dataset_name)
+
+# %%
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+
+silhouette_scores = []
+for n_clusters in range(2, 11):
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+    cluster_labels = kmeans.fit_predict(pca_all)
+    silhouette_avg = silhouette_score(pca_all, cluster_labels)
+    silhouette_scores.append(silhouette_avg)
+
+# %%
+# Plot silhouette scores
+plt.figure(figsize=(10, 6))
+plt.plot(range(2, 11), silhouette_scores, marker='o')
+plt.xlabel('Number of Clusters')
+plt.ylabel('Silhouette Score')
+plt.title('Silhouette Scores for Different Cluster Numbers')
+save_figures("triu_dist_silhouette_scores", dataset_name)
+# %%
