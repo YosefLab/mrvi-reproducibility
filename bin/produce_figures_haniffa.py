@@ -983,27 +983,35 @@ def compute_sample_cf_reconstruction_scores(self, sample_idx, adata=None, indice
 # %%
 sample_name = "newcastle74"
 sample_idx = model.sample_order.tolist().index(sample_name)
-sample_scores, top_idxs = compute_sample_cf_reconstruction_scores(model, sample_idx)
+np.random.seed(42)
+random_indices = np.random.choice(adata.shape[0], size=10000, replace=False)
+sample_scores, top_idxs = compute_sample_cf_reconstruction_scores(model, sample_idx, indices=random_indices)
+
 # %%
-sample_ball_res = ood_res.sel(cell_name=adata.obs_names).sel(sample=model.sample_order[sample_idx])
+adata_subset = adata[sample_scores.index]
+sample_ball_res = ood_res.sel(cell_name=adata_subset.obs_names).sel(sample=model.sample_order[sample_idx])
 sample_adm_log_probs = sample_ball_res.log_probs.to_series()
 sample_adm_bool = sample_ball_res.is_admissible.to_series()
-is_sample = pd.Series(adata.obs["sample_id"] == model.sample_order[sample_idx], name="is_sample", dtype=bool)
-sample_log_lib_size = pd.Series(np.log(adata.X.toarray().sum(axis=1)), index=adata.obs_names, name="log_lib_size")
-cell_category = pd.Series(["Not Admissible"] * adata.shape[0], dtype=str, name="cell_category", index=adata.obs_names)
+is_sample = pd.Series(adata_subset.obs["sample_id"] == model.sample_order[sample_idx], name="is_sample", dtype=bool)
+sample_log_lib_size = pd.Series(np.log(adata_subset.X.toarray().sum(axis=1)), index=adata_subset.obs_names, name="log_lib_size")
+cell_category = pd.Series(["Not Admissible"] * adata_subset.shape[0], dtype=str, name="cell_category", index=adata_subset.obs_names)
 cell_category[sample_adm_bool.to_numpy()] = "Admissible"
 cell_category[is_sample.to_numpy()] = "In Sample"
 cell_category = cell_category.astype("category")
 
-rec_score_plot_df = pd.concat((sample_adm_log_probs, sample_adm_bool, is_sample, cell_category, sample_scores,  sample_log_lib_size), axis=1)
+rec_score_plot_df = (
+    pd.concat((sample_adm_log_probs, sample_adm_bool, is_sample, cell_category, sample_scores,  sample_log_lib_size), axis=1)
+    .sample(frac=1, replace=False)
+)
 # %%
-sns.scatterplot(rec_score_plot_df, x="log_probs", y=f"{sample_name}_score", hue="cell_category")
+sns.scatterplot(rec_score_plot_df, x="log_probs", y=f"{sample_name}_score", hue="cell_category", s=5)
 plt.xlabel("Admissibility Score")
 plt.ylabel("Reconstruction Log Prob of In-Sample NN")
 handles, labels = plt.gca().get_legend_handles_labels()
 order = [1, 2, 0]
 plt.legend([handles[idx] for idx in order],[labels[idx] for idx in order])
-fig.save(os.path.join(FIGURE_DIR, f"haniffa_{sample_name}_admissibility_vs_reconstruction_w_category.svg"))
+plt.xlim(-100, 30)
+# fig.save(os.path.join(FIGURE_DIR, f"haniffa_{sample_name}_admissibility_vs_reconstruction_w_category.svg"))
 
 # %%
 # adata_embs.obs.loc[:, "n_valid_donors"] = res["is_admissible"].values.sum(axis=1)
