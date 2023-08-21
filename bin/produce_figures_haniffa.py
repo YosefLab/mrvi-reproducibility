@@ -496,9 +496,10 @@ import jax.numpy as jnp
 from scvi import REGISTRY_KEYS
 from scvi_v2._constants import MRVI_REGISTRY_KEYS
 from scvi.distributions import JaxNegativeBinomialMeanDisp as NegativeBinomial
-    
+from tqdm import tqdm
+
 # module level function
-def compute_px_from_x(self, x, sample_index, batch_index, cf_sample=None, continuous_covs=None, mc_samples=10):
+def compute_px_from_x(self, x, sample_index, batch_index, cf_sample=None, continuous_covs=None, label_index=None, mc_samples=10):
     """Compute normalized gene expression from observations"""
     log_library = 7.0 * jnp.ones_like(sample_index)  # placeholder, will be replaced by observed library sizes.
     inference_outputs = self.inference(x, sample_index, mc_samples=mc_samples, cf_sample=cf_sample, use_mean=False)
@@ -507,6 +508,7 @@ def compute_px_from_x(self, x, sample_index, batch_index, cf_sample=None, contin
         "library": log_library,
         "batch_index": batch_index,
         "continuous_covs": continuous_covs,
+        "label_index": label_index,
     }
     generative_outputs = self.generative(**generative_inputs)
     return generative_outputs["px"], inference_outputs["u"], log_library
@@ -521,7 +523,7 @@ def compute_sample_cf_reconstruction_scores(self, sample_idx, adata=None, indice
         raise ValueError(f"Sample {sample_name} missing from AnnData.")
     sample_u = self.get_latent_representation(sample_adata, give_z=False)
     sample_index = pynndescent.NNDescent(sample_u)
-    
+
     scdl = self._make_data_loader(adata=adata, batch_size=batch_size, indices=indices, iter_ndarray=True)
 
     def _get_all_inputs(
@@ -531,6 +533,7 @@ def compute_sample_cf_reconstruction_scores(self, sample_idx, adata=None, indice
         sample_index = jnp.array(inputs[MRVI_REGISTRY_KEYS.SAMPLE_KEY])
         batch_index = jnp.array(inputs[REGISTRY_KEYS.BATCH_KEY])
         continuous_covs = inputs.get(REGISTRY_KEYS.CONT_COVS_KEY, None)
+        label_index = inputs.get(REGISTRY_KEYS.LABELS_KEY, None)
         if continuous_covs is not None:
             continuous_covs = jnp.array(continuous_covs)
         return {
@@ -538,14 +541,15 @@ def compute_sample_cf_reconstruction_scores(self, sample_idx, adata=None, indice
             "sample_index": sample_index,
             "batch_index": batch_index,
             "continuous_covs": continuous_covs,
+            "label_index": label_index,
         }
-    
+
     scores = []
     top_idxs = []
-    for array_dict in scdl:
+    for array_dict in tqdm(scdl):
         vars_in = {"params": self.module.params, **self.module.state}
         rngs = self.module.rngs
-        
+
         inputs = _get_all_inputs(array_dict)
         px, u, log_library_placeholder = self.module.apply(
                 vars_in,
@@ -556,13 +560,14 @@ def compute_sample_cf_reconstruction_scores(self, sample_idx, adata=None, indice
                 batch_index=inputs["batch_index"],
                 cf_sample=np.ones(inputs["x"].shape[0]) * sample_idx,
                 continuous_covs=inputs["continuous_covs"],
+                label_index=inputs["label_index"],
                 mc_samples=mc_samples,
             )
         px_m, px_d = px.mean, px.inverse_dispersion
         if px_m.ndim == 2:
             px_m, px_d = np.expand_dims(px_m, axis=0), np.expand_dims(px_d, axis=0)
         px_m, px_d = np.expand_dims(px_m, axis=2), np.expand_dims(px_d, axis=2) # for inner_batch_size dim
-            
+
         mc_log_probs = []
         batch_top_idxs = []
         for mc_sample_i in range(u.shape[0]):
@@ -576,12 +581,13 @@ def compute_sample_cf_reconstruction_scores(self, sample_idx, adata=None, indice
             batch_top_idxs.append(nearest_sample_idxs)
         full_batch_log_probs = np.concatenate(mc_log_probs, axis=0).mean(0)
         top_idxs.append(np.concatenate(batch_top_idxs, axis=1))
-        
+
         scores.append(full_batch_log_probs)
-    
-    all_scores = np.hstack(scores) 
+
+    all_scores = np.hstack(scores)
     all_top_idxs = np.vstack(top_idxs)
-    return pd.Series(all_scores, index=adata[indices].obs_names.to_numpy(), name=f"{sample_name}_score"), all_top_idxs
+    adata_index = adata[indices] if indices is not None else adata
+    return pd.Series(all_scores, index=adata_index.obs_names.to_numpy(), name=f"{sample_name}_score"), all_top_idxs
 
 # %%
 sample_name = "newcastle74"
@@ -605,7 +611,7 @@ plt.xlabel("Admissibility Score")
 plt.ylabel("Reconstruction Log Prob of In-Sample NN")
 handles, labels = plt.gca().get_legend_handles_labels()
 order = [1, 2, 0]
-plt.legend([handles[idx] for idx in order],[labels[idx] for idx in order]) 
+plt.legend([handles[idx] for idx in order],[labels[idx] for idx in order])
 fig.save(os.path.join(FIGURE_DIR, f"haniffa_{sample_name}_admissibility_vs_reconstruction_w_category.svg"))
 
 # %%
