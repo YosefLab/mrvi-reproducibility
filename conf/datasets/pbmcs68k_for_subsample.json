@@ -32,6 +32,7 @@
         "n_replicates_per_subcluster": 4,
         "selected_cluster": 0,
         "selected_subsample_cluster": 1,
+        "selected_oversample_cluster": 4,
         "subsample_rates": [
             0.7,
             0.8,
