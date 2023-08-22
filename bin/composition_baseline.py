@@ -100,7 +100,7 @@ class CompositionBaseline:
             freqs = (
                 comps.loc[:, [self.sample_key, self.subcluster_key, "freqs"]]
                 .set_index([self.sample_key, self.subcluster_key])
-                .squeeze()
+                .squeeze(axis=1)
                 .unstack()
             )
             freqs_all[unique_cluster] = freqs
