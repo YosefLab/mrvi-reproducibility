@@ -212,6 +212,82 @@ g2 = sns.clustermap(
 )
 plt.show()
 
+
+# %%
+# Silhouette plots to check clustering
+
+from sklearn.metrics import silhouette_samples, silhouette_score
+
+
+def silhouette_plot(dist_mtx, cluster_labels, title=""):
+    silhouette_avg = silhouette_samples(dist_mtx, cluster_labels)
+
+    fig, ax = plt.subplots()
+    y_lower = 10
+
+    for i in range(np.max(cluster_labels) + 1):
+        ith_cluster_silhouette_values = silhouette_avg[cluster_labels == i]
+        ith_cluster_silhouette_values.sort()
+
+        size_cluster_i = ith_cluster_silhouette_values.shape[0]
+        if size_cluster_i == 0:
+            continue
+        y_upper = y_lower + size_cluster_i
+
+        color = plt.cm.nipy_spectral(float(i) / np.max(cluster_labels))
+        ax.fill_betweenx(
+            np.arange(y_lower, y_upper),
+            0,
+            ith_cluster_silhouette_values,
+            facecolor=color,
+            edgecolor=color,
+            alpha=0.7,
+        )
+        ax.text(-0.05, y_lower + 0.5 * size_cluster_i, str(i))
+        y_lower = y_upper + 10
+
+    ax.set_xlabel("Silhouette coefficient values")
+    ax.set_ylabel("Cluster label")
+
+    # The vertical line for average silhouette score
+    avg_silhouette_score = silhouette_score(dist_mtx, cluster_labels)
+    ax.axvline(x=avg_silhouette_score, color="red", linestyle="--")
+    ax.set_title(title)
+
+    plt.show()
+
+
+# %%
+for res in np.arange(0.1, 1.05, 0.05):
+    clipped_deg_sim = deg_sim_df.values.copy()
+    clipped_deg_sim[clipped_deg_sim < 0.1] = 0
+    g_adj = ig.Graph.Weighted_Adjacency(clipped_deg_sim, mode="undirected")
+    partition = la.RBConfigurationVertexPartition(g_adj, resolution_parameter=res)
+    optimizer = la.Optimiser()
+    optimizer.optimise_partition(partition)
+
+    # Get the cluster labels
+    cluster_labels = np.array(partition.membership)
+    filtered_cluster_labels = []
+    cluster_label_index = []
+    keep_clusters = [
+        cluster_label
+        for cluster_label, ct in zip(*np.unique(cluster_labels, return_counts=True))
+        if ct > 1
+    ]
+    if len(keep_clusters) == 1:
+        continue
+    for i, cluster_label in enumerate(cluster_labels):
+        if cluster_label in keep_clusters:
+            filtered_cluster_labels.append(cluster_label)
+            cluster_label_index.append(deg_sim_df.index[i])
+    subset_deg_sim_df = deg_sim_df.loc[cluster_label_index, :].loc[
+        :, cluster_label_index
+    ]
+    silhouette_plot(
+        1 - subset_deg_sim_df.values, np.array(filtered_cluster_labels), title=f"{res}, kept {len(filtered_cluster_labels)}"
+    )
+
 # %%
 # Define the parameters for the Leiden algorithm
 clipped_deg_sim = deg_sim_df.values.copy()
@@ -241,7 +317,9 @@ color_list = [
     "black",
     "purple",
     "olive",
-    "goldenrod"
+    "goldenrod",
+    "magenta",
+    "teal",
 ]
 ig.plot(
     g_adj,

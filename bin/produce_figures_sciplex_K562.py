@@ -547,7 +547,6 @@ save_figures(
 
 # %%
 # compute random baseline for percentile
-# %%
 import scipy
 
 all_products = set()
@@ -585,20 +584,25 @@ for product_name in all_products:
 # %%
 # shuffle the mask
 np.random.seed(45)
-shuffled_in_prod_mask = np.zeros(shape=in_prod_mask.shape, dtype=bool)
-shuffled_in_prod_mask[np.triu_indices(in_prod_mask.shape[0])] = np.random.permutation(
-    in_prod_mask[np.triu_indices(in_prod_mask.shape[0])]
-)
-shuffled_in_prod_mask = shuffled_in_prod_mask + shuffled_in_prod_mask.T
+random_in_prod_all_dist_avg_percentiles = []
+for _ in range(100):
+    shuffled_in_prod_mask = np.zeros(shape=in_prod_mask.shape, dtype=bool)
+    shuffled_in_prod_mask[np.triu_indices(in_prod_mask.shape[0])] = np.random.permutation(
+        in_prod_mask[np.triu_indices(in_prod_mask.shape[0])]
+    )
+    shuffled_in_prod_mask = shuffled_in_prod_mask + shuffled_in_prod_mask.T
 
-adjusted_ranks = (
-    scipy.stats.rankdata(cluster_dists_arr).reshape(cluster_dists_arr.shape)
-    - cluster_dists_arr.shape[0]
-)
-shuffled_in_prod_all_dist_avg_percentile = (
-    adjusted_ranks[shuffled_in_prod_mask].mean() / non_diag_mask.sum()
-)
-print(shuffled_in_prod_all_dist_avg_percentile)
+    adjusted_ranks = (
+        scipy.stats.rankdata(cluster_dists_arr).reshape(cluster_dists_arr.shape)
+        - cluster_dists_arr.shape[0]
+    )
+    shuffled_in_prod_all_dist_avg_percentile = (
+        adjusted_ranks[shuffled_in_prod_mask].mean() / non_diag_mask.sum()
+    )
+    random_in_prod_all_dist_avg_percentiles.append(
+        shuffled_in_prod_all_dist_avg_percentile
+    )
+print(np.mean(random_in_prod_all_dist_avg_percentiles))
 # %%
 # Metric plots
 all_results = load_results(results_paths)
@@ -619,16 +623,16 @@ model_to_method_name_mapping = {
 
 plot_df = plot_df[plot_df["model_name"].isin(model_to_method_name_mapping.keys())]
 plot_df["method_name"] = plot_df["model_name"].map(model_to_method_name_mapping)
-plot_df = plot_df.append(
-    pd.DataFrame(
-        {
-            "method_name": ["Random"],
-            "in_product_all_dist_avg_percentile": [
-                shuffled_in_prod_all_dist_avg_percentile
-            ],
-        }
-    )
-)
+for random_in_prod_all_dist_avg_percentile in random_in_prod_all_dist_avg_percentiles:
+    plot_df = pd.concat((plot_df,
+        pd.DataFrame(
+            {
+                "method_name": ["Random"],
+                "in_product_all_dist_avg_percentile": [
+                    random_in_prod_all_dist_avg_percentile
+                ],
+            }
+        )), axis=0)
 
 metric = "in_product_all_dist_avg_percentile"
 
@@ -637,7 +641,7 @@ sns.barplot(
     data=plot_df,
     y="method_name",
     x=metric,
-    order=plot_df.sort_values(metric, ascending=True)["method_name"].values,
+    order = ["mrVI", "CompositionSCVI", "CompositionPCA", "Random"],
     palette=BARPLOT_CMAP,
     ax=ax,
 )

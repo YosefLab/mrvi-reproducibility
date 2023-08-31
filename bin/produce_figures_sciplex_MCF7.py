@@ -549,11 +549,10 @@ save_figures(
     dataset_name,
 )
 # plt.clf()
-
 # %%
 # Metric plots
 
-# Compute random silhouette baseline
+# Compute random silhouette baseline and avg percentile baseline
 gt_cluster_labels_df = None
 gt_clusters_path = f"../data/l1000_signatures/{cl}_cluster_labels.csv"
 gt_cluster_labels_df = pd.read_csv(gt_clusters_path, index_col=0)
@@ -579,11 +578,18 @@ dist_inferred = (
 np.fill_diagonal(dist_inferred, 0)
 # set seed
 np.random.seed(45)
-random_asw = silhouette_score(
-    dist_inferred, gt_cluster_labels_df.sample(frac=1).values, metric="precomputed"
-)
-random_asw = (random_asw + 1) / 2
-print(random_asw)
+random_asws = []
+for i in range(100):
+    random_asw = silhouette_score(
+        dist_inferred,
+        gt_cluster_labels_df.sample(frac=1).values.ravel(),
+        metric="precomputed",
+    )
+    random_asw = (random_asw + 1) / 2
+    random_asws.append(random_asw)
+mean_random_asw = np.mean(random_asws)
+print(mean_random_asw)
+
 # %%
 import scipy
 
@@ -622,20 +628,26 @@ for product_name in all_products:
 # %%
 # shuffle the mask
 np.random.seed(45)
-shuffled_in_prod_mask = np.zeros(shape=in_prod_mask.shape, dtype=bool)
-shuffled_in_prod_mask[np.triu_indices(in_prod_mask.shape[0])] = np.random.permutation(
-    in_prod_mask[np.triu_indices(in_prod_mask.shape[0])]
-)
-shuffled_in_prod_mask = shuffled_in_prod_mask + shuffled_in_prod_mask.T
+random_in_prod_all_dist_avg_percentiles = []
+for _ in range(100):
+    shuffled_in_prod_mask = np.zeros(shape=in_prod_mask.shape, dtype=bool)
+    shuffled_in_prod_mask[
+        np.triu_indices(in_prod_mask.shape[0])
+    ] = np.random.permutation(in_prod_mask[np.triu_indices(in_prod_mask.shape[0])])
+    shuffled_in_prod_mask = shuffled_in_prod_mask + shuffled_in_prod_mask.T
 
-adjusted_ranks = (
-    scipy.stats.rankdata(cluster_dists_arr).reshape(cluster_dists_arr.shape)
-    - cluster_dists_arr.shape[0]
-)
-shuffled_in_prod_all_dist_avg_percentile = (
-    adjusted_ranks[shuffled_in_prod_mask].mean() / non_diag_mask.sum()
-)
-print(shuffled_in_prod_all_dist_avg_percentile)
+    adjusted_ranks = (
+        scipy.stats.rankdata(cluster_dists_arr).reshape(cluster_dists_arr.shape)
+        - cluster_dists_arr.shape[0]
+    )
+    shuffled_in_prod_all_dist_avg_percentile = (
+        adjusted_ranks[shuffled_in_prod_mask].mean() / non_diag_mask.sum()
+    )
+    random_in_prod_all_dist_avg_percentiles.append(
+        shuffled_in_prod_all_dist_avg_percentile
+    )
+print(np.mean(random_in_prod_all_dist_avg_percentiles))
+
 # %%
 all_results = load_results(results_paths)
 sciplex_metrics_df = all_results["sciplex_metrics"]
@@ -655,9 +667,16 @@ model_to_method_name_mapping = {
 # select rows then color w cmap + baseline
 plot_df = plot_df[plot_df["model_name"].isin(model_to_method_name_mapping.keys())]
 plot_df["method_name"] = plot_df["model_name"].map(model_to_method_name_mapping)
-plot_df = plot_df.append(
-    pd.DataFrame({"method_name": ["Random"], "gt_silhouette_score": [random_asw]})
-)
+for random_asw in random_asws:
+    plot_df = pd.concat(
+        (
+            plot_df,
+            pd.DataFrame(
+                {"method_name": ["Random"], "gt_silhouette_score": [random_asw]}
+            ),
+        ),
+        axis=0,
+    )
 
 metric = "gt_silhouette_score"
 
@@ -666,29 +685,34 @@ sns.barplot(
     data=plot_df,
     y="method_name",
     x=metric,
-    order=plot_df.sort_values(metric, ascending=False)["method_name"].values,
+    order=["Random", "mrVI", "CompositionSCVI", "CompositionPCA"],
     palette=BARPLOT_CMAP,
     ax=ax,
 )
 min_lim = plot_df[metric].min() - 0.05
 max_lim = plot_df[metric].max() + 0.05
 ax.set_xlim(min_lim, max_lim)
-ax.set_xticks([0.3, 0.35, 0.4, 0.45])
+ax.set_xticks([0.3, 0.35, 0.4, 0.45, .5])
 save_figures(f"{metric}_final", dataset_name)
 
 # %%
 plot_df = plot_df[plot_df["model_name"].isin(model_to_method_name_mapping.keys())]
 plot_df["method_name"] = plot_df["model_name"].map(model_to_method_name_mapping)
-plot_df = plot_df.append(
-    pd.DataFrame(
-        {
-            "method_name": ["Random"],
-            "in_product_all_dist_avg_percentile": [
-                shuffled_in_prod_all_dist_avg_percentile
-            ],
-        }
+for shuffled_in_prod_all_dist_avg_percentile in random_in_prod_all_dist_avg_percentiles:
+    plot_df = pd.concat(
+        (
+            plot_df,
+            pd.DataFrame(
+                {
+                    "method_name": ["Random"],
+                    "in_product_all_dist_avg_percentile": [
+                        shuffled_in_prod_all_dist_avg_percentile
+                    ],
+                }
+            ),
+        ),
+        axis=0,
     )
-)
 
 metric = "in_product_all_dist_avg_percentile"
 
@@ -697,7 +721,7 @@ sns.barplot(
     data=plot_df,
     y="method_name",
     x=metric,
-    order=plot_df.sort_values(metric, ascending=True)["method_name"].values,
+    order=["mrVI", "CompositionSCVI", "CompositionPCA", "Random"],
     palette=BARPLOT_CMAP,
     ax=ax,
 )
@@ -820,7 +844,7 @@ adata = sc.read(adata_path)
 # for i in range(1, n_clusters + 1):
 #     cluster_name = f"Cluster {i}"
 #     de_genes = train_adata_log.uns["rank_genes_groups_filtered"]["names"][
-#         cluster_name 
+#         cluster_name
 #     ].tolist()
 #     de_genes = [gene for gene in de_genes if str(gene) != "nan"]
 #     try:
@@ -1060,9 +1084,7 @@ model = scvi_v2.MrVI.load(model_path, adata=train_adata)
 train_adata.obs["donor_cluster"] = (
     train_adata.obs["product_dose"].map(donor_info_["cluster_id"]).values.astype(int)
 )
-train_adata.obs.loc[
-    train_adata.obs.product_dose == "Vehicle_0", "donor_cluster"
-] = -1
+train_adata.obs.loc[train_adata.obs.product_dose == "Vehicle_0", "donor_cluster"] = -1
 for cluster_i in range(1, n_clusters + 1):
     train_adata.obs[f"donor_cluster_{cluster_i}"] = (
         train_adata.obs["donor_cluster"] == cluster_i
@@ -1076,7 +1098,8 @@ sub_train_adata.obs["_indices"] = np.arange(sub_train_adata.shape[0])
 cluster_wise_multivar_res = {}
 for cluster_i in range(1, n_clusters + 1):
     cluster_sub_train_adata = sub_train_adata[
-        (sub_train_adata.obs["donor_cluster"] == cluster_i) | (sub_train_adata.obs["donor_cluster"] == -1)
+        (sub_train_adata.obs["donor_cluster"] == cluster_i)
+        | (sub_train_adata.obs["donor_cluster"] == -1)
     ].copy()
     # cluster_sub_train_adata = cluster_sub_train_adata[np.random.choice(cluster_sub_train_adata.shape[0], 50)]
     cluster_multivar_res = model.perform_multivariate_analysis(
@@ -1102,10 +1125,15 @@ enr_result_dict = {}
 full_dfs = {}
 de_dfs = {}
 for cluster_i in cluster_wise_multivar_res:
-# cluster_i = 1
+    # cluster_i = 1
     cluster_multivar_res = cluster_wise_multivar_res[cluster_i]
-    betas_ = cluster_multivar_res["lfc"].transpose("cell_name", "covariate", "gene").loc[{"covariate": f"donor_cluster_{cluster_i}"}].values
-    betas_ = betas_ / np.log(2) # change to log 2
+    betas_ = (
+        cluster_multivar_res["lfc"]
+        .transpose("cell_name", "covariate", "gene")
+        .loc[{"covariate": f"donor_cluster_{cluster_i}"}]
+        .values
+    )
+    betas_ = betas_ / np.log(2)  # change to log 2
     # plt.hist(betas_.mean(0), bins=100)
     # plt.xlabel("LFC")
     # plt.show()
@@ -1133,7 +1161,7 @@ for cluster_i in cluster_wise_multivar_res:
     obs_de.LFC.hist(bins=100)
     de_dfs[cluster_i] = obs_de
 
-    de_genes = obs_de.gene.values 
+    de_genes = obs_de.gene.values
     de_genes = [gene for gene in de_genes if str(gene) != "nan"]
     try:
         enr_results, fig = perform_gsea(
@@ -1204,7 +1232,7 @@ for cluster_i, de_df in de_dfs.items():
         data=abr_de_df,
         ax=ax,
     )
-    ax.axhline(y=0,color="black" )
+    ax.axhline(y=0, color="black")
     # rotate x labels
     ax.set_title(f"Cluster {cluster_i} Top LFC DE Genes")
     ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
@@ -1217,21 +1245,32 @@ for cluster_i, de_df in de_dfs.items():
 # %%
 # matrixplot of top de genes
 from functools import reduce
+
 top_de_genes = reduce(np.union1d, top_de_genes_per_cluster.values())
 
 # get lfcs for each cluster for top de genes
 top_de_lfcs_cols = []
 for cluster_i, full_df in full_dfs.items():
     print(cluster_i)
-    top_des_df = full_df[full_df["gene"].isin(top_de_genes)][["gene", "LFC"]].set_index("gene")
+    top_des_df = full_df[full_df["gene"].isin(top_de_genes)][["gene", "LFC"]].set_index(
+        "gene"
+    )
     top_de_lfcs_cols.append(top_des_df.loc[top_de_genes]["LFC"].values.reshape(-1, 1))
 
-top_de_lfcs_df = pd.DataFrame(np.hstack(top_de_lfcs_cols), index=top_de_genes, columns=full_dfs.keys())
+top_de_lfcs_df = pd.DataFrame(
+    np.hstack(top_de_lfcs_cols), index=top_de_genes, columns=full_dfs.keys()
+)
 top_de_lfcs_df
 
 # %%
-sns.clustermap(top_de_lfcs_df, col_cluster=False, yticklabels=True, xticklabels=True,
-               center=0, cmap="seismic")
+sns.clustermap(
+    top_de_lfcs_df,
+    col_cluster=False,
+    yticklabels=True,
+    xticklabels=True,
+    center=0,
+    cmap="seismic",
+)
 save_figures(
     "top_de_lfcs_clustermap",
     dataset_name,
@@ -1265,7 +1304,9 @@ save_figures("triu_dist_pca_variance_explained", dataset_name)
 
 # %%
 pca_xy = pd.DataFrame(pca.transform(triu_cell_dists_array)[:, :2], columns=["x", "y"])
-pca_xy.loc[:, "phase"] = model.adata.obs.loc[cell_dists.cell_name.values, "phase"].astype(str).values
+pca_xy.loc[:, "phase"] = (
+    model.adata.obs.loc[cell_dists.cell_name.values, "phase"].astype(str).values
+)
 pca_xy
 
 # %%
@@ -1307,9 +1348,9 @@ for n_clusters in range(2, 11):
 # %%
 # Plot silhouette scores
 plt.figure(figsize=(10, 6))
-plt.plot(range(2, 11), silhouette_scores, marker='o')
-plt.xlabel('Number of Clusters')
-plt.ylabel('Silhouette Score')
-plt.title('Silhouette Scores for Different Cluster Numbers')
+plt.plot(range(2, 11), silhouette_scores, marker="o")
+plt.xlabel("Number of Clusters")
+plt.ylabel("Silhouette Score")
+plt.title("Silhouette Scores for Different Cluster Numbers")
 save_figures("triu_dist_silhouette_scores", dataset_name)
 # %%
