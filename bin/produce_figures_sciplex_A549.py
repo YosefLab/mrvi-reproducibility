@@ -1135,6 +1135,7 @@ model.donor_info = obs_df.set_index("_scvi_sample").sort_index()
 sub_train_adata = train_adata[train_adata.obs["donor_cluster"] != "nan"]
 sub_train_adata.obs["_indices"] = np.arange(sub_train_adata.shape[0])
 
+# %%
 cluster_wise_multivar_res = {}
 for cluster_i in range(1, n_clusters + 1):
     cluster_sub_train_adata = sub_train_adata[
@@ -1151,15 +1152,39 @@ for cluster_i in range(1, n_clusters + 1):
     cluster_wise_multivar_res[cluster_i] = cluster_multivar_res
 
 # %%
+# save cluster-wise results
+import pickle
+
+with open(
+    os.path.join(output_dir, f"{dataset_name}.{method_name}.cluster_wise_multivar_res.pkl"),
+    "wb",
+):
+    pickle.dump(cluster_wise_multivar_res, open(f"{dataset_name}.{method_name}.cluster_wise_multivar_res.pkl", "wb"))
+
+# %%
+import pickle
+# read cluster-wise results
+with open(
+    os.path.join(output_dir, f"{dataset_name}.{method_name}.cluster_wise_multivar_res.pkl"),
+    "rb",
+):
+    cluster_wise_multivar_res = pickle.load(open(f"{dataset_name}.{method_name}.cluster_wise_multivar_res.pkl", "rb"))
+
+# %%
 # GSEA for DE genes
 # Load gene sets
-gene_set_names = [
-    "MSigDB_Hallmark_2020",
-]
+gene_set_name = "MSigDB_Hallmark_2020"
+# gene_set_name = "MSigDB_Oncogenic_Signatures"
 gene_sets = [
     gp.parser.download_library(gene_set_name, "human")
-    for gene_set_name in gene_set_names
 ]
+# import json
+# with open(
+#     "../data/MSigDB_GTRD.json", "r"
+# ) as f:
+#     out = json.load(f)
+#     gene_sets = {k: v["geneSymbols"] for k,v in out.items()}
+# %%
 
 enr_result_dict = {}
 full_dfs = {}
@@ -1240,8 +1265,9 @@ enr_pval_df.fillna(0, inplace=True)
 
 # %%
 # Plot GSEA heatmap
+filtered_enr_pval_df = enr_pval_df.loc[:, (enr_pval_df > -np.log10(0.05)).values.any(axis=0)]
 sns.clustermap(
-    enr_pval_df.T,
+    filtered_enr_pval_df.T,
     col_cluster=False,
     yticklabels=True,
     xticklabels=True,
@@ -1250,7 +1276,7 @@ sns.clustermap(
     cmap="Reds",
 )
 save_figures(
-    f"multivar_gsea_heatmap",
+    f"multivar_gsea_heatmap.{gene_set_name}",
     dataset_name,
 )
 
@@ -1278,7 +1304,7 @@ for cluster_i, de_df in de_dfs.items():
     ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
     ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
     save_figures(
-        f"cluster_{cluster_i}_top_lfc_de_genes",
+        f"cluster_{cluster_i}_top_lfc_de_genes.{gene_set_name}",
         dataset_name,
     )
 
@@ -1312,7 +1338,7 @@ sns.clustermap(
     cmap="seismic",
 )
 save_figures(
-    "top_de_lfcs_clustermap",
+    f"top_de_lfcs_clustermap.{gene_set_name}",
     dataset_name,
 )
 
