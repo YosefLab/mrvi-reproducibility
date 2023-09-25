@@ -9,7 +9,6 @@ import scipy.cluster.hierarchy as sch
 import xarray as xr
 from anndata import AnnData
 from scipy.spatial.distance import squareform
-from scvi.model import SCVI
 from sklearn.metrics import pairwise_distances
 from tqdm import tqdm
 from tree_utils import linkage_to_ete
@@ -107,7 +106,7 @@ def _run_dataset_specific_preprocessing(
             config,
             subsample=True,
         )
-    if (adata_in == "haniffa.h5ad") or (adata_in == "haniffasubsample.h5ad"):
+    if adata_in in ["haniffa.h5ad", "haniffasubsample.h5ad", "haniffa2.h5ad"]:
         adata = _process_haniffa(adata, config)
     return adata, distance_matrices
 
@@ -400,45 +399,69 @@ def _process_semisynth2(
     n_subclusters = semisynth_config["n_subclusters"]
     n_replicates_per_subcluster = semisynth_config["n_replicates_per_subcluster"]
     selected_cluster = semisynth_config["selected_cluster"]
+    n_genes_for_subclustering = semisynth_config["n_genes_for_subclustering"]
     if subsample:
         selected_subsample_cluster = semisynth_config["selected_subsample_cluster"]
         subsample_rates = semisynth_config["subsample_rates"]
 
     # use SCVI to obtain latent space
-    SCVI.setup_anndata(
-        adata,
-    )
-    scvi = SCVI(adata)
-    scvi.train(
-        max_epochs=400,
-        batch_size=1024,
-        early_stopping=True,
-        early_stopping_patience=20,
-        early_stopping_monitor="reconstruction_loss_validation",
-    )
-    latent = scvi.get_latent_representation()
-    adata.obsm["X_scvi"] = latent
-    sc.pp.neighbors(adata, use_rep="X_scvi")
-    sc.tl.leiden(adata, resolution=resolution, key_added="leiden")
+    adata_log = adata.copy()
+    sc.pp.normalize_total(adata_log)
+    sc.pp.log1p(adata_log)
+    sc.pp.pca(adata_log, n_comps=50)
+    sc.pp.neighbors(adata_log, use_rep="X_pca")
+    sc.tl.leiden(adata_log, resolution=resolution, key_added="leiden")
+    adata.obs["leiden"] = adata_log.obs["leiden"]
+    if n_genes_for_subclustering is not None:
+        selected_genes_for_subclustering = np.random.choice(
+            adata.var_names, n_genes_for_subclustering, replace=False
+        )
+        adata_log_ = adata_log[:, selected_genes_for_subclustering].copy()
+        adata.var["is_gene_for_subclustering"] = False
+        adata.var.loc[
+            selected_genes_for_subclustering, "is_gene_for_subclustering"
+        ] = True
+        sc.pp.pca(adata_log_, n_comps=50)
+        adata.obsm["X_rep_subclustering"] = adata_log_.obsm["X_pca"]
+    else:
+        adata.obsm["X_rep_subclustering"] = adata_log.obsm["X_pca"]
 
     cluster_to_sizes = adata.obs.leiden.value_counts().sort_values(ascending=False)
-    cluster_name = cluster_to_sizes.index[selected_cluster]
+    positive_cluster = cluster_to_sizes.index[selected_cluster]
     sample_assignments = pd.DataFrame()
     for unique_cluster in tqdm(adata.obs["leiden"].unique()):
         adata_ = adata[adata.obs["leiden"] == unique_cluster].copy()
-        latent_reps = adata_.obsm["X_scvi"]
-        if unique_cluster == cluster_name:
+        latent_reps = adata_.obsm["X_rep_subclustering"]
+        if unique_cluster == positive_cluster:
             res_ = construct_sample_stratifications_from_subcelltypes(
                 latent_reps,
                 n_subclusters,
                 n_replicates_per_subcluster,
             )
-            adata.uns[f"cluster{unique_cluster}_tree_gt"] = res_["tree_gt"].write()
+            adata.uns[f"cluster{positive_cluster}_tree_gt"] = res_["tree_gt"].write()
+            adata.uns[f"cluster{positive_cluster}_tree_linkage"] = res_["tree_linkage"]
+            adata.uns[f"cluster{positive_cluster}_tree_gt_clusters"] = res_[
+                "tree_gt_clusters"
+            ].write()
+            adata.uns[f"cluster{positive_cluster}_tree_linkage_clusters"] = res_[
+                "tree_linkage_clusters"
+            ]
+            adata.uns[f"cluster{positive_cluster}_tree_linkage_leaders"] = res_[
+                "tree_linkage_leaders"
+            ]
             sample_assignments = pd.concat(
                 [
                     sample_assignments,
-                    res_["cluster_info"].assign(cell_index=adata_.obs_names),
+                    res_["cluster_info"]
+                    .loc[:, ["sample_assignments"]]
+                    .assign(cell_index=adata_.obs_names),
                 ]
+            )
+
+            sample_assignment_mapping_ = (
+                res_["cluster_info"]
+                .drop_duplicates()
+                .rename(columns={"sample_assignments": "sample_assignment"})
             )
         else:
             sample_names = 1 + np.arange(n_subclusters * n_replicates_per_subcluster)
@@ -448,53 +471,116 @@ def _process_semisynth2(
             sample_assignments_ = (
                 pd.Series(sample_assignments_)
                 .to_frame("sample_assignments")
-                .assign(cell_index=adata_.obs_names, subcluster_assignments="NA")
+                .assign(cell_index=adata_.obs_names)
             )
             sample_assignments = pd.concat([sample_assignments, sample_assignments_])
-    adata.obs.loc[:, "sample_assignment"] = (
-        sample_assignments.set_index("cell_index")
-        .loc[adata.obs_names, "sample_assignments"]
-        .values
+    sample_assignments = sample_assignments.set_index("cell_index").loc[
+        adata.obs_names
+    ]["sample_assignments"]
+    adata.obs = (
+        adata.obs.assign(
+            sample_assignment=sample_assignments.values, cell_index=adata.obs_names
+        )
+        .merge(sample_assignment_mapping_, on="sample_assignment", how="left")
+        .assign(
+            has_sample_stratification=lambda x: x.leiden == positive_cluster,
+            Site="1",
+            subcluster_assignment=lambda x: x.apply(
+                lambda y: y.sample_group if y.has_sample_stratification else "NA",
+                axis=1,
+            ),
+        )
+        .astype(
+            {
+                "sample_assignment": str,
+                "subcluster_assignment": str,
+            }
+        )
+        .set_index("cell_index")
     )
-    adata.obs.loc[:, "subcluster_assignment"] = (
-        sample_assignments.set_index("cell_index")
-        .loc[adata.obs_names, "subcluster_assignments"]
-        .values
-    )
-    adata.obs.loc[:, "sample_assignment"] = adata.obs["sample_assignment"].astype(str)
-    adata.obs.loc[:, "subcluster_assignment"] = adata.obs[
-        "subcluster_assignment"
-    ].astype(str)
-    adata.obs.loc[:, "Site"] = "1"
-
+    adata.obs.index.name = None
     if subsample:
-        sample_assignment_mapping = adata.obs[["sample_assignment", "subcluster_assignment"]].drop_duplicates(keep="first")
-        sample_assignment_mapping = sample_assignment_mapping[sample_assignment_mapping.subcluster_assignment != "NA"]
-        sample_assignment_mapping["subcluster_assignment"] = sample_assignment_mapping["subcluster_assignment"].astype(str).astype("category")
-        sample_assignment_mapping["sample_assignment_int"] = sample_assignment_mapping.sample_assignment.astype(int)
-        sample_assignment_mapping["rank"] = sample_assignment_mapping.groupby("subcluster_assignment")["sample_assignment_int"].rank(method="dense", ascending=True).astype(int)
+        sample_assignment_mapping = sample_assignment_mapping_[
+            ["sample_assignment", "sample_group"]
+        ]
+        sample_assignment_mapping["subcluster_assignment"] = (
+            sample_assignment_mapping["sample_group"].astype(str).astype("category")
+        )
+        sample_assignment_mapping[
+            "sample_assignment_int"
+        ] = sample_assignment_mapping.sample_assignment.astype(int)
+        sample_assignment_mapping["rank"] = (
+            sample_assignment_mapping.groupby("subcluster_assignment")[
+                "sample_assignment_int"
+            ]
+            .rank(method="dense", ascending=True)
+            .astype(int)
+        )
 
         subsampled_adatas = [adata[adata.obs.leiden != str(selected_subsample_cluster)]]
+        subsample_info_df = pd.DataFrame()
         for rank, subsample_rate in enumerate(subsample_rates, 1):
-            samples_to_subsample = sample_assignment_mapping[sample_assignment_mapping["rank"] == rank]["sample_assignment"].to_list()
-            for sample in samples_to_subsample:
-                subsample_adata = adata[(adata.obs.sample_assignment == str(sample)) & (adata.obs["leiden"] == str(selected_subsample_cluster))]
-                subsample_adata = subsample_adata[np.random.choice(subsample_adata.shape[0], int(subsample_adata.shape[0] * subsample_rate), replace=False)]
-                subsample_adata.obs["rank"] = rank
-                subsampled_adatas.append(subsample_adata)
-        return sc.concat(subsampled_adatas)
+            samples_to_subsample = sample_assignment_mapping[
+                sample_assignment_mapping["rank"] == rank
+            ]["sample_assignment"].to_list()
 
+            subsample_info_df = subsample_info_df.append(
+                pd.DataFrame(
+                    {
+                        "rank": rank,
+                        "subsample_rate": subsample_rate,
+                        "sample": samples_to_subsample,
+                    }
+                )
+            )
+            for sample in samples_to_subsample:
+                subsample_adata = adata[
+                    (adata.obs.sample_assignment == str(sample))
+                    & (adata.obs["leiden"] == str(selected_subsample_cluster))
+                ]
+                subsample_adata = subsample_adata[
+                    np.random.choice(
+                        subsample_adata.shape[0],
+                        int(subsample_adata.shape[0] * subsample_rate),
+                        replace=False,
+                    )
+                ]
+                subsampled_adatas.append(subsample_adata)
+
+        res = sc.concat(subsampled_adatas)
+        subsample_info_df = subsample_info_df.astype({"sample": str}).set_index(
+            "sample"
+        )
+        cell_to_sample = res.obs["sample_assignment"].values
+        res.obs.loc[
+            :, f"subsample_rate_in_leiden{selected_subsample_cluster}"
+        ] = subsample_info_df.loc[cell_to_sample, "subsample_rate"].values
+        res.obs.loc[
+            :, f"rank_in_leiden{selected_subsample_cluster}"
+        ] = subsample_info_df.loc[cell_to_sample, "rank"].values
+        res.obs.loc[:, "sample_metadata2"] = (
+            res.obs[f"subsample_rate_in_leiden{selected_subsample_cluster}"] <= 0.8
+        )
+        res = sc.AnnData(
+            X=res.X,
+            obs=res.obs,
+            obsm=res.obsm,
+            var=adata.var,
+            uns=adata.uns,
+        )
+        return res
     return adata
 
 
 def construct_sample_stratifications_from_subcelltypes(
-    latent_reps, n_subclusters, n_replicates_per_subcluster
+    latent_reps, n_subclusters, n_replicates_per_subcluster, linkage_method="ward"
 ):
     """Construct semisynthetic dataset"""
     dmat = pairwise_distances(latent_reps)
-    dmat = squareform(dmat)
-    Z = sch.linkage(dmat, method="complete")
+    dmat = squareform(dmat, checks=False)
+    Z = sch.linkage(dmat, method=linkage_method)
     subclusters = sch.fcluster(Z, n_subclusters, criterion="maxclust")
+    metadata1 = sch.fcluster(Z, 2, criterion="maxclust")
 
     # get names of internal nodes associated with each cluster
     L, M = sch.leaders(Z, subclusters)
@@ -552,17 +638,23 @@ def construct_sample_stratifications_from_subcelltypes(
     cluster_info = pd.DataFrame(
         {
             "sample_assignments": sample_assignments,
-            "subcluster_assignments": subclusters,
+            "sample_group": subclusters,
+            "sample_metadata": metadata1,
         }
     )
     return {
         "tree_gt": tree_with_replicates,
+        "tree_gt_clusters": tree,
         "cluster_info": cluster_info,
+        "tree_linkage": Z,
+        "tree_linkage_clusters": L,
+        "tree_linkage_leaders": M,
     }
 
 
 def _process_haniffa(adata, config_in):
     adata = adata[:, ~adata.var_names.str.startswith("AB")]
+    adata = adata[adata.obs.Status.isin(["Covid", "Healthy"])]
     adata.obs.loc[:, "age_int"] = adata.obs.Age_interval.apply(
         lambda x: x.split(",")[0][1:]
     ).astype(int)
