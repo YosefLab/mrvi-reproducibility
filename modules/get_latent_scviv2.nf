@@ -1,6 +1,4 @@
 process get_latent_scviv2 {
-    debug true
-
     input:
     path adata_in
     path model_in
