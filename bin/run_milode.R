@@ -26,7 +26,7 @@ rep_key <- "pca.corrected"
 file_str <- paste(readLines(config_file), collapse="\n")
 config <- fromJSON(file_str)
 sample_key <- config$sample_key
-covariate_key <- config$covariate_key
+covariate_key <- config$covariate_key_de
 nuisance_key <- config$batch_key
 data <- readH5AD(file_name)
 

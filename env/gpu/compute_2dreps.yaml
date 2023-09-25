@@ -12,6 +12,7 @@ dependencies:
     - dask=2022.12.1
     - netcdf4=1.6.2
     - pymde=0.1.18
+    - pytorch>=2.0
     - pip
     - pip:
           - click
@@ -19,3 +20,4 @@ dependencies:
           - scikit-learn==1.0.2
           - scikit-misc==0.1.4
           - remote-pdb==2.1.0
+          - scvi-tools

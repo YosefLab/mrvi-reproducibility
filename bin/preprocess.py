@@ -584,6 +584,14 @@ def _process_semisynth2(
         res.obs.loc[:, "sample_metadata2"] = (
             res.obs[f"subsample_rate_in_leiden{selected_subsample_cluster}"] <= 0.8
         )
+
+        one_hot_groupnames = []
+        for unique_group in res.obs["sample_group"].unique():
+            new_key = f"group_{unique_group}"
+            res.obs.loc[:, new_key] = (res.obs["sample_group"] == unique_group).astype(
+                int
+            )
+            one_hot_groupnames.append(new_key)
         res = sc.AnnData(
             X=res.X,
             obs=res.obs,
@@ -591,6 +599,7 @@ def _process_semisynth2(
             var=adata.var,
             uns=adata.uns,
         )
+        res.uns["one_hot_groupnames"] = one_hot_groupnames
         return res
     return adata
 

@@ -32,10 +32,23 @@ from scvi.distributions import JaxNegativeBinomialMeanDisp as NegativeBinomial
 from tqdm import tqdm
 
 
-def compute_px_from_x(self, x, sample_index, batch_index, cf_sample=None, continuous_covs=None, label_index=None, mc_samples=10):
+def compute_px_from_x(
+    self,
+    x,
+    sample_index,
+    batch_index,
+    cf_sample=None,
+    continuous_covs=None,
+    label_index=None,
+    mc_samples=10,
+):
     """Compute normalized gene expression from observations"""
-    log_library = 7.0 * jnp.ones_like(sample_index)  # placeholder, will be replaced by observed library sizes.
-    inference_outputs = self.inference(x, sample_index, mc_samples=mc_samples, cf_sample=cf_sample, use_mean=False)
+    log_library = 7.0 * jnp.ones_like(
+        sample_index
+    )  # placeholder, will be replaced by observed library sizes.
+    inference_outputs = self.inference(
+        x, sample_index, mc_samples=mc_samples, cf_sample=cf_sample, use_mean=False
+    )
     generative_inputs = {
         "z": inference_outputs["z"],
         "library": log_library,
@@ -47,7 +60,15 @@ def compute_px_from_x(self, x, sample_index, batch_index, cf_sample=None, contin
     return generative_outputs["px"], inference_outputs["u"], log_library
 
 
-def compute_sample_cf_reconstruction_scores(self, sample_idx, adata=None, indices=None, batch_size=256, mc_samples=10, n_top_neighbors=5):
+def compute_sample_cf_reconstruction_scores(
+    self,
+    sample_idx,
+    adata=None,
+    indices=None,
+    batch_size=256,
+    mc_samples=10,
+    n_top_neighbors=5,
+):
     self._check_if_trained(warn=False)
     adata = self._validate_anndata(adata)
     sample_name = self.sample_order[sample_idx]
@@ -57,7 +78,9 @@ def compute_sample_cf_reconstruction_scores(self, sample_idx, adata=None, indice
     sample_u = self.get_latent_representation(sample_adata, give_z=False)
     sample_index = pynndescent.NNDescent(sample_u)
 
-    scdl = self._make_data_loader(adata=adata, batch_size=batch_size, indices=indices, iter_ndarray=True)
+    scdl = self._make_data_loader(
+        adata=adata, batch_size=batch_size, indices=indices, iter_ndarray=True
+    )
 
     def _get_all_inputs(
         inputs,
@@ -85,17 +108,17 @@ def compute_sample_cf_reconstruction_scores(self, sample_idx, adata=None, indice
 
         inputs = _get_all_inputs(array_dict)
         px, u, log_library_placeholder = self.module.apply(
-                vars_in,
-                rngs=rngs,
-                method=compute_px_from_x,
-                x=inputs["x"],
-                sample_index=inputs["sample_index"],
-                batch_index=inputs["batch_index"],
-                cf_sample=np.ones(inputs["x"].shape[0]) * sample_idx,
-                continuous_covs=inputs["continuous_covs"],
-                label_index=inputs["label_index"],
-                mc_samples=mc_samples,
-            )
+            vars_in,
+            rngs=rngs,
+            method=compute_px_from_x,
+            x=inputs["x"],
+            sample_index=inputs["sample_index"],
+            batch_index=inputs["batch_index"],
+            cf_sample=np.ones(inputs["x"].shape[0]) * sample_idx,
+            continuous_covs=inputs["continuous_covs"],
+            label_index=inputs["label_index"],
+            mc_samples=mc_samples,
+        )
         px_m, px_d = px.mean, px.inverse_dispersion
         if px_m.ndim == 2:
             px_m, px_d = np.expand_dims(px_m, axis=0), np.expand_dims(px_d, axis=0)
@@ -104,12 +127,30 @@ def compute_sample_cf_reconstruction_scores(self, sample_idx, adata=None, indice
         mc_log_probs = []
         batch_top_idxs = []
         for mc_sample_i in range(u.shape[0]):
-            nearest_sample_idxs = sample_index.query(u[mc_sample_i], k=n_top_neighbors)[0]
-            top_neighbor_counts = sample_adata.X[nearest_sample_idxs.reshape(-1), :].toarray().reshape((nearest_sample_idxs.shape[0],nearest_sample_idxs.shape[1], -1))
-            new_lib_size = top_neighbor_counts.sum(axis=-1) # batch_size x n_top_neighbors
-            corrected_px_m = px_m[mc_sample_i] / np.exp(log_library_placeholder[:, :, None]) * new_lib_size[:, :, None]
-            corrected_px = NegativeBinomial(mean=corrected_px_m, inverse_dispersion=px_d)
-            log_probs = corrected_px.log_prob(top_neighbor_counts).sum(-1).mean(-1) # 1 x batch_size
+            nearest_sample_idxs = sample_index.query(u[mc_sample_i], k=n_top_neighbors)[
+                0
+            ]
+            top_neighbor_counts = (
+                sample_adata.X[nearest_sample_idxs.reshape(-1), :]
+                .toarray()
+                .reshape(
+                    (nearest_sample_idxs.shape[0], nearest_sample_idxs.shape[1], -1)
+                )
+            )
+            new_lib_size = top_neighbor_counts.sum(
+                axis=-1
+            )  # batch_size x n_top_neighbors
+            corrected_px_m = (
+                px_m[mc_sample_i]
+                / np.exp(log_library_placeholder[:, :, None])
+                * new_lib_size[:, :, None]
+            )
+            corrected_px = NegativeBinomial(
+                mean=corrected_px_m, inverse_dispersion=px_d
+            )
+            log_probs = (
+                corrected_px.log_prob(top_neighbor_counts).sum(-1).mean(-1)
+            )  # 1 x batch_size
             mc_log_probs.append(log_probs)
             batch_top_idxs.append(nearest_sample_idxs)
         full_batch_log_probs = np.concatenate(mc_log_probs, axis=0).mean(0)
@@ -120,7 +161,14 @@ def compute_sample_cf_reconstruction_scores(self, sample_idx, adata=None, indice
     all_scores = np.hstack(scores)
     all_top_idxs = np.vstack(top_idxs)
     adata_index = adata[indices] if indices is not None else adata
-    return pd.Series(all_scores, index=adata_index.obs_names.to_numpy(), name=f"{sample_name}_score"), all_top_idxs
+    return (
+        pd.Series(
+            all_scores,
+            index=adata_index.obs_names.to_numpy(),
+            name=f"{sample_name}_score",
+        ),
+        all_top_idxs,
+    )
 
 
 def compute_distance_matrices(model, adata=None, dists=None, leiden_resolutions=None):
@@ -163,7 +211,6 @@ def compute_distance_matrices(model, adata=None, dists=None, leiden_resolutions=
             adata, key_added=f"leiden_dmats_{leiden_resol}", resolution=leiden_resol
         )
     return adata, dists
-
 
 
 INCH_TO_CM = 1 / 2.54
@@ -241,7 +288,6 @@ model = MrVI.load(
     "/data1/scvi-v2-reproducibility/results/aws_pipeline/models/haniffa2.scviv2_attention_mog",
     adata=adata,
     #     "/data1/scvi-v2-reproducibility/results/aws_pipeline/models/haniffa.scviv2_attention_no_prior_mog", adata=adata
-
 )
 model.history["elbo_validation"].iloc[50:].plot()
 ax = model.history["reconstruction_loss_validation"].plot()
@@ -257,22 +303,103 @@ donor_info = (
 
 # %%
 ### UMAPs
+replacer = {
+    "B_cell": "B cell",
+    "CD14": "CD14 Monocyte",
+    "CD16": "CD16 Monocyte",
+    "CD4": "CD4 T cell",
+    "CD8": "CD8 T cell",
+    "DCs": "DC",
+    "gdT": "gd T cell",
+    "NK_16hi": "NK",
+    "NK_56hi": "NK",
+    "pDC": "pDC",
+    "Plasmablast": "Other",
+    "Platelets": "Platelet",
+    "Treg": "Other",
+    "HSC": "Other",
+    "MAIT": "Other",
+    "Lymph_prolif": "Other",
+    "RBC": "Other",
+    "Mono_prolif": "Other",
+    "Lymph_prolif": "Other",
+}
+simplified_cts_cmap = {}
+
 adata_file = "../results/aws_pipeline/data/haniffa2.scviv2_attention_mog.final.h5ad"
 adata_ = sc.read_h5ad(adata_file)
-print(adata_.shape)
-for obsm_key in adata_.obsm.keys():
-    if obsm_key.endswith("mde") & ("scviv2" in obsm_key):
-        print(obsm_key)
-        fig = sc.pl.embedding(
-            adata_,
-            basis=obsm_key,
-            color=["initial_clustering", "Status", "Site", "patient_id"],
-            ncols=1,
-            show=False,
-            return_fig=True,
-        )
-        fig.savefig(os.path.join(FIGURE_DIR, f"haniffa.{obsm_key}.svg"))
-        plt.clf()
+adata_.obs.loc[:, "initial_clustering_simplified"] = adata_.obs.initial_clustering.map(
+    replacer
+)
+cat_order = [
+    "B cell",
+    "CD14 Monocyte",
+    "CD16 Monocyte",
+    "CD4 T cell",
+    "CD8 T cell",
+    "gd T cell",
+    "DC",
+    "NK",
+    "Platelet",
+    "pDC",
+    # "Other",
+]
+adata_.obs.loc[:, "initial_clustering_simplified"] = pd.Categorical(
+    adata_.obs.initial_clustering_simplified, categories=cat_order
+)
+print("# of CTs in original key:", adata_.obs.initial_clustering.nunique())
+print("# of CTs in simplified key:", adata_.obs.initial_clustering_simplified.nunique())
+
+
+# %%
+# keys_to_plot = ["initial_clustering", "initial_clustering_simplified", "Status", "Site", "patient_id"]
+# for obsm_key in adata_.obsm.keys():
+#     if obsm_key.endswith("mde") & ("scviv2" in obsm_key):
+#         print(obsm_key)
+#         fig = sc.pl.embedding(
+#             adata_,
+#             basis=obsm_key,
+#             color=keys_to_plot,
+#             ncols=1,
+#             show=False,
+#             return_fig=True,
+#         )
+#         fig.savefig(os.path.join(FIGURE_DIR, f"haniffa.{obsm_key}.svg"))
+#         plt.show()
+
+# %%
+for obsm_key in ["X_scviv2_attention_mog_u_mde", "X_scviv2_attention_mog_z_mde"]:
+    fig = sc.pl.embedding(
+        adata_,
+        basis=obsm_key,
+        color="initial_clustering_simplified",
+        ncols=1,
+        show=False,
+        return_fig=True,
+    )
+    fig.savefig(
+        os.path.join(FIGURE_DIR, f"haniffa.{obsm_key}.simple_celltypes.svg")
+    )
+    
+    idx_cov = adata_.obs.query("Status=='Covid'").index
+    idx_heal = adata_.obs.query("Status=='Healthy'").index
+    n_heal = len(idx_heal)
+    idx_cov = np.random.choice(idx_cov, size=n_heal, replace=False)
+    idx_total = np.concatenate([idx_heal, idx_cov])
+    idx_total = np.random.permutation(idx_total)
+    fig2 = sc.pl.embedding(
+        adata_[idx_total],
+        basis=obsm_key,
+        color="Status",
+        palette=["#9C0101", "#017401"],
+        ncols=1,
+        show=False,
+        return_fig=True,
+        # alpha=0.5,
+    )
+    fig2.savefig(
+        os.path.join(FIGURE_DIR, f"haniffa.{obsm_key}.covid_status.svg")
+    )
 
 
 # %%
@@ -367,6 +494,7 @@ fig = sc.pl.embedding(
         DMAT_CLUSTERING_KEY,
     ],
     return_fig=True,
+    palette="Set2",
 )
 fig.savefig(
     os.path.join(
@@ -468,7 +596,7 @@ model.donor_info = obs_df.set_index("_scvi_sample").sort_index()
 _adata = adata_mat[adata_mat.obs[DMAT_CLUSTERING_KEY] == "1"].copy()
 
 # %%
-## Perform DE analysis
+# ## Perform DE analysis
 
 multivariate_analysis_kwargs = {
     "batch_size": 128,
@@ -478,21 +606,56 @@ multivariate_analysis_kwargs = {
     "eps_lfc": 1e-4,
 }
 
+# res = model.perform_multivariate_analysis(
+#     donor_keys=donor_keys_bis,
+#     adata=_adata,
+#     **multivariate_analysis_kwargs,
+# )
+# # %%
+# betas_ = res.lfc.transpose("cell_name", "covariate", "gene")
+# betas_ = (
+#     betas_.loc[{"covariate": "is_covid2"}].values
+#     - betas_.loc[{"covariate": "is_covid1"}].values
+# )
+# plt.hist(betas_.mean(0), bins=100)
+# plt.xlabel("LFC")
+# plt.show()
+
+# # %%
+# betas_ = res.lfc.transpose("cell_name", "covariate", "gene")
+# betas_ = (
+#     betas_.loc[{"covariate": "is_covid2"}].values
+#     - betas_.loc[{"covariate": "is_covid1"}].values
+# )
+# plt.hist(betas_.mean(0), bins=100)
+# plt.xlabel("LFC")
+# plt.show()
+# %%
+## Perform DE analysis
+
+donor_subset = obs_df.loc[
+    lambda x: (x.is_covid1 == 1) | (x.is_covid2 == 1)
+].patient_id.values
+donor_keys_ = ["is_covid1"]
+multivariate_analysis_kwargs = {
+    "batch_size": 128,
+    "normalize_design_matrix": True,
+    "offset_design_matrix": False,
+    "store_lfc": True,
+    "eps_lfc": 1e-4,
+}
+
 res = model.perform_multivariate_analysis(
-    donor_keys=donor_keys_bis,
+    donor_keys=donor_keys_,
     adata=_adata,
+    donor_subset=donor_subset,
     **multivariate_analysis_kwargs,
 )
 # %%
-betas_ = res.lfc.transpose("cell_name", "covariate", "gene")
-betas_ = (
-    betas_.loc[{"covariate": "is_covid2"}].values
-    - betas_.loc[{"covariate": "is_covid1"}].values
-)
+betas_ = res.lfc.values.squeeze(0)
 plt.hist(betas_.mean(0), bins=100)
 plt.xlabel("LFC")
 plt.show()
-
 # %%
 lfc_df = pd.DataFrame(
     {
@@ -515,7 +678,7 @@ v500 = lfc_df.gene_score.sort_values().iloc[-1000]
 plt.vlines(v500, 0, 1000)
 
 # Cluster and visualize DE genes
-cond = lfc_df.sort_values("gene_score", ascending=False).iloc[:1000].gene_index.values
+cond = lfc_df.sort_values("gene_score", ascending=False).iloc[:500].gene_index.values
 betas_de = betas_[:, cond]
 obs_de = lfc_df.loc[cond, :].reset_index(drop=True)
 obs_de.index = obs_de.gene
@@ -528,8 +691,8 @@ adata_t = sc.AnnData(
     # X=np.abs(betas_de.T),
     obs=obs_de,
 )
-lfc_pca = PCA(n_components=5)
-lfc_pca = KernelPCA(n_components=5, kernel="cosine")
+lfc_pca = PCA(n_components=4)
+# lfc_pca = KernelPCA(n_components=5, kernel="cosine")
 lfc_pcs = lfc_pca.fit_transform(adata_t.X)
 adata_t.obsm["lfc_pca"] = lfc_pcs
 adata_t.obsm["lfc_mds"] = TSNE(
@@ -538,12 +701,15 @@ adata_t.obsm["lfc_mds"] = TSNE(
 
 sc.pp.neighbors(adata_t, use_rep="lfc_pca", n_neighbors=10, random_state=0)
 
+# %%
 # RESOLUTION = 0.25
 RESOLUTION = 0.15
 sc.tl.leiden(adata_t, key_added="lfc_leiden", resolution=RESOLUTION, random_state=0)
-adata_t.obs["lfc_clusters"] = KMeans(n_clusters=3, n_init=1000).fit_predict(lfc_pcs)
+adata_t.obs["lfc_clusters"] = KMeans(n_clusters=4, n_init=1000).fit_predict(lfc_pcs)
 adata_t.obs["lfc_clusters"] = adata_t.obs["lfc_clusters"].astype(str)
+# adata_t.obs["lfc_clusters"] = adata_t.obs["lfc_leiden"].astype(str)
 
+# %%
 vmax = np.quantile(obs_de.absLFC.values, 0.95)
 sc.pl.embedding(
     adata_t,
@@ -616,19 +782,32 @@ gene_info_modules.to_csv(
 )
 
 # %%
+# sc.pp.neighbors(_adata, use_rep="X_scviv2_attention_mog_u")
+# sc.tl.umap(_adata, min_dist=0.5)
+
+# %%
+
 ## Plot cell subpopulations
-# fig = sc.pl.embedding(
+fig = sc.pl.embedding(
+    _adata,
+    basis="X_scviv2_attention_mog_u_mde",
+    color=["initial_clustering"],
+    return_fig=True,
+)
+
+# fig = sc.pl.umap(
 #     _adata,
-#     basis="X_scviv2_attention_mog_u_mde",
+#     # basis="X_scviv2_attention_mog_u_mde",
 #     color=["initial_clustering"],
 #     return_fig=True,
 # )
-# fig.savefig(
-#     os.path.join(
-#         FIGURE_DIR,
-#         f"initial_clustering_{cluster}.svg",
-#     )
-# )
+
+fig.savefig(
+    os.path.join(
+        FIGURE_DIR,
+        f"initial_clustering_{cluster}.svg",
+    )
+)
 
 # %%
 genes_of_interest = [
@@ -639,6 +818,7 @@ genes_of_interest = [
     "IRF7",
     "ССL13",
     "IL1B",
+    "LGALS1",
     "LGALS2",
     "CSF3R",
     "HLA-DRA",
@@ -658,9 +838,7 @@ for gene in genes_of_interest:
 for beta_module_key in beta_module_keys:
     cluster = int(beta_module_key.split("_")[-1])
     gene_info_module = (
-        gene_info_.loc[
-            gene_info_[LFC_CLUSTERING_KEY] == str(cluster)
-        ]
+        gene_info_.loc[gene_info_[LFC_CLUSTERING_KEY] == str(cluster)]
         .sort_values("absLFC", ascending=False)
         .loc[:, ["gene", "LFC", "absLFC"]]
     )
@@ -672,7 +850,7 @@ for beta_module_key in beta_module_keys:
         sep="\t",
     )
 
-    vmin, vmax = np.quantile(_adata.obs[beta_module_key], [0.05, 0.95])
+    vmin, vmax = np.quantile(_adata.obs[beta_module_key], [0.10, 0.90])
     # Option when sorted by abs
     # cmap = "viridis"
 
@@ -693,6 +871,14 @@ for beta_module_key in beta_module_keys:
         cmap=cmap,
         return_fig=True,
     )
+    # fig = sc.pl.umap(
+    #     _adata,
+    #     color=beta_module_key,
+    #     vmin=vmin,
+    #     vmax=vmax,
+    #     cmap=cmap,
+    #     return_fig=True,
+    # )
     fig.savefig(
         os.path.join(
             FIGURE_DIR,
@@ -720,8 +906,8 @@ for beta_module_key in beta_module_keys:
                 x="Term",
                 y="Significance score",
                 # fill='Gene_set',
-            )
-            )
+            ),
+        )
         + p9.geom_col(color="grey")
         # + p9.geom_col()
         + p9.labs(
@@ -752,7 +938,9 @@ for beta_module_key in beta_module_keys:
         print(term)
 
 # %%
-da_res = model.get_outlier_cell_sample_pairs(flavor="ap", minibatch_size=1000, adata=_adata)
+da_res = model.get_outlier_cell_sample_pairs(
+    flavor="ap", minibatch_size=1000, adata=_adata
+)
 gp1 = model.donor_info.query('Status == "Covid"').patient_id.values
 gp2 = model.donor_info.query('Status == "Healthy"').patient_id.values
 log_p1 = da_res.log_probs.loc[{"sample": gp1}]
@@ -762,8 +950,8 @@ log_p2 = logsumexp(log_p2, axis=1) - np.log(log_p2.shape[1])
 log_ratios_casecontrol = log_p1 - log_p2
 
 
-gp1 = model.donor_info.query('is_covid2 == 1').patient_id.values
-gp2 = model.donor_info.query('is_covid1 == 1').patient_id.values
+gp1 = model.donor_info.query("is_covid2 == 1").patient_id.values
+gp2 = model.donor_info.query("is_covid1 == 1").patient_id.values
 log_p1 = da_res.log_probs.loc[{"sample": gp1}]
 log_p1 = logsumexp(log_p1, axis=1) - np.log(log_p1.shape[1])
 log_p2 = da_res.log_probs.loc[{"sample": gp2}]
@@ -812,13 +1000,11 @@ for key in ["initial_clustering", "log_ratios_casecontrol", "log_ratios_earlylat
 
 
 # %%
-plot_df = (
-    _adata.obs
-    .loc[lambda x: x.initial_clustering.isin(["CD14", "CD16", "DCs"])]
-    .melt(
-        id_vars=["initial_clustering"],
-        value_vars=["log_ratios_casecontrol", "log_ratios_earlylate"],
-    )
+plot_df = _adata.obs.loc[
+    lambda x: x.initial_clustering.isin(["CD14", "CD16", "DCs"])
+].melt(
+    id_vars=["initial_clustering"],
+    value_vars=["log_ratios_casecontrol", "log_ratios_earlylate"],
 )
 
 (
@@ -837,34 +1023,63 @@ sample_name = "newcastle74"
 sample_idx = model.sample_order.tolist().index(sample_name)
 np.random.seed(42)
 random_indices = np.random.choice(adata.shape[0], size=10000, replace=False)
-sample_scores, top_idxs = compute_sample_cf_reconstruction_scores(model, sample_idx, indices=random_indices)
+sample_scores, top_idxs = compute_sample_cf_reconstruction_scores(
+    model, sample_idx, indices=random_indices
+)
 
 # %%
 adata_subset = adata[sample_scores.index]
-sample_ball_res = ood_res.sel(cell_name=adata_subset.obs_names).sel(sample=model.sample_order[sample_idx])
+sample_ball_res = ood_res.sel(cell_name=adata_subset.obs_names).sel(
+    sample=model.sample_order[sample_idx]
+)
 sample_adm_log_probs = sample_ball_res.log_probs.to_series()
 sample_adm_bool = sample_ball_res.is_admissible.to_series()
-is_sample = pd.Series(adata_subset.obs["sample_id"] == model.sample_order[sample_idx], name="is_sample", dtype=bool)
-sample_log_lib_size = pd.Series(np.log(adata_subset.X.toarray().sum(axis=1)), index=adata_subset.obs_names, name="log_lib_size")
-cell_category = pd.Series(["Not Admissible"] * adata_subset.shape[0], dtype=str, name="cell_category", index=adata_subset.obs_names)
+is_sample = pd.Series(
+    adata_subset.obs["sample_id"] == model.sample_order[sample_idx],
+    name="is_sample",
+    dtype=bool,
+)
+sample_log_lib_size = pd.Series(
+    np.log(adata_subset.X.toarray().sum(axis=1)),
+    index=adata_subset.obs_names,
+    name="log_lib_size",
+)
+cell_category = pd.Series(
+    ["Not Admissible"] * adata_subset.shape[0],
+    dtype=str,
+    name="cell_category",
+    index=adata_subset.obs_names,
+)
 cell_category[sample_adm_bool.to_numpy()] = "Admissible"
 cell_category[is_sample.to_numpy()] = "In Sample"
 cell_category = cell_category.astype("category")
 
-rec_score_plot_df = (
-    pd.concat((sample_adm_log_probs, sample_adm_bool, is_sample, cell_category, sample_scores,  sample_log_lib_size), axis=1)
-    .sample(frac=1, replace=False)
-)
+rec_score_plot_df = pd.concat(
+    (
+        sample_adm_log_probs,
+        sample_adm_bool,
+        is_sample,
+        cell_category,
+        sample_scores,
+        sample_log_lib_size,
+    ),
+    axis=1,
+).sample(frac=1, replace=False)
 
-ax = sns.scatterplot(rec_score_plot_df, x="log_probs", y=f"{sample_name}_score", hue="cell_category", s=5)
+ax = sns.scatterplot(
+    rec_score_plot_df, x="log_probs", y=f"{sample_name}_score", hue="cell_category", s=5
+)
 plt.xlabel("Admissibility Score")
 plt.ylabel("Reconstruction Log Prob of In-Sample NN")
 handles, labels = plt.gca().get_legend_handles_labels()
 order = [1, 2, 0]
-plt.legend([handles[idx] for idx in order],[labels[idx] for idx in order])
+plt.legend([handles[idx] for idx in order], [labels[idx] for idx in order])
 plt.xlim(-100, 30)
 plt.savefig(
-    os.path.join(FIGURE_DIR, f"haniffa_{sample_name}_admissibility_vs_reconstruction_w_category.svg")
+    os.path.join(
+        FIGURE_DIR,
+        f"haniffa_{sample_name}_admissibility_vs_reconstruction_w_category.svg",
+    )
 )
 plt.clf()
 
@@ -911,3 +1126,5 @@ bm.plot_results_table(
     min_max_scale=False,
     save_dir=FIGURE_DIR,
 )
+
+# %%

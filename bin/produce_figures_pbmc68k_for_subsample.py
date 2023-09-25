@@ -8,6 +8,10 @@ import numpy as np
 from scipy.special import logsumexp
 import matplotlib.pyplot as plt
 import seaborn as sns
+import scipy.sparse as sp
+from scipy.stats import pearsonr
+from pydeseq2.dds import DeseqDataSet
+from tqdm import tqdm
 from ete3 import Tree
 
 from tree_utils import hierarchical_clustering
@@ -114,10 +118,11 @@ for adata_file in adata_files:
             print(obsm_key)
             rdm_perm = np.random.permutation(adata.shape[0])
             adata_.obs["cell_type"] = adata.obs.leiden.copy().astype(str)
-            adata_.obs.loc[~adata_.obs.leiden.isin(("0", "1")), "cell_type"] = "other"
+            adata_.obs.loc[~adata_.obs.leiden.isin(("0", "1", "3")), "cell_type"] = "other"
             adata_.obs["cell_type"] = adata_.obs["cell_type"].astype("category")
             adata_.uns["cell_type_colors"] = {
-                "0": "#7AB5FF",
+                "0": "#7AA98F",
+                "3": "#7AB5FF",
                 "1": "#FF7A7A",
                 "other": "lightgray",
             }
@@ -151,6 +156,7 @@ for adata_file in adata_files:
                 return_fig=True,
                 show=False,
             )
+            print(os.path.join(FIGURE_DIR, f"{obsm_key}_subcluster.svg"))
             plt.savefig(
                 os.path.join(FIGURE_DIR, f"{obsm_key}_subcluster.svg"),
                 bbox_inches="tight",
@@ -531,12 +537,181 @@ model.donor_info = obs_df.set_index("_scvi_sample").sort_index()
 adata.obs
 
 # %%
+WORKDIR = "/data1/scvi-v2-reproducibility/results/milo/models"
+filedir = os.path.join(WORKDIR, "pbmcs68k_for_subsample.MILODE.de_analysis.tsv")
+mtx_file = os.path.join(WORKDIR, "pbmcs68k_for_subsample.MILODE.assignments.mtx")
+
+milode_preds = pd.read_csv(
+    filedir, 
+    sep="\t",
+)
+milode_neighborhoods = pd.read_csv(
+    mtx_file,
+    sep="\s",
+    skiprows=2,
+    header=None,
+)
+cell_idx = milode_neighborhoods.iloc[:, 0].to_numpy() - 1
+neigh_idx = milode_neighborhoods.iloc[:, 1].to_numpy() - 1
+data_idx = np.ones_like(cell_idx)
+mtx = sp.csr_matrix((data_idx, (cell_idx, neigh_idx)))
+
+# %%
+milode_nhoods_lfcs = (
+    milode_preds
+    .pivot_table(columns="gene", index="Nhood", values="logFC")
+    .fillna(0.0)
+    .sort_index()
+)
+milode_nhoods_lfcs.columns.name = None
+milode_nhoods_pvals = (
+    milode_preds
+    .pivot_table(columns="gene", index="Nhood", values="pval")
+    .fillna(1.0)
+    .sort_index()
+)
+milode_nhoods_pvals.columns.name = None
+
+milode_cell_pvals_max = []
+milode_cell_pvals_mean = []
+milode_cell_lfcs = []
+for row in tqdm(mtx):
+    row_ = row.toarray().flatten()
+    row_ = row_ > 0
+    res_lfc = milode_nhoods_lfcs.iloc[row_]
+    res_pval = milode_nhoods_pvals.iloc[row_]
+    
+    milode_cell_lfcs.append(res_lfc.mean(0))
+    milode_cell_pvals_mean.append(res_pval.mean(0))
+    milode_cell_pvals_max.append(res_pval.max(0))
+milode_cell_lfcs = pd.concat(milode_cell_lfcs, axis=1).T
+milode_cell_pvals_max = pd.concat(milode_cell_pvals_max, axis=1).T
+milode_cell_pvals_mean = pd.concat(milode_cell_pvals_mean, axis=1).T
+
+
+# %%
+
+# %%
+multivariate_analysis_kwargs = {
+    "batch_size": 128,
+    "normalize_design_matrix": True,
+    "offset_design_matrix": False,
+    "store_lfc": True,
+    "eps_lfc": 1e-4,
+}
+
+d_keys = ["group_1"]
+
 mv_deg_res = model.perform_multivariate_analysis(
-    adata,
-    donor_keys=[f"group_{group}" for group in sample_to_group.unique()],
-    store_lfc=True,
+    adata, donor_keys=d_keys, **multivariate_analysis_kwargs,
 )
 mv_deg_res
+
+# %%
+mrvi_lfcs = mv_deg_res.lfc.squeeze("covariate").to_pandas()
+milode_cell_lfcs.index = adata.obs_names
+
+
+# adata_pos = adata[adata.obs.leiden == "0"].copy()
+# sc.pp.normalize_total(adata_pos, target_sum=1e4)
+# sc.pp.log1p(adata_pos)
+
+# adata_pos_1 = adata_pos[adata_pos.obs.sample_group == 1].copy()
+# x_1 = adata_pos_1.X.toarray()
+# adata_pos_2 = adata_pos[adata_pos.obs.sample_group != 1].copy()
+# x_2 = adata_pos_2.X.toarray()
+# lfc_gt = x_1.mean(0) - x_2.mean(0)
+# stat_res = ranksums(x_1, x_2)
+
+# gt_de_analysis = pd.DataFrame(
+#     {
+#         "gene": adata_pos_1.var_names,
+#         "pvalue": stat_res.pvalue,
+#         "statistic": stat_res.statistic,
+#         "lfc_gt": lfc_gt,
+#         "padj": multipletests(stat_res.pvalue, method="fdr_bh")[1],
+#     }
+# )
+# gt_de_analysis.loc[:, "is_gene_for_subclustering"] = gt_de_analysis.padj < 0.05
+
+# %%
+adata_pos = adata[adata.obs.leiden == "0"].copy()
+sc.pp.subsample(adata_pos, n_obs=8000)
+counts_df = pd.DataFrame(
+    adata_pos.X.toarray(), 
+    columns=adata_pos.var_names
+)
+metadata = (adata_pos.obs.sample_group == 1).astype(int).to_frame("condition")
+dds = DeseqDataSet(
+    counts=counts_df,
+    metadata=metadata,
+    design_factors="condition",
+    refit_cooks=True,
+    n_cpus=8,
+)
+dds.deseq2()
+# %%
+gt_de_analysis = pd.DataFrame(
+    {
+        "gene": dds.var_names,
+        "lfc_gt": dds.varm["LFC"]["condition_1_vs_0"].fillna(0.0).values,
+    }
+)
+
+# %%
+
+mrvi_res = gt_de_analysis.merge(
+    mrvi_lfcs[(adata.obs.leiden == "0").values].mean(0).to_frame("LFC"),
+    on="gene",
+    how="left",
+)
+
+milode_res = gt_de_analysis.merge(
+    milode_cell_lfcs[(adata.obs.leiden == "0").values].mean(0).to_frame("LFC"),
+    left_on="gene",
+    right_index=True,
+)
+r_mrvi = pearsonr(
+    mrvi_res.LFC.values,
+    mrvi_res.lfc_gt.values,
+)
+r_milode = pearsonr(
+    milode_res.LFC.values,
+    milode_res.lfc_gt.values,
+)
+de_comp = pd.concat(
+    [
+        mrvi_res.assign(method=f"MrVI; Pearson r: {r_mrvi[0]:.2f}"),
+        milode_res.assign(method=f"MILODE; Pearson r: {r_milode[0]:.2f}"),
+    ]
+)
+
+# %%
+de_comp_ = de_comp.sample(frac=0.3)
+de_comp_
+# %%
+vmax = 0.5
+fig = (
+    p9.ggplot(de_comp_, p9.aes(x="LFC", y="lfc_gt", fill="method"))
+    + p9.geom_abline(slope=1, intercept=0, color="black", linetype="dashed", size=1)
+    + p9.geom_point(stroke=0.1, alpha=0.5)
+    + p9.theme_classic()
+    + p9.xlim(-vmax, vmax)
+    + p9.ylim(-vmax, vmax)
+    + p9.theme(
+        figure_size=(4 * INCH_TO_CM, 4 * INCH_TO_CM),
+        axis_text=p9.element_text(size=6),
+        axis_title=p9.element_text(size=7),
+        legend_position="none",
+    )
+    + p9.labs(
+        y="Inferred LFC",
+    )
+)
+fig.save(os.path.join(FIGURE_DIR, "deg_comparison_legend.svg"))
+fig
+
+
 
 # %%
 group_no = 1
@@ -546,7 +721,7 @@ model_out_adata.obs[f"group_{group_no}_eff_size"] = mv_deg_res.effect_size.sel(
 fig = sc.pl.embedding(
     model_out_adata,
     basis="X_scviv2_attention_mog_u_mde",
-    color=f"group_{group_no}_eff_size",
+    color=[f"group_{group_no}_eff_size", "leiden"],
     vmax="p95",
     vmin="p5",
     return_fig=True,
@@ -558,6 +733,8 @@ plt.savefig(
 )
 plt.show()
 plt.clf()
+
+
 
 # %%
 lfcs = mv_deg_res.lfc.sel(covariate="group_1").values
@@ -571,54 +748,6 @@ plt.hist(lfcs_in_one, bins=bins, alpha=0.5, label="cluster 1")
 plt.hist(lfcs_in_others, bins=bins, alpha=0.5, label="other clusters")
 plt.legend()
 
-# %%
-# abs_lfcs = np.abs(lfcs)
-# abs_lfcs_in_one = abs_lfcs[adata.obs.leiden == "0"].mean(0)
-# abs_lfcs_in_others = abs_lfcs[adata.obs.leiden != "0"].mean(0)
-# abs_lfcs_in_one = np.abs(lfcs_in_one)
-# abs_lfcs_in_others = np.abs(lfcs_in_others)
-# is_gene_used = adata.var["is_gene_for_subclustering"]
-# plot_df = pd.concat(
-#     [
-#         pd.DataFrame(
-#             {
-#                 "abs_lfc": abs_lfcs_in_one,
-#                 "is_gene_for_subclustering": is_gene_used,
-#                 "cluster": "cluster 0",
-#             }
-#         ),
-#         pd.DataFrame(
-#             {
-#                 "abs_lfc": abs_lfcs_in_others,
-#                 "is_gene_for_subclustering": is_gene_used,
-#                 "cluster": "other_clusters",
-#             }
-#         ),
-#     ]
-# )
-
-# colors = ["#7AB5FF", "lightgray"]
-# fig = (
-#     p9.ggplot(
-#         plot_df,
-#         p9.aes(x="factor(is_gene_for_subclustering)", y="abs_lfc", fill="cluster"),
-#     )
-#     + p9.geom_boxplot(outlier_alpha=0.0)
-#     + p9.ylim(0, 0.02)
-#     + p9.scale_fill_manual(values=colors)
-#     + p9.coord_flip()
-#     + p9.labs(
-#         x="",
-#         y="Absolute LFC",
-#     )
-#     + p9.theme_classic()
-#     + p9.theme(
-#         figure_size=(8 * INCH_TO_CM, 4 * INCH_TO_CM),
-#     )
-#     + SHARED_THEME
-# )
-# fig.save(os.path.join(FIGURE_DIR, "DEGs.svg"))
-# fig
 
 # %%
 from scipy.stats import wilcoxon, ranksums
@@ -627,34 +756,6 @@ from statsmodels.stats.multitest import multipletests
 adata_pos = adata[adata.obs.leiden == "0"].copy()
 sc.pp.normalize_total(adata_pos, target_sum=1e4)
 sc.pp.log1p(adata_pos)
-# gt_de_analysis = []
-# for leiden in adata_pos.obs.sample_group.unique():
-#     adata_pos_1 = adata_pos[adata_pos.obs.sample_group == leiden].copy()
-#     x_1 = adata_pos_1.X.toarray()
-#     adata_pos_2 = adata_pos[adata_pos.obs.sample_group != leiden].copy()
-#     x_2 = adata_pos_2.X.toarray()
-
-#     # stat_res = np.array([wilcoxon(x_, y_).pvalue for (x_, y_) in zip(x_1.T, x_2.T)])
-#     stat_res = ranksums(x_1, x_2)
-
-#     gt_de_analysis.append(
-#         pd.DataFrame(
-#             {
-#                 "gene": adata_pos_1.var_names,
-#                 "pvalue": stat_res.pvalue,
-#                 "statistic": stat_res.statistic,
-#                 "leiden": leiden,
-#                 "padj": multipletests(stat_res.pvalue, method="fdr_bh")[1],
-#             }
-#         )
-#     )
-# gene_scores = (
-#     gt_de_analysis
-#     .groupby("gene")
-#     .mean()
-# )
-# gt_de_analysis = pd.concat(gt_de_analysis)
-
 
 adata_pos_1 = adata_pos[adata_pos.obs.sample_group == 1].copy()
 x_1 = adata_pos_1.X.toarray()
@@ -706,7 +807,9 @@ lfcs_ = (
 )
 lfcs_
 
-(p9.ggplot(lfcs_, p9.aes(x="LFC", y="statistic", fill="Group")) + p9.geom_point())
+
+# %%
+
 
 
 # %%
@@ -728,10 +831,11 @@ fig = (
     )
 )
 fig.save(os.path.join(FIGURE_DIR, "semisynth_DEGs_legend.svg"))
+fig
 
-fig = fig + p9.theme(legend_position="none")
-fig.save(os.path.join(FIGURE_DIR, "semisynth_DEGs.svg"))
-
+fig2 = fig + p9.theme(legend_position="none")
+fig2.save(os.path.join(FIGURE_DIR, "semisynth_DEGs.svg"))
+fig
 # %%
 high_eff_size_cells = model_out_adata[
     model_out_adata.obs["group_1_eff_size"] > 400
@@ -892,6 +996,7 @@ model_out_adata.obs.loc[:, "log_ratios"] = log_ratios
 # %%
 q5, q95 = np.quantile(log_ratios, [0.05, 0.95])
 qval = np.maximum(np.abs(q5), np.abs(q95))
+qval = np.abs(q5)
 fig = sc.pl.embedding(
     model_out_adata,
     basis="X_scviv2_attention_mog_u_mde",
@@ -909,14 +1014,10 @@ plt.savefig(
 )
 
 # %%
-import scipy.sparse as sp
-from tqdm import tqdm
-
 # Comparison to MILO
 milo_analysis = pd.read_csv(
     "../results/milo/models/pbmcs68k_for_subsample.MILO.da_analysis.tsv", sep="\t"
 )
-milo_analysis
 milo_neighborhoods = pd.read_csv(
     "../results/milo/models/pbmcs68k_for_subsample.MILO.assignments.mtx",
     sep="\s",
@@ -928,6 +1029,7 @@ neigh_idx = milo_neighborhoods.iloc[:, 1].to_numpy() - 1
 data_idx = np.ones_like(cell_idx)
 mtx = sp.csr_matrix((data_idx, (cell_idx, neigh_idx)))
 
+print(mtx.shape, milo_analysis.shape)
 # %%
 milo_cell_res = []
 for row in tqdm(mtx):
@@ -936,7 +1038,9 @@ for row in tqdm(mtx):
     res_ = milo_analysis.iloc[row_]
     lfc = res_["logFC"].mean(0)
     pval = res_["PValue"].min(0)
-    milo_cell_res.append(dict(lfc=lfc, pval=pval))
+    pval_conservative = res_["PValue"].max(0)
+    abs_lfc = np.abs(lfc)
+    milo_cell_res.append(dict(lfc=lfc, pval=pval, pval_conservative=pval_conservative, abs_lfc=abs_lfc))
 milo_cell_res = pd.DataFrame(milo_cell_res)
 
 
@@ -954,14 +1058,19 @@ fig = sc.pl.embedding(
     show=False,
     return_fig=True,
 )
-fig.show()
+fig.savefig(
+    os.path.join(
+        FIGURE_DIR, f"DA_comparison_lfcs.svg"
+    )
+)
 
 # %%
 from sklearn.metrics import precision_recall_curve
 
 
 def plot_pr(y_pred, label=None):
-    y_true = (adata.obs["leiden"] == "1").values
+    # y_true = (adata.obs["leiden"] == "1").values
+    y_true = (adata.obs["leiden"].isin(["1", "3"])).values
     y_pred_ = y_pred.copy()
     y_pred_[np.isnan(y_pred_)] = 0.0
     pre, rec, _ = precision_recall_curve(y_true, -y_pred_)
@@ -969,22 +1078,12 @@ def plot_pr(y_pred, label=None):
     return pd.DataFrame(dict(precision=pre, recall=rec))
 
 
-# plot_pr(log_ratios, label="MrVI")
-# plot_pr(milo_cell_res["lfc"].values, label="MILO")
-# plt.legend()
-# plt.xlabel("Recall")
-# plt.ylabel("Precision")
-# plt.xlim(0.01, 1.0)
-# plt.savefig(
-#     os.path.join(FIGURE_DIR, f"semisynth_pr.svg"),
-# )
-# plt.show()
 
 # %%
-df1 = plot_pr(log_ratios, label="MrVI")
-df2 = plot_pr(milo_cell_res["lfc"].values, label="MrVI")
+df1 = plot_pr(-np.abs(log_ratios))
+# df2 = plot_pr(milo_cell_res["pval"].values)
+df2 = plot_pr(-np.abs(milo_cell_res["lfc"].values))
 df = pd.concat([df1.assign(model="MrVI"), df2.assign(model="MILO")])
-
 fig = (
     p9.ggplot(df, p9.aes(x="recall", y="precision", color="model"))
     + p9.geom_line()
@@ -999,121 +1098,148 @@ fig = (
     )
 )
 fig.save(
-    os.path.join(FIGURE_DIR, f"semisynth_pr.svg"),
+    os.path.join(FIGURE_DIR, f"semisynth_pr2.svg"),
 )
 fig
 
-# %%
-plot_df = pd.concat(
-    [
-        pd.DataFrame(
-            dict(
-                es=log_ratios,
-                method="MrVI",
-                is_cell_affected=(adata.obs["leiden"] == "1").values,
-            )
-        ),
-        pd.DataFrame(
-            dict(
-                es=milo_cell_res["lfc"].values,
-                method="MILO",
-                is_cell_affected=(adata.obs["leiden"] == "1").values,
-            )
-        ),
-    ]
-)
-(
-    p9.ggplot(plot_df, p9.aes(x="factor(is_cell_affected)", y="es", fill="method"))
-    + p9.geom_boxplot()
-)
 
 # %%
-lib_size = adata.X.sum(1).A1
-log_ratios
+# df1 = plot_pr(log_ratios, label="MrVI")
+# # df2 = plot_pr(milo_cell_res["lfc"].values, label="MrVI")
+# df2 = plot_pr(-milo_cell_res["pvalue"].values, label="MrVI")
+# df = pd.concat([df1.assign(model="MrVI"), df2.assign(model="MILO")])
+
+# fig = (
+#     p9.ggplot(df, p9.aes(x="recall", y="precision", color="model"))
+#     + p9.geom_line()
+#     + p9.theme_classic()
+#     + SHARED_THEME
+#     + p9.theme(
+#         figure_size=(5.8 * INCH_TO_CM, 4 * INCH_TO_CM),
+#     )
+#     + p9.xlim(0.01, 1.0)
+#     + p9.labs(
+#         color="",
+#     )
+# )
+# fig.save(
+#     os.path.join(FIGURE_DIR, f"semisynth_pr.svg"),
+# )
+# fig
+
+# # %%
+# plot_df = pd.concat(
+#     [
+#         pd.DataFrame(
+#             dict(
+#                 es=log_ratios,
+#                 method="MrVI",
+#                 is_cell_affected=(adata.obs["leiden"] == "1").values,
+#             )
+#         ),
+#         pd.DataFrame(
+#             dict(
+#                 es=milo_cell_res["lfc"].values,
+#                 method="MILO",
+#                 is_cell_affected=(adata.obs["leiden"] == "1").values,
+#             )
+#         ),
+#     ]
+# )
+# (
+#     p9.ggplot(plot_df, p9.aes(x="factor(is_cell_affected)", y="es", fill="method"))
+#     + p9.geom_boxplot()
+# )
+
+# # %%
+# lib_size = adata.X.sum(1).A1
+# log_ratios
 
 
-df_ = pd.DataFrame(
-    {
-        "lib_size": lib_size,
-        "log_ratios": log_ratios,
-        "population": adata.obs["leiden"].values,
-    }
-)
-df_ = (
-    df_.assign(
-        is_cell_affected=lambda x: x["population"] == "1",
-    )
-    # .query("population != '1'")
-    # .sort_values("log_ratios")
-)
+# df_ = pd.DataFrame(
+#     {
+#         "lib_size": lib_size,
+#         "log_ratios": log_ratios,
+#         "population": adata.obs["leiden"].values,
+#     }
+# )
+# df_ = (
+#     df_.assign(
+#         is_cell_affected=lambda x: x["population"] == "1",
+#     )
+#     # .query("population != '1'")
+#     # .sort_values("log_ratios")
+# )
 
-(
-    p9.ggplot(
-        df_.sample(frac=1.0),
-        p9.aes(x="lib_size", y="log_ratios", fill="is_cell_affected"),
-    )
-    + p9.geom_point()
-)
+# (
+#     p9.ggplot(
+#         df_.sample(frac=1.0),
+#         p9.aes(x="lib_size", y="log_ratios", fill="is_cell_affected"),
+#     )
+#     + p9.geom_point()
+# )
+
+# # %%
+# df_.query("~is_cell_affected").sort_values("log_ratios").assign(
+#     rank_=lambda x: np.arange(len(x))
+# ).plot.scatter("rank_", "lib_size")
+
+
+# # %%
+# adata_files = glob.glob("../results/milo/data/pbmcs68k_for_subsample*.final.h5ad")
+# for adata_file in adata_files:
+#     print(adata_file)
+
+# # %%
+# selected_files = [
+#     dict(
+#         filename="../results/milo/data/pbmcs68k_for_subsample.scviv2_attention_mog.final.h5ad",
+#         modelname="MrVI",
+#         keyname="X_scviv2_attention_mog_u",
+#     ),
+#     dict(
+#         filename="../results/milo/data/pbmcs68k_for_subsample.composition_SCVI_leiden1_subleiden1.final.h5ad",
+#         modelname="SCVI",
+#         keyname="X_SCVI_leiden1_subleiden1",
+#     ),
+#     dict(
+#         filename="../results/milo/data/pbmcs68k_for_subsample.composition_PCA_leiden1_subleiden1.final.h5ad",
+#         modelname="PCA",
+#         keyname="X_PCA_leiden1_subleiden1",
+#     ),
+# ]
+# embedding_obsm_keys = []
+# for mydic in selected_files:
+#     file = mydic["filename"]
+#     keyname = mydic["keyname"]
+#     modelname = mydic["modelname"]
+#     _adata = sc.read_h5ad(file)
+#     adata.obsm[modelname] = _adata.obsm[keyname]
+#     embedding_obsm_keys.append(modelname)
+
+# # %%
+# from scib_metrics.benchmark import Benchmarker
+
+# bm = Benchmarker(
+#     adata,
+#     batch_key="sample_assignment",
+#     label_key="leiden",
+#     embedding_obsm_keys=embedding_obsm_keys,
+#     # pre_integrated_embedding_obsm_key="X_pca",
+#     n_jobs=-1,
+# )
+
+# # bm.prepare(neighbor_computer=faiss_brute_force_nn)
+# bm.prepare()
+# bm.benchmark()
+# bm.plot_results_table(
+#     min_max_scale=False,
+#     save_dir=FIGURE_DIR,
+# )
+
+# # %%
+# model.history["reconstruction_loss_validation"].plot()
+# # %%
+# model.history["elbo_validation"].iloc[20:].plot()
 
 # %%
-df_.query("~is_cell_affected").sort_values("log_ratios").assign(
-    rank_=lambda x: np.arange(len(x))
-).plot.scatter("rank_", "lib_size")
-
-
-# %%
-adata_files = glob.glob("../results/milo/data/pbmcs68k_for_subsample*.final.h5ad")
-for adata_file in adata_files:
-    print(adata_file)
-
-# %%
-selected_files = [
-    dict(
-        filename="../results/milo/data/pbmcs68k_for_subsample.scviv2_attention_mog.final.h5ad",
-        modelname="MrVI",
-        keyname="X_scviv2_attention_mog_u",
-    ),
-    dict(
-        filename="../results/milo/data/pbmcs68k_for_subsample.composition_SCVI_leiden1_subleiden1.final.h5ad",
-        modelname="SCVI",
-        keyname="X_SCVI_leiden1_subleiden1",
-    ),
-    dict(
-        filename="../results/milo/data/pbmcs68k_for_subsample.composition_PCA_leiden1_subleiden1.final.h5ad",
-        modelname="PCA",
-        keyname="X_PCA_leiden1_subleiden1",
-    ),
-]
-embedding_obsm_keys = []
-for mydic in selected_files:
-    file = mydic["filename"]
-    keyname = mydic["keyname"]
-    modelname = mydic["modelname"]
-    _adata = sc.read_h5ad(file)
-    adata.obsm[modelname] = _adata.obsm[keyname]
-    embedding_obsm_keys.append(modelname)
-
-# %%
-from scib_metrics.benchmark import Benchmarker
-
-bm = Benchmarker(
-    adata,
-    batch_key="sample_assignment",
-    label_key="leiden",
-    embedding_obsm_keys=embedding_obsm_keys,
-    # pre_integrated_embedding_obsm_key="X_pca",
-    n_jobs=-1,
-)
-
-# bm.prepare(neighbor_computer=faiss_brute_force_nn)
-bm.prepare()
-bm.benchmark()
-bm.plot_results_table(
-    min_max_scale=False,
-    save_dir=FIGURE_DIR,
-)
-
-# %%
-model.history["reconstruction_loss_validation"].plot()
-# %%
-model.history["elbo_validation"].iloc[20:].plot()
