@@ -36,7 +36,6 @@ def fit_scviv2(
     use_mlp_uz = use_mlp_uz.lower() == "true"
     use_same_dim_uz = use_same_dim_uz.lower() == "true"
     use_encoder_regularnorm = use_encoder_regularnorm.lower() == "true"
-    use_encoder_mlp = use_encoder_mlp.lower() == "true"
     use_iso_prior = use_iso_prior.lower() == "true"
 
     config = load_config(config_in)
