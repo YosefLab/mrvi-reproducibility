@@ -402,6 +402,7 @@ def _process_semisynth2(
     n_genes_for_subclustering = semisynth_config["n_genes_for_subclustering"]
     if subsample:
         selected_subsample_cluster = semisynth_config["selected_subsample_cluster"]
+        selected_oversample_cluster = semisynth_config["selected_oversample_cluster"]
         subsample_rates = semisynth_config["subsample_rates"]
 
     # use SCVI to obtain latent space
@@ -517,7 +518,14 @@ def _process_semisynth2(
             .astype(int)
         )
 
-        subsampled_adatas = [adata[adata.obs.leiden != str(selected_subsample_cluster)]]
+        # subsampled_adatas = [adata[adata.obs.leiden != str(selected_subsample_cluster)]]
+        subsampled_adatas = [
+            adata[
+                ~adata.obs.leiden.isin(
+                    [str(selected_subsample_cluster), str(selected_oversample_cluster)]
+                )
+            ]
+        ]
         subsample_info_df = pd.DataFrame()
         for rank, subsample_rate in enumerate(subsample_rates, 1):
             samples_to_subsample = sample_assignment_mapping[
@@ -538,16 +546,31 @@ def _process_semisynth2(
                     (adata.obs.sample_assignment == str(sample))
                     & (adata.obs["leiden"] == str(selected_subsample_cluster))
                 ]
-                subsample_adata = subsample_adata[
-                    np.random.choice(
-                        subsample_adata.shape[0],
-                        int(subsample_adata.shape[0] * subsample_rate),
-                        replace=False,
-                    )
-                ]
+                n_subsampled = int(subsample_adata.shape[0] * subsample_rate)
+                n_removed = subsample_adata.shape[0] - n_subsampled
+                subsampled_idx = np.random.choice(
+                    subsample_adata.shape[0],
+                    n_subsampled,
+                    replace=False,
+                )
+                subsample_adata = subsample_adata[subsampled_idx]
                 subsampled_adatas.append(subsample_adata)
 
+                # Add cells to ensure total number of cells is the same
+                oversample_adata = adata[
+                    (adata.obs.sample_assignment == str(sample))
+                    & (adata.obs["leiden"] == str(selected_oversample_cluster))
+                ]
+                oversample_idx = np.random.choice(
+                    oversample_adata.shape[0],
+                    oversample_adata.shape[0] + n_removed,
+                    replace=True,
+                )
+                oversample_adata = oversample_adata[oversample_idx]
+                subsampled_adatas.append(oversample_adata)
+
         res = sc.concat(subsampled_adatas)
+        res.obs_names_make_unique()
         subsample_info_df = subsample_info_df.astype({"sample": str}).set_index(
             "sample"
         )
@@ -561,6 +584,14 @@ def _process_semisynth2(
         res.obs.loc[:, "sample_metadata2"] = (
             res.obs[f"subsample_rate_in_leiden{selected_subsample_cluster}"] <= 0.8
         )
+
+        one_hot_groupnames = []
+        for unique_group in res.obs["sample_group"].unique():
+            new_key = f"group_{unique_group}"
+            res.obs.loc[:, new_key] = (res.obs["sample_group"] == unique_group).astype(
+                int
+            )
+            one_hot_groupnames.append(new_key)
         res = sc.AnnData(
             X=res.X,
             obs=res.obs,
@@ -568,6 +599,7 @@ def _process_semisynth2(
             var=adata.var,
             uns=adata.uns,
         )
+        res.uns["one_hot_groupnames"] = one_hot_groupnames
         return res
     return adata
 
