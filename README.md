@@ -1,4 +1,4 @@
-# scvi-v2-reproducibility
+# mrvi-reproducibility
 
 ## Running existing workflows
 Existing workflows can be discovered under `workflows/`. These can be run as follows from

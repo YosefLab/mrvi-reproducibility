@@ -19,6 +19,7 @@ from plot_utils import INCH_TO_CM
 RUN_WITH_PARSER = True
 plt.rcParams["svg.fonttype"] = "none"
 
+
 # %%
 def parser():
     """Parse paths to results files (used by nextflow)"""
@@ -41,6 +42,8 @@ if RUN_WITH_PARSER:
 else:
     output_dir = os.path.join("../results/sciplex_pipeline/figures")
     results_paths = set(glob.glob("../results/sciplex_pipeline/*/*.csv"))
+
+
 # %%
 def save_figures(filename, dataset_name):
     dataset_dir = os.path.join(output_dir, dataset_name)
@@ -124,11 +127,11 @@ for dataset_name in sciplex_metrics_df["dataset_name"].unique():
 # %%
 cell_lines = ["A549", "MCF7", "K562"]
 method_names = [
-    "scviv2",
-    "scviv2_attention",
-    "scviv2_mlp",
-    "scviv2_prior",
-    "scviv2_weighted",
+    "mrvi",
+    "mrvi_attention",
+    "mrvi_mlp",
+    "mrvi_prior",
+    "mrvi_weighted",
 ]
 
 # Per dataset plots

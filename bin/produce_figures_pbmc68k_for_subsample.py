@@ -110,7 +110,7 @@ adata_files = glob.glob("../results/milo/data/pbmcs68k_for_subsample*.final.h5ad
 for adata_file in adata_files:
     adata_ = sc.read_h5ad(adata_file)
     for obsm_key in adata_.obsm.keys():
-        if obsm_key.endswith("mde") & ("scviv2" in obsm_key):
+        if obsm_key.endswith("mde") & ("mrvi" in obsm_key):
             print(obsm_key)
             rdm_perm = np.random.permutation(adata.shape[0])
             adata_.obs["cell_type"] = adata.obs.leiden.copy().astype(str)
@@ -163,7 +163,7 @@ for adata_file in adata_files:
 
 # # %%
 # scibv_files = glob.glob(
-#     "../results/milo/metrics/pbmcs68k_for_subsample*scviv2*.csv"
+#     "../results/milo/metrics/pbmcs68k_for_subsample*mrvi*.csv"
 # )
 # scib_metrics = pd.DataFrame()
 # for dmat_file in scibv_files:
@@ -284,10 +284,10 @@ all_res = pd.DataFrame(all_res).assign(
 
 # %%
 model_renamer = {
-    # "scviv2_attention_noprior": "MrVI",
-    "scviv2_attention_no_prior_mog": "MrVI (MoG)",
-    # "scviv2_attention_mog": "MrVI (MoG Large)",
-    # "scviv2_attention_no_prior_mog_large": "MrVI (MoG Large w/ Prior)",
+    # "mrvi_attention_noprior": "MrVI",
+    "mrvi_attention_no_prior_mog": "MrVI (MoG)",
+    # "mrvi_attention_mog": "MrVI (MoG Large)",
+    # "mrvi_attention_no_prior_mog_large": "MrVI (MoG Large w/ Prior)",
     "composition_PCA_clusterkey_subleiden1": "Composition (PCA)",
     "composition_SCVI_clusterkey_subleiden1": "Composition (SCVI)",
 }
@@ -354,9 +354,9 @@ fig
 # %%
 # Plot variance of dist to sample 8 per rank
 sample_to_group_and_rank = pd.DataFrame(sample_to_group).reset_index()
-sample_to_group_and_rank[
-    "sample_assignment_int"
-] = sample_to_group_and_rank.sample_assignment.astype(int)
+sample_to_group_and_rank["sample_assignment_int"] = (
+    sample_to_group_and_rank.sample_assignment.astype(int)
+)
 sample_to_group_and_rank["rank"] = (
     sample_to_group_and_rank.groupby("subcluster_assignment")["sample_assignment_int"]
     .rank(method="dense", ascending=True)
@@ -495,16 +495,16 @@ plt.clf()
 
 # %%
 # DEG Analysis
-import scvi_v2
+import mrvi
 
-modelname = "scviv2_attention_mog"
+modelname = "mrvi_attention_mog"
 
 adata_path = os.path.join(
     f"../results/milo/data/pbmcs68k_for_subsample.preprocessed.h5ad"
 )
 model_path = os.path.join(f"../results/milo/models/pbmcs68k_for_subsample.{modelname}")
 adata = sc.read(adata_path)
-model = scvi_v2.MrVI.load(model_path, adata=adata)
+model = mrvi.MrVI.load(model_path, adata=adata)
 model
 
 # %%
@@ -545,7 +545,7 @@ model_out_adata.obs[f"group_{group_no}_eff_size"] = mv_deg_res.effect_size.sel(
 )
 fig = sc.pl.embedding(
     model_out_adata,
-    basis="X_scviv2_attention_mog_u_mde",
+    basis="X_mrvi_attention_mog_u_mde",
     color=f"group_{group_no}_eff_size",
     vmax="p95",
     vmin="p5",
@@ -760,7 +760,7 @@ model_out_adata.obs.loc[adata.obs_names, highest_group_gene] = adata[
 ].X.toarray()
 fig = sc.pl.embedding(
     model_out_adata,
-    basis="X_scviv2_attention_mog_z_mde",
+    basis="X_mrvi_attention_mog_z_mde",
     color=[highest_group_gene, "subcluster_assignment"],
     vmax="p95",
     return_fig=True,
@@ -782,7 +782,7 @@ model_out_adata.obs.loc[:, f"{highest_group_gene}_lfc"] = (
 )
 fig = sc.pl.embedding(
     model_out_adata,
-    basis="X_scviv2_attention_mog_z_mde",
+    basis="X_mrvi_attention_mog_z_mde",
     color=[f"{highest_group_gene}_lfc", "subcluster_assignment"],
     vmax="p95",
     vcenter=0,
@@ -809,7 +809,7 @@ model_out_adata.obs["sample_1_admissibility"] = ball_res.is_admissible.sel(
 ).astype(str)
 fig = sc.pl.embedding(
     model_out_adata,
-    basis="X_scviv2_attention_mog_u_mde",
+    basis="X_mrvi_attention_mog_u_mde",
     color=["sample_1_admissibility", "leiden"],
     return_fig=True,
     show=False,
@@ -822,7 +822,7 @@ plt.savefig(
 # %%
 fig = sc.pl.embedding(
     model_out_adata[model_out_adata.obs["sample_assignment"] == "1"],
-    basis="X_scviv2_attention_mog_u_mde",
+    basis="X_mrvi_attention_mog_u_mde",
     color=["leiden"],
     return_fig=True,
     show=False,
@@ -835,7 +835,7 @@ plt.savefig(
 # %%
 fig = sc.pl.embedding(
     model_out_adata[model_out_adata.obs["sample_assignment"] == "4"],
-    basis="X_scviv2_attention_mog_u_mde",
+    basis="X_mrvi_attention_mog_u_mde",
     color=["leiden"],
     return_fig=True,
     show=False,
@@ -857,7 +857,7 @@ model_out_adata.obs["sample_1_4_da"] = ap_res.log_probs.sel(
 ) - ap_res.log_probs.sel(sample="4")
 fig = sc.pl.embedding(
     model_out_adata,
-    basis="X_scviv2_attention_mog_u_mde",
+    basis="X_mrvi_attention_mog_u_mde",
     color=["sample_1_4_da", "leiden"],
     vmax="p95",
     vmin="p5",
@@ -894,7 +894,7 @@ q5, q95 = np.quantile(log_ratios, [0.05, 0.95])
 qval = np.maximum(np.abs(q5), np.abs(q95))
 fig = sc.pl.embedding(
     model_out_adata,
-    basis="X_scviv2_attention_mog_u_mde",
+    basis="X_mrvi_attention_mog_u_mde",
     color=["log_ratios", "leiden"],
     vmax=qval,
     vmin=-qval,
@@ -945,7 +945,7 @@ model_out_adata.obs.loc[:, "milo_lfc"] = milo_cell_res["lfc"].values
 model_out_adata.obs.loc[:, "mrvi_lfc"] = log_ratios
 fig = sc.pl.embedding(
     model_out_adata,
-    basis="X_scviv2_attention_mog_u_mde",
+    basis="X_mrvi_attention_mog_u_mde",
     color=["milo_lfc", "mrvi_lfc", "leiden"],
     vmax=qval,
     vmin=-qval,
@@ -1069,9 +1069,9 @@ for adata_file in adata_files:
 # %%
 selected_files = [
     dict(
-        filename="../results/milo/data/pbmcs68k_for_subsample.scviv2_attention_mog.final.h5ad",
+        filename="../results/milo/data/pbmcs68k_for_subsample.mrvi_attention_mog.final.h5ad",
         modelname="MrVI",
-        keyname="X_scviv2_attention_mog_u",
+        keyname="X_mrvi_attention_mog_u",
     ),
     dict(
         filename="../results/milo/data/pbmcs68k_for_subsample.composition_SCVI_leiden1_subleiden1.final.h5ad",

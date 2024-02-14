@@ -1,12 +1,12 @@
 import jax.numpy as jnp
 import flax.linen as nn
 import scanpy as sc
-import scvi_v2
+import mrvi
 from utils import load_config, make_parents, wrap_kwargs
 
 
 @wrap_kwargs
-def fit_scviv2(
+def fit_mrvi(
     *,
     adata_in: str,
     config_in: str,
@@ -17,7 +17,7 @@ def fit_scviv2(
     use_same_dim_uz: str = "false",
     use_encoder_regularnorm: str = "false",
     use_iso_prior: str = "false",
-) -> scvi_v2.MrVI:
+) -> mrvi.MrVI:
     """
     Train a MrVI model.
 
@@ -41,11 +41,11 @@ def fit_scviv2(
     config = load_config(config_in)
     batch_key = config.get("batch_key", None)
     sample_key = config.get("sample_key", None)
-    model_kwargs = config.get("scviv2_model_kwargs", {})
-    train_kwargs = config.get("scviv2_train_kwargs", {})
+    model_kwargs = config.get("mrvi_model_kwargs", {})
+    train_kwargs = config.get("mrvi_train_kwargs", {})
     adata = sc.read(adata_in)
 
-    scvi_v2.MrVI.setup_anndata(
+    mrvi.MrVI.setup_anndata(
         adata,
         batch_key=batch_key,
         sample_key=sample_key,
@@ -121,7 +121,7 @@ def fit_scviv2(
             }
         )
 
-    model = scvi_v2.MrVI(adata, **model_kwargs)
+    model = mrvi.MrVI(adata, **model_kwargs)
     model.train(**train_kwargs)
 
     make_parents(model_out)
@@ -130,4 +130,4 @@ def fit_scviv2(
 
 
 if __name__ == "__main__":
-    fit_scviv2()
+    fit_mrvi()

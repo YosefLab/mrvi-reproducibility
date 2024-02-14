@@ -65,7 +65,7 @@ sc.set_figure_params(dpi_save=500)
 plt.rcParams["axes.grid"] = False
 plt.rcParams["svg.fonttype"] = "none"
 
-FIGURE_DIR = "/data1/scvi-v2-reproducibility/experiments/haniffa2"
+FIGURE_DIR = "/data1/mrvi-reproducibility/experiments/haniffa2"
 os.makedirs(FIGURE_DIR, exist_ok=True)
 
 adata = sc.read_h5ad("../results/aws_pipeline/haniffa2.preprocessed.h5ad")
@@ -102,14 +102,14 @@ adata.var.loc[:, "ensembl_gene"] = ensembl_gene.reindex(adata.var_names)[
 ].values
 
 # %%
-from scvi_v2 import MrVI
+from mrvi import MrVI
 
 model = MrVI.load(
-    "/data1/scvi-v2-reproducibility/results/aws_pipeline/models/haniffa2.scviv2_attention_mog",
+    "/data1/mrvi-reproducibility/results/aws_pipeline/models/haniffa2.mrvi_attention_mog",
     adata=adata,
 )
 # model = MrVI.load(
-#     "/data1/scvi-v2-reproducibility/results/aws_pipeline/models/haniffa.scviv2_attention_no_prior_mog", adata=adata
+#     "/data1/mrvi-reproducibility/results/aws_pipeline/models/haniffa.mrvi_attention_no_prior_mog", adata=adata
 # )
 
 # %%
@@ -131,12 +131,12 @@ donor_info = (
 )
 
 # %%
-# adata_file =  '../results/aws_pipeline/data/haniffa.scviv2_attention_noprior.final.h5ad'
-adata_file = "../results/aws_pipeline/data/haniffa2.scviv2_attention_mog.final.h5ad"
+# adata_file =  '../results/aws_pipeline/data/haniffa.mrvi_attention_noprior.final.h5ad'
+adata_file = "../results/aws_pipeline/data/haniffa2.mrvi_attention_mog.final.h5ad"
 adata_ = sc.read_h5ad(adata_file)
 print(adata_.shape)
 for obsm_key in adata_.obsm.keys():
-    if obsm_key.endswith("mde") & ("scviv2" in obsm_key):
+    if obsm_key.endswith("mde") & ("mrvi" in obsm_key):
         print(obsm_key)
         fig = sc.pl.embedding(
             adata_,
@@ -226,7 +226,7 @@ for legend_name, my_legend in all_legends.items():
 
 
 # %%
-adata_file = "../results/aws_pipeline/data/haniffa2.scviv2_attention_mog.final.h5ad"
+adata_file = "../results/aws_pipeline/data/haniffa2.mrvi_attention_mog.final.h5ad"
 adata_embs = sc.read_h5ad(adata_file)
 
 
@@ -288,7 +288,7 @@ adata_mat.obsm = adata_embs.obsm
 DMAT_CLUSTERING_KEY = "leiden_dmats_0.005"
 fig = sc.pl.embedding(
     adata_mat,
-    basis="X_scviv2_attention_mog_u_mde",
+    basis="X_mrvi_attention_mog_u_mde",
     color=[
         CT_ANNOTATION_KEY,
         DMAT_CLUSTERING_KEY,
@@ -394,9 +394,7 @@ _adata = adata_mat[adata_mat.obs[DMAT_CLUSTERING_KEY] == "1"].copy()
 
 # %%
 ap_res = model.get_outlier_cell_sample_pairs(
-    adata=_adata,
-    flavor="ap",
-    minibatch_size=1000
+    adata=_adata, flavor="ap", minibatch_size=1000
 )
 
 
@@ -550,7 +548,7 @@ gene_info_modules.to_csv(
 # %%
 fig = sc.pl.embedding(
     _adata,
-    basis="X_scviv2_attention_mog_u_mde",
+    basis="X_mrvi_attention_mog_u_mde",
     color=["initial_clustering"],
     return_fig=True,
 )
@@ -575,7 +573,7 @@ for beta_module_key in beta_module_keys:
 
     fig = sc.pl.embedding(
         _adata,
-        basis="X_scviv2_attention_mog_u_mde",
+        basis="X_mrvi_attention_mog_u_mde",
         color=beta_module_key,
         vmin=vmin,
         vmax=vmax,
@@ -650,7 +648,7 @@ adata.obs.loc[:, "eps_pca"] = eps_pca
 # %%
 print(adata_embs.shape)
 for obsm_key in adata_embs.obsm.keys():
-    if obsm_key.endswith("mde") & ("scviv2" in obsm_key):
+    if obsm_key.endswith("mde") & ("mrvi" in obsm_key):
         print(obsm_key)
         # rdm_perm = np.random.permutation(adata.shape[0])
         fig = sc.pl.embedding(
@@ -764,9 +762,9 @@ dmat_files = glob.glob("../results/aws_pipeline/distance_matrices/haniffa2.*.nc"
 dmat_files
 
 # %%
-# dmat_file = "../results/aws_pipeline/distance_matrices/haniffa2.scviv2_attention.distance_matrices.nc"
-# dmat_file = "../results/aws_pipeline/distance_matrices/haniffa2.scviv2_attention_no_prior_mog_large.distance_matrices.nc"
-dmat_file = "../results/aws_pipeline/distance_matrices/haniffa2.scviv2_attention_mog.distance_matrices.nc"
+# dmat_file = "../results/aws_pipeline/distance_matrices/haniffa2.mrvi_attention.distance_matrices.nc"
+# dmat_file = "../results/aws_pipeline/distance_matrices/haniffa2.mrvi_attention_no_prior_mog_large.distance_matrices.nc"
+dmat_file = "../results/aws_pipeline/distance_matrices/haniffa2.mrvi_attention_mog.distance_matrices.nc"
 d = xr.open_dataset(dmat_file)
 
 
@@ -885,15 +883,29 @@ joined = n_donors_with_atleast.join(n_pred_donors)
 import pynndescent
 import jax.numpy as jnp
 from scvi import REGISTRY_KEYS
-from scvi_v2._constants import MRVI_REGISTRY_KEYS
+from mrvi._constants import MRVI_REGISTRY_KEYS
 from scvi.distributions import JaxNegativeBinomialMeanDisp as NegativeBinomial
 from tqdm import tqdm
 
+
 # module level function
-def compute_px_from_x(self, x, sample_index, batch_index, cf_sample=None, continuous_covs=None, label_index=None, mc_samples=10):
+def compute_px_from_x(
+    self,
+    x,
+    sample_index,
+    batch_index,
+    cf_sample=None,
+    continuous_covs=None,
+    label_index=None,
+    mc_samples=10,
+):
     """Compute normalized gene expression from observations"""
-    log_library = 7.0 * jnp.ones_like(sample_index)  # placeholder, will be replaced by observed library sizes.
-    inference_outputs = self.inference(x, sample_index, mc_samples=mc_samples, cf_sample=cf_sample, use_mean=False)
+    log_library = 7.0 * jnp.ones_like(
+        sample_index
+    )  # placeholder, will be replaced by observed library sizes.
+    inference_outputs = self.inference(
+        x, sample_index, mc_samples=mc_samples, cf_sample=cf_sample, use_mean=False
+    )
     generative_inputs = {
         "z": inference_outputs["z"],
         "library": log_library,
@@ -905,7 +917,16 @@ def compute_px_from_x(self, x, sample_index, batch_index, cf_sample=None, contin
     return generative_outputs["px"], inference_outputs["u"], log_library
 
 
-def compute_sample_cf_reconstruction_scores(self, sample_idx, adata=None, indices=None, batch_size=256, inner_batch_size=8, mc_samples=10, n_top_neighbors=5):
+def compute_sample_cf_reconstruction_scores(
+    self,
+    sample_idx,
+    adata=None,
+    indices=None,
+    batch_size=256,
+    inner_batch_size=8,
+    mc_samples=10,
+    n_top_neighbors=5,
+):
     self._check_if_trained(warn=False)
     adata = self._validate_anndata(adata)
     sample_name = self.sample_order[sample_idx]
@@ -915,7 +936,9 @@ def compute_sample_cf_reconstruction_scores(self, sample_idx, adata=None, indice
     sample_u = self.get_latent_representation(sample_adata, give_z=False)
     sample_index = pynndescent.NNDescent(sample_u)
 
-    scdl = self._make_data_loader(adata=adata, batch_size=batch_size, indices=indices, iter_ndarray=True)
+    scdl = self._make_data_loader(
+        adata=adata, batch_size=batch_size, indices=indices, iter_ndarray=True
+    )
 
     def _get_all_inputs(
         inputs,
@@ -943,31 +966,51 @@ def compute_sample_cf_reconstruction_scores(self, sample_idx, adata=None, indice
 
         inputs = _get_all_inputs(array_dict)
         px, u, log_library_placeholder = self.module.apply(
-                vars_in,
-                rngs=rngs,
-                method=compute_px_from_x,
-                x=inputs["x"],
-                sample_index=inputs["sample_index"],
-                batch_index=inputs["batch_index"],
-                cf_sample=np.ones(inputs["x"].shape[0]) * sample_idx,
-                continuous_covs=inputs["continuous_covs"],
-                label_index=inputs["label_index"],
-                mc_samples=mc_samples,
-            )
+            vars_in,
+            rngs=rngs,
+            method=compute_px_from_x,
+            x=inputs["x"],
+            sample_index=inputs["sample_index"],
+            batch_index=inputs["batch_index"],
+            cf_sample=np.ones(inputs["x"].shape[0]) * sample_idx,
+            continuous_covs=inputs["continuous_covs"],
+            label_index=inputs["label_index"],
+            mc_samples=mc_samples,
+        )
         px_m, px_d = px.mean, px.inverse_dispersion
         if px_m.ndim == 2:
             px_m, px_d = np.expand_dims(px_m, axis=0), np.expand_dims(px_d, axis=0)
-        px_m, px_d = np.expand_dims(px_m, axis=2), np.expand_dims(px_d, axis=2) # for inner_batch_size dim
+        px_m, px_d = np.expand_dims(px_m, axis=2), np.expand_dims(
+            px_d, axis=2
+        )  # for inner_batch_size dim
 
         mc_log_probs = []
         batch_top_idxs = []
         for mc_sample_i in range(u.shape[0]):
-            nearest_sample_idxs = sample_index.query(u[mc_sample_i], k=n_top_neighbors)[0]
-            top_neighbor_counts = sample_adata.X[nearest_sample_idxs.reshape(-1), :].toarray().reshape((nearest_sample_idxs.shape[0],nearest_sample_idxs.shape[1], -1))
-            new_lib_size = top_neighbor_counts.sum(axis=-1) # batch_size x n_top_neighbors
-            corrected_px_m = px_m[mc_sample_i] / np.exp(log_library_placeholder[:, :, None]) * new_lib_size[:, :, None]
-            corrected_px = NegativeBinomial(mean=corrected_px_m, inverse_dispersion=px_d) # mc_samples x batch_size x inner_batch_size x genes
-            log_probs = corrected_px.log_prob(top_neighbor_counts).sum(-1).mean(-1) # 1 x batch_size
+            nearest_sample_idxs = sample_index.query(u[mc_sample_i], k=n_top_neighbors)[
+                0
+            ]
+            top_neighbor_counts = (
+                sample_adata.X[nearest_sample_idxs.reshape(-1), :]
+                .toarray()
+                .reshape(
+                    (nearest_sample_idxs.shape[0], nearest_sample_idxs.shape[1], -1)
+                )
+            )
+            new_lib_size = top_neighbor_counts.sum(
+                axis=-1
+            )  # batch_size x n_top_neighbors
+            corrected_px_m = (
+                px_m[mc_sample_i]
+                / np.exp(log_library_placeholder[:, :, None])
+                * new_lib_size[:, :, None]
+            )
+            corrected_px = NegativeBinomial(
+                mean=corrected_px_m, inverse_dispersion=px_d
+            )  # mc_samples x batch_size x inner_batch_size x genes
+            log_probs = (
+                corrected_px.log_prob(top_neighbor_counts).sum(-1).mean(-1)
+            )  # 1 x batch_size
             mc_log_probs.append(log_probs)
             batch_top_idxs.append(nearest_sample_idxs)
         full_batch_log_probs = np.concatenate(mc_log_probs, axis=0).mean(0)
@@ -978,45 +1021,79 @@ def compute_sample_cf_reconstruction_scores(self, sample_idx, adata=None, indice
     all_scores = np.hstack(scores)
     all_top_idxs = np.vstack(top_idxs)
     adata_index = adata[indices] if indices is not None else adata
-    return pd.Series(all_scores, index=adata_index.obs_names.to_numpy(), name=f"{sample_name}_score"), all_top_idxs
+    return (
+        pd.Series(
+            all_scores,
+            index=adata_index.obs_names.to_numpy(),
+            name=f"{sample_name}_score",
+        ),
+        all_top_idxs,
+    )
+
 
 # %%
 sample_name = "newcastle74"
 sample_idx = model.sample_order.tolist().index(sample_name)
 np.random.seed(42)
 random_indices = np.random.choice(adata.shape[0], size=10000, replace=False)
-sample_scores, top_idxs = compute_sample_cf_reconstruction_scores(model, sample_idx, indices=random_indices)
+sample_scores, top_idxs = compute_sample_cf_reconstruction_scores(
+    model, sample_idx, indices=random_indices
+)
 
 # %%
 adata_subset = adata[sample_scores.index]
-sample_ball_res = ood_res.sel(cell_name=adata_subset.obs_names).sel(sample=model.sample_order[sample_idx])
+sample_ball_res = ood_res.sel(cell_name=adata_subset.obs_names).sel(
+    sample=model.sample_order[sample_idx]
+)
 sample_adm_log_probs = sample_ball_res.log_probs.to_series()
 sample_adm_bool = sample_ball_res.is_admissible.to_series()
-is_sample = pd.Series(adata_subset.obs["sample_id"] == model.sample_order[sample_idx], name="is_sample", dtype=bool)
-sample_log_lib_size = pd.Series(np.log(adata_subset.X.toarray().sum(axis=1)), index=adata_subset.obs_names, name="log_lib_size")
-cell_category = pd.Series(["Not Admissible"] * adata_subset.shape[0], dtype=str, name="cell_category", index=adata_subset.obs_names)
+is_sample = pd.Series(
+    adata_subset.obs["sample_id"] == model.sample_order[sample_idx],
+    name="is_sample",
+    dtype=bool,
+)
+sample_log_lib_size = pd.Series(
+    np.log(adata_subset.X.toarray().sum(axis=1)),
+    index=adata_subset.obs_names,
+    name="log_lib_size",
+)
+cell_category = pd.Series(
+    ["Not Admissible"] * adata_subset.shape[0],
+    dtype=str,
+    name="cell_category",
+    index=adata_subset.obs_names,
+)
 cell_category[sample_adm_bool.to_numpy()] = "Admissible"
 cell_category[is_sample.to_numpy()] = "In Sample"
 cell_category = cell_category.astype("category")
 
-rec_score_plot_df = (
-    pd.concat((sample_adm_log_probs, sample_adm_bool, is_sample, cell_category, sample_scores,  sample_log_lib_size), axis=1)
-    .sample(frac=1, replace=False)
-)
+rec_score_plot_df = pd.concat(
+    (
+        sample_adm_log_probs,
+        sample_adm_bool,
+        is_sample,
+        cell_category,
+        sample_scores,
+        sample_log_lib_size,
+    ),
+    axis=1,
+).sample(frac=1, replace=False)
 # %%
-sns.scatterplot(rec_score_plot_df, x="log_probs", y=f"{sample_name}_score", hue="cell_category", s=5)
+sns.scatterplot(
+    rec_score_plot_df, x="log_probs", y=f"{sample_name}_score", hue="cell_category", s=5
+)
 plt.xlabel("Admissibility Score")
 plt.ylabel("Reconstruction Log Prob of In-Sample NN")
 handles, labels = plt.gca().get_legend_handles_labels()
 order = [1, 2, 0]
-plt.legend([handles[idx] for idx in order],[labels[idx] for idx in order])
+plt.legend([handles[idx] for idx in order], [labels[idx] for idx in order])
 plt.xlim(-100, 30)
 # fig.save(os.path.join(FIGURE_DIR, f"haniffa_{sample_name}_admissibility_vs_reconstruction_w_category.svg"))
 
 # %%
 # adata_embs.obs.loc[:, "n_valid_donors"] = res["is_admissible"].values.sum(axis=1)
 # for obsm_key in adata_embs.obsm.keys():
-#     if obsm_key.endswith("mde") & ("scviv2" in obsm_key):
+#     if obsm_key.endswith("mde") & ("mrvi" in obsm_key):
 #         print(obsm_key)
 #         sc.pl.embedding(
 #             # adata_embs[rdm_perm],
@@ -1063,7 +1140,7 @@ adata_embs.obs.loc[:, is_sig_keys] = (
 
 # %%
 for obsm_key in adata_embs.obsm.keys():
-    if obsm_key.endswith("mde") & ("scviv2" in obsm_key):
+    if obsm_key.endswith("mde") & ("mrvi" in obsm_key):
         print(obsm_key)
         sc.pl.embedding(
             # adata_embs[rdm_perm],
@@ -1169,7 +1246,7 @@ adata.obs.loc[:, "de_es"] = de_es
 # %%
 sc.pl.embedding(
     adata,
-    basis="X_scviv2_attention_mog_u_mde",
+    basis="X_mrvi_attention_mog_u_mde",
     color=["initial_clustering", "da_es", "log_p"],
     # vmin=-2,
     # vmax=2,
@@ -1202,7 +1279,7 @@ my_adata = adata[adata.obs.initial_clustering == "Plasmablast"].copy()
 my_adata.obs.da_es.hist(bins=100)
 sc.pl.embedding(
     my_adata,
-    basis="X_scviv2_attention_mog_u_mde",
+    basis="X_mrvi_attention_mog_u_mde",
     color=["initial_clustering", "da_es", "log_p", "is_admissible_"],
     ncols=1,
 )
@@ -1218,7 +1295,7 @@ sc.pl.embedding(
 # %%
 fig = sc.pl.embedding(
     adata,
-    basis="X_scviv2_attention_mog_u_mde",
+    basis="X_mrvi_attention_mog_u_mde",
     color=["initial_clustering", "da_es", "is_admissible_"],
     vmin=-2,
     vmax=2,
@@ -1231,7 +1308,7 @@ fig.savefig(os.path.join(FIGURE_DIR, f"haniffa.DA_mde.svg"))
 # %%
 fig = sc.pl.embedding(
     adata,
-    basis="X_scviv2_attention_mog_u_mde",
+    basis="X_mrvi_attention_mog_u_mde",
     color="de_es",
     return_fig=True,
 )
@@ -1464,7 +1541,7 @@ all_enrichr_results = pd.concat(all_enrichr_results).astype({"Gene_set": "catego
 # %%
 fig = sc.pl.embedding(
     adata_,
-    basis="X_scviv2_attention_mog_u_mde",
+    basis="X_mrvi_attention_mog_u_mde",
     color=["initial_clustering"],
     vmax="p95",
     cmap="coolwarm",
@@ -1486,7 +1563,7 @@ for beta_module_key in beta_module_keys:
 
     fig = sc.pl.embedding(
         adata_,
-        basis="X_scviv2_attention_mog_u_mde",
+        basis="X_mrvi_attention_mog_u_mde",
         color=beta_module_key,
         vmin=vmin,
         vmax=vmax,
@@ -1576,7 +1653,7 @@ for beta_module_key in beta_module_keys:
 keys_of_interest = {
     "X_SCVI_clusterkey_subleiden1": "SCVI",
     "X_PCA_clusterkey_subleiden1": "PCA",
-    "X_scviv2_attention_mog_u": "MrVI",
+    "X_mrvi_attention_mog_u": "MrVI",
 }
 for adata_file in adata_files:
     try:

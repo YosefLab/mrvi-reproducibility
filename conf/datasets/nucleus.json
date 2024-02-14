@@ -9,7 +9,7 @@
         "n_top_genes": 3000,
         "flavor": "seurat_v3"
     },
-    "scviv2_train_kwargs": {
+    "mrvi_train_kwargs": {
         "max_epochs": 400,
         "batch_size": 1024,
         "early_stopping": true,
