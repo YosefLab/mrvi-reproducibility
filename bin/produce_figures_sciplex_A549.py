@@ -117,22 +117,19 @@ cell_lines = ["A549"]
 method_names = [
     # "mrvi_attention_noprior",
     # "mrvi_attention_no_prior_mog",
-    "mrvi_z10",
-    "mrvi_z30",
-    "mrvi_z10_u5",
+    # "mrvi_z10",
+    # "mrvi_z30",
+    # "mrvi_z10_u5",
     "mrvi_z20_u5",
     "mrvi_z30_u5",
-    "mrvi_z10_u10",
-    "mrvi_z50_u5",
-    "mrvi_z100_u5",
+    # "mrvi_z10_u10",
+    # "mrvi_z50_u5",
+    # "mrvi_z100_u5",
 ]
 # %%
 # Cross method comparison plots
 all_results = load_results(results_paths)
 sciplex_metrics_df = all_results["sciplex_metrics"]
-sciplex_metrics_df = sciplex_metrics_df[
-    sciplex_metrics_df["model_name"].isin(method_names)
-]
 
 for dataset_name in sciplex_metrics_df["dataset_name"].unique():
     dataset_dir = os.path.join(output_dir, dataset_name)
