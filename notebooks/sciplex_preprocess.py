@@ -10,12 +10,12 @@ import matplotlib.pyplot as plt
 
 # %%
 adata = sc.read(
-    "/home/justin/ghrepos/scvi-v2-reproducibility/data/archive/sciplex_raw.h5ad"
+    "/home/justin/ghrepos/mrvi-reproducibility/data/archive/sciplex_raw.h5ad"
 )
 adata
 # %%
 plate_meta = pd.read_csv(
-    "/home/justin/ghrepos/scvi-v2-reproducibility/data/archive/aax6234-srivatsan-table-s3.txt",
+    "/home/justin/ghrepos/mrvi-reproducibility/data/archive/aax6234-srivatsan-table-s3.txt",
     header=1,
     sep="\t",
 )
@@ -23,9 +23,9 @@ plate_meta
 
 # %%
 # Fix two drug names in plate meta unaligned w adata
-plate_meta.loc[
-    plate_meta["name"] == "Glesatinib(MGCD265)", "name"
-] = "Glesatinib?(MGCD265)"
+plate_meta.loc[plate_meta["name"] == "Glesatinib(MGCD265)", "name"] = (
+    "Glesatinib?(MGCD265)"
+)
 plate_meta.loc[plate_meta["name"] == "SNS-314 Mesylate", "name"] = "SNS-314"
 plate_meta.loc[plate_meta["name"].isna(), "name"] = "Vehicle"
 set(plate_meta["name"].unique()).symmetric_difference(

@@ -1,4 +1,4 @@
-process get_latent_scviv2 {
+process get_latent_mrvi {
     input:
     path adata_in
     path model_in
@@ -12,7 +12,7 @@ process get_latent_scviv2 {
     distance_matrices_out = "${params.outputs.distance_matrices}/${adata_name}.${method_name}.distance_matrices.nc"
     normalized_distance_matrices_out = "${params.outputs.distance_matrices}/${adata_name}.${method_name}.normalized_distance_matrices.nc"
     """
-    python3 ${params.bin.get_latent_scviv2} \\
+    python3 ${params.bin.get_latent_mrvi} \\
         --adata_in ${adata_in} \\
         --model_in ${model_in} \\
         --config_in ${config_in} \\

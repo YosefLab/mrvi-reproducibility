@@ -1,4 +1,4 @@
-process fit_scviv2 {
+process fit_mrvi {
     input:
     path adata_in
     val use_reference
@@ -13,27 +13,27 @@ process fit_scviv2 {
     config_in = "${params.conf.datasets}/${adata_name}.json"
 
     if (use_reference) {
-        method_name = "scviv2_attention_mog"
+        method_name = "mrvi_attention_mog"
     }
     else if (use_linear_uz) {
-        method_name = "scviv2_linear_uz"
+        method_name = "mrvi_linear_uz"
     }
     else if (use_mlp_uz) {
-        method_name = "scviv2_mlp_uz"
+        method_name = "mrvi_mlp_uz"
     }
     else if (use_same_dim_uz) {
-        method_name = "scviv2_samedim_uz"
+        method_name = "mrvi_samedim_uz"
     }
     else if (use_encoder_regularnorm) {
-        method_name = "scviv2_encoder_regularnorm"
+        method_name = "mrvi_encoder_regularnorm"
     }
     else if (use_iso_prior) {
-        method_name = "scviv2_attention_iso"
+        method_name = "mrvi_attention_iso"
     }
 
     model_out = "${params.outputs.models}/${adata_name}.${method_name}"
     """
-    python3 ${params.bin.fit_scviv2} \\
+    python3 ${params.bin.fit_mrvi} \\
         --adata_in ${adata_in} \\
         --config_in ${config_in} \\
         --model_out ${model_out} \\

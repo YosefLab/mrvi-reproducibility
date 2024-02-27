@@ -3,9 +3,6 @@
     "sample_key": "product_dose",
     "labels_key": "_dummy",
     "mrvi_train_kwargs": {
-        "max_epochs": 400
-    },
-    "scviv2_train_kwargs": {
         "max_epochs": 400,
         "batch_size": 256,
         "early_stopping": true,

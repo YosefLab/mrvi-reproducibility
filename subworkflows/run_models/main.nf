@@ -1,20 +1,20 @@
 include {
-    fit_scviv2 as fit_scviv2_attention_mog;
-    fit_scviv2 as fit_scviv2_linear_uz;
-    fit_scviv2 as fit_scviv2_mlp_uz;
-    fit_scviv2 as fit_scviv2_samedim_uz;
-    fit_scviv2 as fit_scviv2_regularnorm;
-    fit_scviv2 as fit_scviv2_isoprior;
-} from params.modules.fit_scviv2
+    fit_mrvi as fit_mrvi_attention_mog;
+    fit_mrvi as fit_mrvi_linear_uz;
+    fit_mrvi as fit_mrvi_mlp_uz;
+    fit_mrvi as fit_mrvi_samedim_uz;
+    fit_mrvi as fit_mrvi_regularnorm;
+    fit_mrvi as fit_mrvi_isoprior;
+} from params.modules.fit_mrvi
 include {
-    get_latent_scviv2 as get_latent_scviv2_attention_mog;
-    get_latent_scviv2 as get_latent_scviv2_linear_uz;
-    get_latent_scviv2 as get_latent_scviv2_mlp_uz;
-    get_latent_scviv2 as get_latent_scviv2_samedim_uz;
-    get_latent_scviv2 as get_latent_scviv2_regularnorm;
-    get_latent_scviv2 as get_latent_scviv2_isoprior;
+    get_latent_mrvi as get_latent_mrvi_attention_mog;
+    get_latent_mrvi as get_latent_mrvi_linear_uz;
+    get_latent_mrvi as get_latent_mrvi_mlp_uz;
+    get_latent_mrvi as get_latent_mrvi_samedim_uz;
+    get_latent_mrvi as get_latent_mrvi_regularnorm;
+    get_latent_mrvi as get_latent_mrvi_isoprior;
 
-} from params.modules.get_latent_scviv2
+} from params.modules.get_latent_mrvi
 include {
     fit_and_get_latent_composition_baseline as fit_and_get_latent_composition_scvi_clusterkey;
     fit_and_get_latent_composition_baseline as fit_and_get_latent_composition_pca_clusterkey;
@@ -36,19 +36,19 @@ workflow run_models {
 
     // Step 1: Run models
     // Run base model
-    scvi_attention_mog_outs = fit_scviv2_attention_mog(adatas_in, true, false, false, false, false, false) | get_latent_scviv2_attention_mog
-    scvi_attention_mog_adata = scvi_attention_mog_outs.adata
+    mrvi_attention_mog_outs = fit_mrvi_attention_mog(adatas_in, true, false, false, false, false, false) | get_latent_mrvi_attention_mog
+    mrvi_attention_mog_adata = mrvi_attention_mog_outs.adata
 
-    scvi_isoprior_outs = fit_scviv2_isoprior(adatas_in, false, false, false, false, false, true) | get_latent_scviv2_isoprior
-    scvi_isoprior_adata = scvi_isoprior_outs.adata
+    mrvi_isoprior_outs = fit_mrvi_isoprior(adatas_in, false, false, false, false, false, true) | get_latent_mrvi_isoprior
+    mrvi_isoprior_adata = mrvi_isoprior_outs.adata
 
-    distance_matrices = scvi_attention_mog_outs.distance_matrices.concat(
-        scvi_attention_mog_outs.normalized_distance_matrices,
-        scvi_isoprior_outs.distance_matrices,
-        scvi_isoprior_outs.normalized_distance_matrices,
+    distance_matrices = mrvi_attention_mog_outs.distance_matrices.concat(
+        mrvi_attention_mog_outs.normalized_distance_matrices,
+        mrvi_isoprior_outs.distance_matrices,
+        mrvi_isoprior_outs.normalized_distance_matrices,
     )
-    adatas = scvi_attention_mog_adata.concat(
-        scvi_isoprior_adata,
+    adatas = mrvi_attention_mog_adata.concat(
+        mrvi_isoprior_adata,
     )
 
     if ( params.runMILO ) {
@@ -57,35 +57,35 @@ workflow run_models {
     }
 
     if ( params.runAllMRVIModels ) {
-        scvi_linear_uz_outs = fit_scviv2_linear_uz(adatas_in, false, true, false, false, false, false) | get_latent_scviv2_linear_uz
-        scvi_linear_uz_adata = scvi_linear_uz_outs.adata
+        mrvi_linear_uz_outs = fit_mrvi_linear_uz(adatas_in, false, true, false, false, false, false) | get_latent_mrvi_linear_uz
+        mrvi_linear_uz_adata = mrvi_linear_uz_outs.adata
 
-        scvi_mlp_uz_outs = fit_scviv2_mlp_uz(adatas_in, false, false, true, false, false, false) | get_latent_scviv2_mlp_uz
-        scvi_mlp_uz_adata = scvi_mlp_uz_outs.adata
+        mrvi_mlp_uz_outs = fit_mrvi_mlp_uz(adatas_in, false, false, true, false, false, false) | get_latent_mrvi_mlp_uz
+        mrvi_mlp_uz_adata = mrvi_mlp_uz_outs.adata
 
-        scvi_samedim_uz_outs = fit_scviv2_samedim_uz(adatas_in, false, false, false, true, false, false) | get_latent_scviv2_samedim_uz
-        scvi_samedim_uz_adata = scvi_samedim_uz_outs.adata
+        mrvi_samedim_uz_outs = fit_mrvi_samedim_uz(adatas_in, false, false, false, true, false, false) | get_latent_mrvi_samedim_uz
+        mrvi_samedim_uz_adata = mrvi_samedim_uz_outs.adata
 
-        scvi_regularnorm_outs = fit_scviv2_regularnorm(adatas_in, false, false, false, false, true, false) | get_latent_scviv2_regularnorm
-        scvi_regularnorm_adata = scvi_regularnorm_outs.adata
+        mrvi_regularnorm_outs = fit_mrvi_regularnorm(adatas_in, false, false, false, false, true, false) | get_latent_mrvi_regularnorm
+        mrvi_regularnorm_adata = mrvi_regularnorm_outs.adata
 
         distance_matrices = distance_matrices.concat(
-            scvi_linear_uz_outs.distance_matrices,
-            scvi_linear_uz_outs.normalized_distance_matrices,
-            scvi_mlp_uz_outs.distance_matrices,
-            scvi_mlp_uz_outs.normalized_distance_matrices,
-            scvi_samedim_uz_outs.distance_matrices,
-            scvi_samedim_uz_outs.normalized_distance_matrices,
-            scvi_regularnorm_outs.distance_matrices,
-            scvi_regularnorm_outs.normalized_distance_matrices,
+            mrvi_linear_uz_outs.distance_matrices,
+            mrvi_linear_uz_outs.normalized_distance_matrices,
+            mrvi_mlp_uz_outs.distance_matrices,
+            mrvi_mlp_uz_outs.normalized_distance_matrices,
+            mrvi_samedim_uz_outs.distance_matrices,
+            mrvi_samedim_uz_outs.normalized_distance_matrices,
+            mrvi_regularnorm_outs.distance_matrices,
+            mrvi_regularnorm_outs.normalized_distance_matrices,
         )
 
         // Organize all outputs
         adatas = adatas.concat(
-            scvi_regularnorm_adata,
-            scvi_mlp_uz_adata,
-            scvi_samedim_uz_adata,
-            scvi_regularnorm_adata,
+            mrvi_regularnorm_adata,
+            mrvi_mlp_uz_adata,
+            mrvi_samedim_uz_adata,
+            mrvi_regularnorm_adata,
             
         )
     }
