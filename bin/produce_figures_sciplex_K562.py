@@ -74,7 +74,7 @@ rep_results_paths = [
     x
     for x in all_results_files
     if x.startswith(
-        f"/home/justin/ghrepos/scvi-v2-reproducibility/bin/../results/sciplex_pipeline/data/{dataset_name}"
+        f"/home/justin/ghrepos/mrvi-reproducibility/bin/../results/sciplex_pipeline/data/{dataset_name}"
     )
     and x.endswith(".final.h5ad")
 ]
@@ -191,16 +191,16 @@ for dataset_name in sciplex_metrics_df["dataset_name"].unique():
 # %%
 cell_lines = ["K562"]
 method_names = [
-    # "scviv2_attention_noprior",
-    # "scviv2_attention_no_prior_mog",
-    # "scviv2_z10",
-    # "scviv2_z30",
-    # "scviv2_z10_u5",
-    "scviv2_z20_u5",
-    "scviv2_z30_u5",
-    # "scviv2_z10_u10",
-    # "scviv2_z50_u5",
-    # "scviv2_z100_u5",
+    # "mrvi_attention_noprior",
+    # "mrvi_attention_no_prior_mog",
+    # "mrvi_z10",
+    # "mrvi_z30",
+    # "mrvi_z10_u5",
+    "mrvi_z20_u5",
+    "mrvi_z30_u5",
+    # "mrvi_z10_u10",
+    # "mrvi_z50_u5",
+    # "mrvi_z100_u5",
 ]
 
 # Per dataset plots
@@ -458,7 +458,7 @@ for method_name in method_names:
 # Final distance matrix and DE analysis
 #######################################
 cl = "K562"
-method_name = "scviv2_z30_u5"
+method_name = "mrvi_z30_u5"
 
 dataset_name = f"sciplex_{cl}_simple_filtered_all_phases"
 dists_path = f"{dataset_name}.{method_name}.distance_matrices.nc"
@@ -587,8 +587,8 @@ np.random.seed(45)
 random_in_prod_all_dist_avg_percentiles = []
 for _ in range(100):
     shuffled_in_prod_mask = np.zeros(shape=in_prod_mask.shape, dtype=bool)
-    shuffled_in_prod_mask[np.triu_indices(in_prod_mask.shape[0])] = np.random.permutation(
-        in_prod_mask[np.triu_indices(in_prod_mask.shape[0])]
+    shuffled_in_prod_mask[np.triu_indices(in_prod_mask.shape[0])] = (
+        np.random.permutation(in_prod_mask[np.triu_indices(in_prod_mask.shape[0])])
     )
     shuffled_in_prod_mask = shuffled_in_prod_mask + shuffled_in_prod_mask.T
 
@@ -624,15 +624,20 @@ model_to_method_name_mapping = {
 plot_df = plot_df[plot_df["model_name"].isin(model_to_method_name_mapping.keys())]
 plot_df["method_name"] = plot_df["model_name"].map(model_to_method_name_mapping)
 for random_in_prod_all_dist_avg_percentile in random_in_prod_all_dist_avg_percentiles:
-    plot_df = pd.concat((plot_df,
-        pd.DataFrame(
-            {
-                "method_name": ["Random"],
-                "in_product_all_dist_avg_percentile": [
-                    random_in_prod_all_dist_avg_percentile
-                ],
-            }
-        )), axis=0)
+    plot_df = pd.concat(
+        (
+            plot_df,
+            pd.DataFrame(
+                {
+                    "method_name": ["Random"],
+                    "in_product_all_dist_avg_percentile": [
+                        random_in_prod_all_dist_avg_percentile
+                    ],
+                }
+            ),
+        ),
+        axis=0,
+    )
 
 metric = "in_product_all_dist_avg_percentile"
 
@@ -641,7 +646,7 @@ sns.barplot(
     data=plot_df,
     y="method_name",
     x=metric,
-    order = ["mrVI", "CompositionSCVI", "CompositionPCA", "Random"],
+    order=["mrVI", "CompositionSCVI", "CompositionPCA", "Random"],
     palette=BARPLOT_CMAP,
     ax=ax,
 )
@@ -970,12 +975,12 @@ save_figures(f"{method_name}.u_mdes_colored_by_cluster", dataset_name)
 
 # %%
 # admissibility check
-import scvi_v2
+import mrvi
 
 model_path = f"{dataset_name}.{method_name}"
 if not RUN_WITH_PARSER:
     model_path = os.path.join("../results/sciplex_pipeline/models", model_path)
-model = scvi_v2.MrVI.load(model_path, adata=train_adata)
+model = mrvi.MrVI.load(model_path, adata=train_adata)
 # %%
 outlier_res = model.get_outlier_cell_sample_pairs(
     flavor="ball",
@@ -988,9 +993,9 @@ outlier_res.to_netcdf(
     os.path.join(output_dir, f"{dataset_name}.{method_name}.outlier_res.nc")
 )
 # %%
-adata.obs.loc[
-    outlier_res.cell_name.values, "total_admissible"
-] = outlier_res.is_admissible.sum(axis=1).values
+adata.obs.loc[outlier_res.cell_name.values, "total_admissible"] = (
+    outlier_res.is_admissible.sum(axis=1).values
+)
 plot_df = pd.DataFrame(adata.obsm[f"X_{method_name}_u_mde"], columns=["x", "y"])
 plot_df["total_admissible"] = adata.obs.total_admissible.values
 
@@ -1010,21 +1015,19 @@ save_figures(f"{method_name}.total_admissible_hist", dataset_name)
 # %%
 # Multivariate analysis DE
 # (For this we create a column for each cluster since we require float values)
-import scvi_v2
+import mrvi
 
 model_path = f"{dataset_name}.{method_name}"
 if not RUN_WITH_PARSER:
     model_path = os.path.join("../results/sciplex_pipeline/models", model_path)
 # Register adata to get scvi sample assignment
-model = scvi_v2.MrVI.load(model_path, adata=train_adata)
+model = mrvi.MrVI.load(model_path, adata=train_adata)
 
 # %%
 train_adata.obs["donor_cluster"] = (
     train_adata.obs["product_dose"].map(donor_info_["cluster_id"]).values.astype(int)
 )
-train_adata.obs.loc[
-    train_adata.obs.product_dose == "Vehicle_0", "donor_cluster"
-] = -1
+train_adata.obs.loc[train_adata.obs.product_dose == "Vehicle_0", "donor_cluster"] = -1
 for cluster_i in range(1, n_clusters + 1):
     train_adata.obs[f"donor_cluster_{cluster_i}"] = (
         train_adata.obs["donor_cluster"] == cluster_i
@@ -1038,7 +1041,8 @@ sub_train_adata.obs["_indices"] = np.arange(sub_train_adata.shape[0])
 cluster_wise_multivar_res = {}
 for cluster_i in range(1, n_clusters + 1):
     cluster_sub_train_adata = sub_train_adata[
-        (sub_train_adata.obs["donor_cluster"] == cluster_i) | (sub_train_adata.obs["donor_cluster"] == -1)
+        (sub_train_adata.obs["donor_cluster"] == cluster_i)
+        | (sub_train_adata.obs["donor_cluster"] == -1)
     ].copy()
     # cluster_sub_train_adata = cluster_sub_train_adata[np.random.choice(cluster_sub_train_adata.shape[0], 50)]
     cluster_multivar_res = model.perform_multivariate_analysis(
@@ -1064,10 +1068,15 @@ enr_result_dict = {}
 full_dfs = {}
 de_dfs = {}
 for cluster_i in cluster_wise_multivar_res:
-# cluster_i = 1
+    # cluster_i = 1
     cluster_multivar_res = cluster_wise_multivar_res[cluster_i]
-    betas_ = cluster_multivar_res["lfc"].transpose("cell_name", "covariate", "gene").loc[{"covariate": f"donor_cluster_{cluster_i}"}].values
-    betas_ = betas_ / np.log(2) # change to log 2
+    betas_ = (
+        cluster_multivar_res["lfc"]
+        .transpose("cell_name", "covariate", "gene")
+        .loc[{"covariate": f"donor_cluster_{cluster_i}"}]
+        .values
+    )
+    betas_ = betas_ / np.log(2)  # change to log 2
     # plt.hist(betas_.mean(0), bins=100)
     # plt.xlabel("LFC")
     # plt.show()
@@ -1095,7 +1104,7 @@ for cluster_i in cluster_wise_multivar_res:
     obs_de.LFC.hist(bins=100)
     de_dfs[cluster_i] = obs_de
 
-    de_genes = obs_de.gene.values 
+    de_genes = obs_de.gene.values
     de_genes = [gene for gene in de_genes if str(gene) != "nan"]
     try:
         enr_results, fig = perform_gsea(
@@ -1166,7 +1175,7 @@ for cluster_i, de_df in de_dfs.items():
         data=abr_de_df,
         ax=ax,
     )
-    ax.axhline(y=0,color="black" )
+    ax.axhline(y=0, color="black")
     # rotate x labels
     ax.set_title(f"Cluster {cluster_i} Top LFC DE Genes")
     ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
@@ -1179,21 +1188,32 @@ for cluster_i, de_df in de_dfs.items():
 # %%
 # matrixplot of top de genes
 from functools import reduce
+
 top_de_genes = reduce(np.union1d, top_de_genes_per_cluster.values())
 
 # get lfcs for each cluster for top de genes
 top_de_lfcs_cols = []
 for cluster_i, full_df in full_dfs.items():
     print(cluster_i)
-    top_des_df = full_df[full_df["gene"].isin(top_de_genes)][["gene", "LFC"]].set_index("gene")
+    top_des_df = full_df[full_df["gene"].isin(top_de_genes)][["gene", "LFC"]].set_index(
+        "gene"
+    )
     top_de_lfcs_cols.append(top_des_df.loc[top_de_genes]["LFC"].values.reshape(-1, 1))
 
-top_de_lfcs_df = pd.DataFrame(np.hstack(top_de_lfcs_cols), index=top_de_genes, columns=full_dfs.keys())
+top_de_lfcs_df = pd.DataFrame(
+    np.hstack(top_de_lfcs_cols), index=top_de_genes, columns=full_dfs.keys()
+)
 top_de_lfcs_df
 
 # %%
-sns.clustermap(top_de_lfcs_df, col_cluster=False, yticklabels=True, xticklabels=True,
-               center=0, cmap="seismic")
+sns.clustermap(
+    top_de_lfcs_df,
+    col_cluster=False,
+    yticklabels=True,
+    xticklabels=True,
+    center=0,
+    cmap="seismic",
+)
 save_figures(
     "top_de_lfcs_clustermap",
     dataset_name,
@@ -1227,7 +1247,9 @@ save_figures("triu_dist_pca_variance_explained", dataset_name)
 
 # %%
 pca_xy = pd.DataFrame(pca.transform(triu_cell_dists_array)[:, :2], columns=["x", "y"])
-pca_xy.loc[:, "phase"] = model.adata.obs.loc[cell_dists.cell_name.values, "phase"].astype(str).values
+pca_xy.loc[:, "phase"] = (
+    model.adata.obs.loc[cell_dists.cell_name.values, "phase"].astype(str).values
+)
 pca_xy
 
 # %%
@@ -1269,9 +1291,9 @@ for n_clusters in range(2, 11):
 # %%
 # Plot silhouette scores
 plt.figure(figsize=(10, 6))
-plt.plot(range(2, 11), silhouette_scores, marker='o')
-plt.xlabel('Number of Clusters')
-plt.ylabel('Silhouette Score')
-plt.title('Silhouette Scores for Different Cluster Numbers')
+plt.plot(range(2, 11), silhouette_scores, marker="o")
+plt.xlabel("Number of Clusters")
+plt.ylabel("Silhouette Score")
+plt.title("Silhouette Scores for Different Cluster Numbers")
 save_figures("triu_dist_silhouette_scores", dataset_name)
 # %%

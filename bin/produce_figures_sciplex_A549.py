@@ -74,7 +74,7 @@ rep_results_paths = [
     x
     for x in all_results_files
     if x.startswith(
-        f"/home/justin/ghrepos/scvi-v2-reproducibility/bin/../results/sciplex_pipeline/data/{dataset_name}"
+        f"/home/justin/ghrepos/mrvi-reproducibility/bin/../results/sciplex_pipeline/data/{dataset_name}"
     )
     and x.endswith(".final.h5ad")
 ]
@@ -113,9 +113,26 @@ if mde_reps.size >= 1:
             plt.clf()
 
 # %%
+cell_lines = ["A549"]
+method_names = [
+    # "mrvi_attention_noprior",
+    # "mrvi_attention_no_prior_mog",
+    "mrvi_z10",
+    "mrvi_z30",
+    "mrvi_z10_u5",
+    "mrvi_z20_u5",
+    "mrvi_z30_u5",
+    "mrvi_z10_u10",
+    "mrvi_z50_u5",
+    "mrvi_z100_u5",
+]
+# %%
 # Cross method comparison plots
 all_results = load_results(results_paths)
 sciplex_metrics_df = all_results["sciplex_metrics"]
+sciplex_metrics_df = sciplex_metrics_df[
+    sciplex_metrics_df["model_name"].isin(method_names)
+]
 
 for dataset_name in sciplex_metrics_df["dataset_name"].unique():
     dataset_dir = os.path.join(output_dir, dataset_name)
@@ -192,21 +209,6 @@ for dataset_name in sciplex_metrics_df["dataset_name"].unique():
         save_figures(f"{metric}_normalized", dataset_name)
         plt.clf()
 
-
-# %%
-cell_lines = ["A549"]
-method_names = [
-    # "scviv2_attention_noprior",
-    # "scviv2_attention_no_prior_mog",
-    # "scviv2_z10",
-    # "scviv2_z30",
-    # "scviv2_z10_u5",
-    "scviv2_z20_u5",
-    "scviv2_z30_u5",
-    # "scviv2_z10_u10",
-    "scviv2_z50_u5",
-    # "scviv2_z100_u5",
-]
 
 # %%
 # Per dataset plots
@@ -460,14 +462,14 @@ for method_name in method_names:
 
 # %%
 # ELBO validation comparison
-# import scvi_v2
+# import mrvi
 
 # elbo_validaton_scores = {}
 # for compare_method_name in method_names:
 #     model_path = f"{dataset_name}.{compare_method_name}"
 #     if not RUN_WITH_PARSER:
 #         model_path = os.path.join("../results/sciplex_pipeline/models", model_path)
-#     model = scvi_v2.MrVI.load(model_path, adata=train_adata)
+#     model = mrvi.MrVI.load(model_path, adata=train_adata)
 #     elbo_validaton_scores[compare_method_name] = model.history_["elbo_validation"].iloc[
 #         -1
 #     ]["elbo_validation"]
@@ -482,7 +484,7 @@ for method_name in method_names:
 # Final distance matrix and DE analysis
 #######################################
 cl = "A549"
-method_name = "scviv2_z30_u5"
+method_name = "mrvi_z30_u5"
 
 dataset_name = f"sciplex_{cl}_simple_filtered_all_phases"
 dists_path = f"{dataset_name}.{method_name}.distance_matrices.nc"
@@ -659,9 +661,9 @@ np.random.seed(45)
 random_in_prod_all_dist_avg_percentiles = []
 for _ in range(100):
     shuffled_in_prod_mask = np.zeros(shape=in_prod_mask.shape, dtype=bool)
-    shuffled_in_prod_mask[
-        np.triu_indices(in_prod_mask.shape[0])
-    ] = np.random.permutation(in_prod_mask[np.triu_indices(in_prod_mask.shape[0])])
+    shuffled_in_prod_mask[np.triu_indices(in_prod_mask.shape[0])] = (
+        np.random.permutation(in_prod_mask[np.triu_indices(in_prod_mask.shape[0])])
+    )
     shuffled_in_prod_mask = shuffled_in_prod_mask + shuffled_in_prod_mask.T
 
     adjusted_ranks = (
@@ -945,13 +947,13 @@ save_figures(f"{method_name}.u_mdes_colored_by_cluster", dataset_name)
 # %%
 # Multivariate analysis DE
 # (For this we create a column for each cluster since we require float values)
-import scvi_v2
+import mrvi
 
 model_path = f"{dataset_name}.{method_name}"
 if not RUN_WITH_PARSER:
     model_path = os.path.join("../results/sciplex_pipeline/models", model_path)
 # Register adata to get scvi sample assignment
-model = scvi_v2.MrVI.load(model_path, adata=train_adata)
+model = mrvi.MrVI.load(model_path, adata=train_adata)
 
 # %%
 train_adata.obs["donor_cluster"] = (

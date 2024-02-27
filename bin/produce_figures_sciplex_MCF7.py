@@ -74,7 +74,7 @@ rep_results_paths = [
     x
     for x in all_results_files
     if x.startswith(
-        f"/home/justin/ghrepos/scvi-v2-reproducibility/bin/../results/sciplex_pipeline/data/{dataset_name}"
+        f"/home/justin/ghrepos/mrvi-reproducibility/bin/../results/sciplex_pipeline/data/{dataset_name}"
     )
     and x.endswith(".final.h5ad")
 ]
@@ -196,16 +196,16 @@ for dataset_name in sciplex_metrics_df["dataset_name"].unique():
 # %%
 cell_lines = ["MCF7"]
 method_names = [
-    # "scviv2_attention_noprior",
-    # "scviv2_attention_no_prior_mog",
-    # "scviv2_z10",
-    # "scviv2_z30",
-    # "scviv2_z10_u5",
-    "scviv2_z20_u5",
-    "scviv2_z30_u5",
-    # "scviv2_z10_u10",
-    # "scviv2_z50_u5",
-    # "scviv2_z100_u5",
+    # "mrvi_attention_noprior",
+    # "mrvi_attention_no_prior_mog",
+    # "mrvi_z10",
+    # "mrvi_z30",
+    # "mrvi_z10_u5",
+    "mrvi_z20_u5",
+    "mrvi_z30_u5",
+    # "mrvi_z10_u10",
+    # "mrvi_z50_u5",
+    # "mrvi_z100_u5",
 ]
 
 # Per dataset plots
@@ -463,7 +463,7 @@ for method_name in method_names:
 # Final distance matrix and DE analysis
 #######################################
 cl = "MCF7"
-method_name = "scviv2_z30_u5"
+method_name = "mrvi_z30_u5"
 
 dataset_name = f"sciplex_{cl}_simple_filtered_all_phases"
 dists_path = f"{dataset_name}.{method_name}.distance_matrices.nc"
@@ -631,9 +631,9 @@ np.random.seed(45)
 random_in_prod_all_dist_avg_percentiles = []
 for _ in range(100):
     shuffled_in_prod_mask = np.zeros(shape=in_prod_mask.shape, dtype=bool)
-    shuffled_in_prod_mask[
-        np.triu_indices(in_prod_mask.shape[0])
-    ] = np.random.permutation(in_prod_mask[np.triu_indices(in_prod_mask.shape[0])])
+    shuffled_in_prod_mask[np.triu_indices(in_prod_mask.shape[0])] = (
+        np.random.permutation(in_prod_mask[np.triu_indices(in_prod_mask.shape[0])])
+    )
     shuffled_in_prod_mask = shuffled_in_prod_mask + shuffled_in_prod_mask.T
 
     adjusted_ranks = (
@@ -692,7 +692,7 @@ sns.barplot(
 min_lim = plot_df[metric].min() - 0.05
 max_lim = plot_df[metric].max() + 0.05
 ax.set_xlim(min_lim, max_lim)
-ax.set_xticks([0.3, 0.35, 0.4, 0.45, .5])
+ax.set_xticks([0.3, 0.35, 0.4, 0.45, 0.5])
 save_figures(f"{metric}_final", dataset_name)
 
 # %%
@@ -1032,12 +1032,12 @@ save_figures(f"{method_name}.u_mdes_colored_by_cluster", dataset_name)
 
 # %%
 # admissibility check
-import scvi_v2
+import mrvi
 
 model_path = f"{dataset_name}.{method_name}"
 if not RUN_WITH_PARSER:
     model_path = os.path.join("../results/sciplex_pipeline/models", model_path)
-model = scvi_v2.MrVI.load(model_path, adata=train_adata)
+model = mrvi.MrVI.load(model_path, adata=train_adata)
 # %%
 outlier_res = model.get_outlier_cell_sample_pairs(
     flavor="ball",
@@ -1050,9 +1050,9 @@ outlier_res.to_netcdf(
     os.path.join(output_dir, f"{dataset_name}.{method_name}.outlier_res.nc")
 )
 # %%
-adata.obs.loc[
-    outlier_res.cell_name.values, "total_admissible"
-] = outlier_res.is_admissible.sum(axis=1).values
+adata.obs.loc[outlier_res.cell_name.values, "total_admissible"] = (
+    outlier_res.is_admissible.sum(axis=1).values
+)
 plot_df = pd.DataFrame(adata.obsm[f"X_{method_name}_u_mde"], columns=["x", "y"])
 plot_df["total_admissible"] = adata.obs.total_admissible.values
 
@@ -1072,13 +1072,13 @@ save_figures(f"{method_name}.total_admissible_hist", dataset_name)
 # %%
 # Multivariate analysis DE
 # (For this we create a column for each cluster since we require float values)
-import scvi_v2
+import mrvi
 
 model_path = f"{dataset_name}.{method_name}"
 if not RUN_WITH_PARSER:
     model_path = os.path.join("../results/sciplex_pipeline/models", model_path)
 # Register adata to get scvi sample assignment
-model = scvi_v2.MrVI.load(model_path, adata=train_adata)
+model = mrvi.MrVI.load(model_path, adata=train_adata)
 
 # %%
 train_adata.obs["donor_cluster"] = (
