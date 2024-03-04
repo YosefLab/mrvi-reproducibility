@@ -112,10 +112,8 @@ if use_simple_deg_filter:
             for dose in n_deg_dict[prod]:
                 n_deg_list.append(n_deg_dict[prod][dose])
 
-        plt.hist(n_deg_list, bins=100)
+        plt.hist(n_deg_list, bins=100, alpha=0.3, label=cl)
         plt.xlim(0, 10000)
-        plt.axvline(x=n_deg_cutoff, color="r", linestyle="--")
-        plt.show()
 
         # Keep products with at least one dose past the cutoff
         for prod in n_deg_dict:
@@ -123,6 +121,13 @@ if use_simple_deg_filter:
                 if n_deg_dict[prod][dose] >= n_deg_cutoff:
                     per_cl_deg_products[cl].append(prod)
                     per_cl_deg_product_doses[cl].append(f"{prod}_{dose}")
+
+    # plot overlaid histograms
+    plt.legend()
+    plt.axvline(x=n_deg_cutoff, color="r", linestyle="--")
+    plt.xlabel("Num. DEGs")
+    plt.ylabel("Count")
+    plt.savefig("figures/n_deg_cutoff.png", dpi=300)
 
     for cl in per_cl_deg_products:
         print(cl, len(set(per_cl_deg_products[cl])))

@@ -7,6 +7,8 @@ process fit_mrvi {
     val use_same_dim_uz
     val use_encoder_regularnorm
     val use_iso_prior
+    val z_dim
+    val u_dim
 
     script:
     adata_name = adata_in.getSimpleName()
@@ -30,6 +32,7 @@ process fit_mrvi {
     else if (use_iso_prior) {
         method_name = "mrvi_attention_iso"
     }
+    method_name = "${method_name}_z_${z_dim}_u_${u_dim}"
 
     model_out = "${params.outputs.models}/${adata_name}.${method_name}"
     """
@@ -42,7 +45,9 @@ process fit_mrvi {
         --use_mlp_uz ${use_mlp_uz} \\
         --use_same_dim_uz ${use_same_dim_uz} \\
         --use_encoder_regularnorm ${use_encoder_regularnorm} \\
-        --use_iso_prior ${use_iso_prior}
+        --use_iso_prior ${use_iso_prior} \\
+        --z_dim ${z_dim} \\
+        --u_dim ${u_dim}
     """
 
     output:

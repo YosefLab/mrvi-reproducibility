@@ -76,7 +76,7 @@ rep_results_paths = [
     if x.startswith(
         f"/home/justin/ghrepos/mrvi-reproducibility/bin/../results/sciplex_pipeline/data/{dataset_name}"
     )
-    and x.endswith(".final.h5ad")
+    and x.endswith(".h5ad")
 ]
 rep_results = load_results(rep_results_paths)
 
@@ -115,21 +115,29 @@ if mde_reps.size >= 1:
 # %%
 cell_lines = ["A549"]
 method_names = [
-    # "mrvi_attention_noprior",
-    # "mrvi_attention_no_prior_mog",
-    # "mrvi_z10",
-    # "mrvi_z30",
-    # "mrvi_z10_u5",
-    "mrvi_z20_u5",
-    "mrvi_z30_u5",
-    # "mrvi_z10_u10",
-    # "mrvi_z50_u5",
-    # "mrvi_z100_u5",
+    # "mrvi_attention_iso_z_2_u_2",
+    # "mrvi_attention_iso_z_5_u_2",
+    # "mrvi_attention_iso_z_10_u_2",
+    # "mrvi_attention_iso_z_30_u_2",
+    # "mrvi_attention_iso_z_50_u_2",
+    # "mrvi_attention_iso_z_5_u_5",
+    "mrvi_attention_iso_z_10_u_5",
+    "mrvi_attention_iso_z_30_u_5",
+    # "mrvi_attention_iso_z_50_u_5",
+    # "mrvi_attention_iso_z_10_u_10",
+    "mrvi_attention_iso_z_30_u_10",
+    # "mrvi_attention_iso_z_50_u_10",
+    # "mrvi_attention_iso_z_30_u_30",
+    # "mrvi_attention_iso_z_50_u_30",
+    # "mrvi_attention_iso_z_50_u_50",
 ]
 # %%
 # Cross method comparison plots
 all_results = load_results(results_paths)
 sciplex_metrics_df = all_results["sciplex_metrics"]
+sciplex_metrics_df = sciplex_metrics_df[
+    sciplex_metrics_df["model_name"].isin(method_names)
+]
 
 for dataset_name in sciplex_metrics_df["dataset_name"].unique():
     dataset_dir = os.path.join(output_dir, dataset_name)
@@ -138,24 +146,28 @@ for dataset_name in sciplex_metrics_df["dataset_name"].unique():
 
     plot_df = sciplex_metrics_df[
         (sciplex_metrics_df["dataset_name"] == dataset_name)
-        & (sciplex_metrics_df["leiden_1.0"].isna())
+        # & (sciplex_metrics_df["leiden_1.0"].isna())
         & (
             sciplex_metrics_df["distance_type"] == "distance_matrices"
         )  # Exclude normalized matrices
     ]
     for metric in [
         "gt_silhouette_score",
+        "gt_correlation_score",
         "in_product_all_dist_avg_percentile",
         "in_product_top_2_dist_avg_percentile",
     ]:
         if plot_df[metric].isna().all():
             continue
-        fig, ax = plt.subplots(figsize=(4 * INCH_TO_CM, 4 * INCH_TO_CM))
+        fig, ax = plt.subplots(figsize=(4 * INCH_TO_CM, 6 * INCH_TO_CM))
+        plot_df["Model"] = plot_df["model_name"].map(
+            lambda x: "u={}, z={}".format(x.split("_")[-3], x.split("_")[-1])
+        )
         sns.barplot(
             data=plot_df,
-            y="model_name",
+            y="Model",
             x=metric,
-            order=plot_df.sort_values(metric, ascending=False)["model_name"].values,
+            order=plot_df.sort_values(metric, ascending=False)["Model"].values,
             color="blue",
             ax=ax,
         )
@@ -165,51 +177,33 @@ for dataset_name in sciplex_metrics_df["dataset_name"].unique():
         save_figures(metric, dataset_name)
         plt.clf()
 
+
 # %%
-# same metrics for normalized
-for dataset_name in sciplex_metrics_df["dataset_name"].unique():
-    dataset_dir = os.path.join(output_dir, dataset_name)
-    if not os.path.exists(dataset_dir):
-        os.makedirs(dataset_dir, exist_ok=True)
-
-    plot_df = sciplex_metrics_df[
-        (sciplex_metrics_df["dataset_name"] == dataset_name)
-        & (
-            (
-                sciplex_metrics_df["distance_type"] == "normalized_distance_matrices"
-            )  # Only normalized matrices
-            | (
-                sciplex_metrics_df["model_name"].str.startswith("composition")
-                & sciplex_metrics_df["leiden_1.0"].isna()
-            )
-        )
-    ]
-    for metric in [
-        "gt_silhouette_score",
-        "in_product_all_dist_avg_percentile",
-        "in_product_top_2_dist_avg_percentile",
-    ]:
-        if plot_df[metric].isna().all():
-            continue
-        fig, ax = plt.subplots(figsize=(4 * INCH_TO_CM, 4 * INCH_TO_CM))
-        sns.barplot(
-            data=plot_df,
-            y="model_name",
-            x=metric,
-            order=plot_df.sort_values(metric, ascending=False)["model_name"].values,
-            color="blue",
-            ax=ax,
-        )
-        min_lim = plot_df[metric].min() - 0.05
-        max_lim = plot_df[metric].max() + 0.05
-        ax.set_xlim(min_lim, max_lim)
-        save_figures(f"{metric}_normalized", dataset_name)
-        plt.clf()
-
+# ELBO validation comparison
+elbo_validation_df = rep_results["elbo_validations"]
+fig, ax = plt.subplots(figsize=(4 * INCH_TO_CM, 6 * INCH_TO_CM))
+elbo_validation_df["Model"] = elbo_validation_df["model_name"].map(
+    lambda x: "u={}, z={}".format(x.split("_")[-3], x.split("_")[-1])
+)
+sns.barplot(
+    data=elbo_validation_df,
+    y="Model",
+    x="elbo_validation",
+    order=elbo_validation_df.sort_values("elbo_validation", ascending=False)[
+        "Model"
+    ].values,
+    color="blue",
+    ax=ax,
+)
+min_lim = elbo_validation_df["elbo_validation"].min() - 20
+max_lim = elbo_validation_df["elbo_validation"].max() + 20
+ax.set_xlim(min_lim, max_lim)
+save_figures(f"elbo_validation_comparison", dataset_name)
+plt.clf()
 
 # %%
 # Per dataset plots
-use_normalized = False
+use_normalized = True
 for method_name in method_names:
     for cl in cell_lines:
         dataset_name = f"sciplex_{cl}_simple_filtered_all_phases"
@@ -295,93 +289,135 @@ for method_name in method_names:
         for cluster in dists[cluster_dim_name].values:
             # unnormalized version
             unnormalized_vmax = np.percentile(dists.values, 90)
-            g_dists = sns.clustermap(
-                dists.loc[cluster]
-                .sel(
-                    sample_x=normalized_dists.sample_x,
-                    sample_y=normalized_dists.sample_y,
-                )
-                .to_pandas(),
-                yticklabels=True,
-                xticklabels=True,
-                col_colors=full_col_colors_df,
-                vmin=0,
-                vmax=unnormalized_vmax,
-            )
-            g_dists.ax_heatmap.set_xticklabels(
-                g_dists.ax_heatmap.get_xmajorticklabels(), fontsize=2
-            )
-            g_dists.ax_heatmap.set_yticklabels(
-                g_dists.ax_heatmap.get_ymajorticklabels(), fontsize=2
-            )
+            # g_dists = sns.clustermap(
+            #     dists.loc[cluster]
+            #     .sel(
+            #         sample_x=normalized_dists.sample_x,
+            #         sample_y=normalized_dists.sample_y,
+            #     )
+            #     .to_pandas(),
+            #     yticklabels=True,
+            #     xticklabels=True,
+            #     col_colors=full_col_colors_df,
+            #     vmin=0,
+            #     vmax=unnormalized_vmax,
+            # )
+            # g_dists.ax_heatmap.set_xticklabels(
+            #     g_dists.ax_heatmap.get_xmajorticklabels(), fontsize=2
+            # )
+            # g_dists.ax_heatmap.set_yticklabels(
+            #     g_dists.ax_heatmap.get_ymajorticklabels(), fontsize=2
+            # )
 
-            handles = [
-                Patch(facecolor=pathway_color_map[name]) for name in pathway_color_map
-            ]
-            product_legend = plt.legend(
-                handles,
-                pathway_color_map,
-                title="Product Name",
-                bbox_to_anchor=(1, 0.9),
-                bbox_transform=plt.gcf().transFigure,
-                loc="upper right",
-            )
-            plt.gca().add_artist(product_legend)
-            save_figures(
-                f"{cluster}.{method_name}.distance_matrices_heatmap", dataset_name
-            )
-            plt.clf()
+            # handles = [
+            #     Patch(facecolor=pathway_color_map[name]) for name in pathway_color_map
+            # ]
+            # product_legend = plt.legend(
+            #     handles,
+            #     pathway_color_map,
+            #     title="Product Name",
+            #     bbox_to_anchor=(1, 0.9),
+            #     bbox_transform=plt.gcf().transFigure,
+            #     loc="upper right",
+            # )
+            # plt.gca().add_artist(product_legend)
+            # save_figures(
+            #     f"{cluster}.{method_name}.distance_matrices_heatmap", dataset_name
+            # )
+            # plt.clf()
 
-            # normalized with same order
+            # # normalized with same order
             normalized_vmax = np.percentile(normalized_dists.values, 90)
-            g = sns.clustermap(
-                normalized_dists.loc[cluster]
-                .sel(
-                    sample_x=normalized_dists.sample_x,
-                    sample_y=normalized_dists.sample_y,
-                )
-                .to_pandas(),
-                yticklabels=True,
-                xticklabels=True,
-                col_colors=full_col_colors_df,
-                vmin=0,
-                vmax=normalized_vmax,
-            )
-            g.ax_heatmap.set_xticklabels(
-                g.ax_heatmap.get_xmajorticklabels(), fontsize=2
-            )
-            g.ax_heatmap.set_yticklabels(
-                g.ax_heatmap.get_ymajorticklabels(), fontsize=2
-            )
+            # g = sns.clustermap(
+            #     normalized_dists.loc[cluster]
+            #     .sel(
+            #         sample_x=normalized_dists.sample_x,
+            #         sample_y=normalized_dists.sample_y,
+            #     )
+            #     .to_pandas(),
+            #     yticklabels=True,
+            #     xticklabels=True,
+            #     col_colors=full_col_colors_df,
+            #     vmin=0,
+            #     vmax=normalized_vmax,
+            # )
+            # g.ax_heatmap.set_xticklabels(
+            #     g.ax_heatmap.get_xmajorticklabels(), fontsize=2
+            # )
+            # g.ax_heatmap.set_yticklabels(
+            #     g.ax_heatmap.get_ymajorticklabels(), fontsize=2
+            # )
 
-            handles = [
-                Patch(facecolor=pathway_color_map[name]) for name in pathway_color_map
-            ]
-            product_legend = plt.legend(
-                handles,
-                pathway_color_map,
-                title="Product Name",
-                bbox_to_anchor=(1, 0.9),
-                bbox_transform=plt.gcf().transFigure,
-                loc="upper right",
-            )
-            plt.gca().add_artist(product_legend)
-            save_figures(
-                f"{cluster}.{method_name}.normalized_distance_matrices_heatmap",
-                dataset_name,
-            )
-            plt.clf()
+            # handles = [
+            #     Patch(facecolor=pathway_color_map[name]) for name in pathway_color_map
+            # ]
+            # product_legend = plt.legend(
+            #     handles,
+            #     pathway_color_map,
+            #     title="Product Name",
+            #     bbox_to_anchor=(1, 0.9),
+            #     bbox_transform=plt.gcf().transFigure,
+            #     loc="upper right",
+            # )
+            # plt.gca().add_artist(product_legend)
+            # save_figures(
+            #     f"{cluster}.{method_name}.normalized_distance_matrices_heatmap",
+            #     dataset_name,
+            # )
+            # plt.clf()
 
             dists = normalized_dists if use_normalized else dists
-            sig_samples = adata.obs[
-                (adata.obs[f"{cl}_deg_product_dose"] == "True")
-                | (adata.obs["product_name"] == "Vehicle")
-            ]["product_dose"].unique()
+            # sig_samples = adata.obs[
+            #     (adata.obs[f"{cl}_deg_product_dose"] == "True")
+            #     | (adata.obs["product_name"] == "Vehicle")
+            # ]["product_dose"].unique()
+            # g = sns.clustermap(
+            #     dists.loc[cluster]
+            #     .sel(
+            #         sample_x=sig_samples,
+            #         sample_y=sig_samples,
+            #     )
+            #     .to_pandas(),
+            #     yticklabels=True,
+            #     xticklabels=True,
+            #     col_colors=full_col_colors_df,
+            #     vmin=0,
+            #     vmax=normalized_vmax if use_normalized else unnormalized_vmax,
+            # )
+            # g.ax_heatmap.set_xticklabels(
+            #     g.ax_heatmap.get_xmajorticklabels(), fontsize=2
+            # )
+            # g.ax_heatmap.set_yticklabels(
+            #     g.ax_heatmap.get_ymajorticklabels(), fontsize=2
+            # )
+
+            # handles = [
+            #     Patch(facecolor=pathway_color_map[name]) for name in pathway_color_map
+            # ]
+            # product_legend = plt.legend(
+            #     handles,
+            #     pathway_color_map,
+            #     title="Product Name",
+            #     bbox_to_anchor=(1, 0.9),
+            #     bbox_transform=plt.gcf().transFigure,
+            #     loc="upper right",
+            # )
+            # plt.gca().add_artist(product_legend)
+            # save_figures(
+            #     f"{cluster}.{method_name}.sig_{'normalized_' if use_normalized else ''}distance_matrices_heatmap",
+            #     dataset_name,
+            # )
+            # plt.clf()
+
+            unlike_thresh = 2 if use_normalized else 0.6
+            vehicle_unlike_samples = dists.coords["sample_y"][
+                dists.loc[cluster].sel(sample_x="Vehicle_0") > unlike_thresh
+            ].values.tolist() + ["Vehicle_0"]
             g = sns.clustermap(
                 dists.loc[cluster]
                 .sel(
-                    sample_x=sig_samples,
-                    sample_y=sig_samples,
+                    sample_x=vehicle_unlike_samples,
+                    sample_y=vehicle_unlike_samples,
                 )
                 .to_pandas(),
                 yticklabels=True,
@@ -410,78 +446,60 @@ for method_name in method_names:
             )
             plt.gca().add_artist(product_legend)
             save_figures(
-                f"{cluster}.{method_name}.sig_{'normalized_' if use_normalized else ''}distance_matrices_heatmap",
+                f"{cluster}.{method_name}.vehicleunlike_{'normalized_' if use_normalized else ''}distance_matrices_heatmap",
                 dataset_name,
             )
             plt.clf()
 
-            top_samples = adata.obs[
-                (adata.obs["dose"] == 10000.0)
-                | (adata.obs["product_name"] == "Vehicle")
-            ]["product_dose"].unique()
-            g = sns.clustermap(
-                dists.loc[cluster]
-                .sel(
-                    sample_x=top_samples,
-                    sample_y=top_samples,
-                )
-                .to_pandas(),
-                yticklabels=True,
-                xticklabels=True,
-                col_colors=full_col_colors_df,
-                vmin=0,
-                vmax=normalized_vmax if use_normalized else unnormalized_vmax,
-            )
-            g.ax_heatmap.set_xticklabels(
-                g.ax_heatmap.get_xmajorticklabels(), fontsize=2
-            )
-            g.ax_heatmap.set_yticklabels(
-                g.ax_heatmap.get_ymajorticklabels(), fontsize=2
-            )
+            # top_samples = adata.obs[
+            #     (adata.obs["dose"] == 10000.0)
+            #     | (adata.obs["product_name"] == "Vehicle")
+            # ]["product_dose"].unique()
+            # g = sns.clustermap(
+            #     dists.loc[cluster]
+            #     .sel(
+            #         sample_x=top_samples,
+            #         sample_y=top_samples,
+            #     )
+            #     .to_pandas(),
+            #     yticklabels=True,
+            #     xticklabels=True,
+            #     col_colors=full_col_colors_df,
+            #     vmin=0,
+            #     vmax=normalized_vmax if use_normalized else unnormalized_vmax,
+            # )
+            # g.ax_heatmap.set_xticklabels(
+            #     g.ax_heatmap.get_xmajorticklabels(), fontsize=2
+            # )
+            # g.ax_heatmap.set_yticklabels(
+            #     g.ax_heatmap.get_ymajorticklabels(), fontsize=2
+            # )
 
-            handles = [
-                Patch(facecolor=pathway_color_map[name]) for name in pathway_color_map
-            ]
-            product_legend = plt.legend(
-                handles,
-                pathway_color_map,
-                title="Product Name",
-                bbox_to_anchor=(1, 0.9),
-                bbox_transform=plt.gcf().transFigure,
-                loc="upper right",
-            )
-            plt.gca().add_artist(product_legend)
-            save_figures(
-                f"{cluster}.{method_name}.topdose_{'normalized_' if use_normalized else ''}distance_matrices_heatmap",
-                dataset_name,
-            )
-            plt.clf()
+            # handles = [
+            #     Patch(facecolor=pathway_color_map[name]) for name in pathway_color_map
+            # ]
+            # product_legend = plt.legend(
+            #     handles,
+            #     pathway_color_map,
+            #     title="Product Name",
+            #     bbox_to_anchor=(1, 0.9),
+            #     bbox_transform=plt.gcf().transFigure,
+            #     loc="upper right",
+            # )
+            # plt.gca().add_artist(product_legend)
+            # save_figures(
+            #     f"{cluster}.{method_name}.topdose_{'normalized_' if use_normalized else ''}distance_matrices_heatmap",
+            #     dataset_name,
+            # )
+            # plt.clf()
 
-# %%
-# ELBO validation comparison
-# import mrvi
-
-# elbo_validaton_scores = {}
-# for compare_method_name in method_names:
-#     model_path = f"{dataset_name}.{compare_method_name}"
-#     if not RUN_WITH_PARSER:
-#         model_path = os.path.join("../results/sciplex_pipeline/models", model_path)
-#     model = mrvi.MrVI.load(model_path, adata=train_adata)
-#     elbo_validaton_scores[compare_method_name] = model.history_["elbo_validation"].iloc[
-#         -1
-#     ]["elbo_validation"]
-# # %%
-# elbo_validation_df = pd.DataFrame.from_records(
-#     [(k, v) for k, v in elbo_validaton_scores.items()],
-#     columns=["Method", "Validation ELBO"],
-# )
-# sns.barplot(x="Method", y="Validation ELBO", data=elbo_validation_df)
 # %%
 #######################################
 # Final distance matrix and DE analysis
 #######################################
 cl = "A549"
-method_name = "mrvi_z30_u5"
+# method_name = "mrvi_z30_u5"
+method_name = "mrvi_attention_iso"
 
 dataset_name = f"sciplex_{cl}_simple_filtered_all_phases"
 dists_path = f"{dataset_name}.{method_name}.distance_matrices.nc"

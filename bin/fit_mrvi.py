@@ -17,6 +17,8 @@ def fit_mrvi(
     use_same_dim_uz: str = "false",
     use_encoder_regularnorm: str = "false",
     use_iso_prior: str = "false",
+    z_dim: int = 30,
+    u_dim: int = 5,
 ) -> mrvi.MrVI:
     """
     Train a MrVI model.
@@ -52,8 +54,8 @@ def fit_mrvi(
     )
     model_kwargs.update(
         {
-            "n_latent": 30,
-            "n_latent_u": 5,
+            "n_latent": int(z_dim),
+            "n_latent_u": int(u_dim),
             "qz_nn_flavor": "attention",
             "px_nn_flavor": "attention",
             "qz_kwargs": {

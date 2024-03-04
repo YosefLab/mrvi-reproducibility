@@ -46,9 +46,14 @@ def get_latent_mrvi(
     _adata.uns["model_name"] = model_name
     u_latent_key = f"X_{model_name}_u"
     z_latent_key = f"X_{model_name}_z"
-    _adata.obsm[u_latent_key] = model.get_latent_representation(adata, give_z=False)
-    _adata.obsm[z_latent_key] = model.get_latent_representation(adata, give_z=True)
+    # _adata.obsm[u_latent_key] = model.get_latent_representation(adata, give_z=False)
+    # _adata.obsm[z_latent_key] = model.get_latent_representation(adata, give_z=True)
     _adata.uns["latent_keys"] = [u_latent_key, z_latent_key]
+
+    _adata.uns["elbo_validation"] = model.history_["elbo_validation"].iloc[-1][
+        "elbo_validation"
+    ]
+
     make_parents(adata_out)
     _adata.write(filename=adata_out)
     del _adata
@@ -69,18 +74,18 @@ def get_latent_mrvi(
     del cell_dists
 
     make_parents(normalized_distance_matrices_out)
-    try:
-        cell_normalized_dists = model.get_local_sample_distances(
-            adata,
-            use_mean=True,
-            normalize_distances=True,
-            keep_cell=False,
-            groupby=labels_key,
-        )
-        cell_normalized_dists.to_netcdf(normalized_distance_matrices_out)
-        del cell_normalized_dists
-    except AttributeError:
-        Path(normalized_distance_matrices_out).touch()
+    # try:
+    #     cell_normalized_dists = model.get_local_sample_distances(
+    #         adata,
+    #         use_mean=True,
+    #         normalize_distances=True,
+    #         keep_cell=False,
+    #         groupby=labels_key,
+    #     )
+    #     cell_normalized_dists.to_netcdf(normalized_distance_matrices_out)
+    #     del cell_normalized_dists
+    # except AttributeError:
+    Path(normalized_distance_matrices_out).touch()
 
     return (
         adata_out,

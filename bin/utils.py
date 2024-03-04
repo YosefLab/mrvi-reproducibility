@@ -127,6 +127,7 @@ def load_results(results_paths):
         "umaps_metrics": [],
         "distances_metrics": [],
         "representations": [],
+        "elbo_validations": [],
         "sciplex_metrics": [],
     }
     for file in results_paths:
@@ -163,6 +164,19 @@ def load_results(results_paths):
                     all_results["representations"].append(
                         append_representations(adata, uns_key, rep_type, dataset_name)
                     )
+            print(adata.uns)
+            if "elbo_validation" in adata.uns:
+                all_results["elbo_validations"].append(
+                    pd.DataFrame.from_records(
+                        [
+                            {
+                                "dataset_name": dataset_name,
+                                "model_name": model_name,
+                                "elbo_validation": adata.uns["elbo_validation"],
+                            }
+                        ]
+                    )
+                )
             del adata
             gc.collect()  # Adata uns creates weak reference that must be manually gc.
     for key in all_results.keys():
