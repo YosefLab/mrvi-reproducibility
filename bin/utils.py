@@ -115,7 +115,7 @@ def load_results(results_paths):
                 obs_.loc[:, "representation_name"] = latent_key
                 obs_.loc[:, "representation_type"] = representation_name
                 obs_.loc[:, "dataset_name"] = dataset_name
-                obs = obs.append(obs_)
+                obs = pd.concat([obs, obs_], axis=0, ignore_index=True)
             return obs
         return None
 

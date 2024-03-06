@@ -13,14 +13,10 @@ workflow run_main {
 
     outs = preprocess_data(input) | run_models
 
-    sciplex_metrics = compute_sciplex_metrics(outs.distance_matrices, gt_clusters, gt_deg_sim_in)
-    // metrics = compute_metrics(outs.adatas, outs.distance_matrices)
-
-    // metrics = sciplex_metrics.concat(metrics)
-    metrics = sciplex_metrics
+    metrics = compute_sciplex_metrics(outs.distance_matrices, gt_clusters, gt_deg_sim_in)
 
     results = outs.adatas.concat(
-        // outs.rfs,
+        outs.rfs,
         outs.distance_matrices,
         metrics,
     )

@@ -17,10 +17,13 @@ from matplotlib.patches import Patch
 from sklearn.metrics import silhouette_score
 from scipy.cluster.hierarchy import fcluster
 import gseapy as gp
+from tqdm import tqdm
 
 from utils import load_results, perform_gsea
 from tree_utils import hierarchical_clustering
 from plot_utils import INCH_TO_CM, SCIPLEX_PATHWAY_CMAP, BARPLOT_CMAP
+
+import mrvi
 
 # Change to False if you want to run this script directly
 RUN_WITH_PARSER = False
@@ -113,23 +116,22 @@ if mde_reps.size >= 1:
             plt.clf()
 
 # %%
-cell_lines = ["A549"]
 method_names = [
-    # "mrvi_attention_iso_z_2_u_2",
-    # "mrvi_attention_iso_z_5_u_2",
-    # "mrvi_attention_iso_z_10_u_2",
-    # "mrvi_attention_iso_z_30_u_2",
-    # "mrvi_attention_iso_z_50_u_2",
-    # "mrvi_attention_iso_z_5_u_5",
+    "mrvi_attention_iso_z_2_u_2",
+    "mrvi_attention_iso_z_5_u_2",
+    "mrvi_attention_iso_z_10_u_2",
+    "mrvi_attention_iso_z_30_u_2",
+    "mrvi_attention_iso_z_50_u_2",
+    "mrvi_attention_iso_z_5_u_5",
     "mrvi_attention_iso_z_10_u_5",
     "mrvi_attention_iso_z_30_u_5",
-    # "mrvi_attention_iso_z_50_u_5",
-    # "mrvi_attention_iso_z_10_u_10",
+    "mrvi_attention_iso_z_50_u_5",
+    "mrvi_attention_iso_z_10_u_10",
     "mrvi_attention_iso_z_30_u_10",
-    # "mrvi_attention_iso_z_50_u_10",
-    # "mrvi_attention_iso_z_30_u_30",
-    # "mrvi_attention_iso_z_50_u_30",
-    # "mrvi_attention_iso_z_50_u_50",
+    "mrvi_attention_iso_z_50_u_10",
+    "mrvi_attention_iso_z_30_u_30",
+    "mrvi_attention_iso_z_50_u_30",
+    "mrvi_attention_iso_z_50_u_50",
 ]
 # %%
 # Cross method comparison plots
@@ -203,19 +205,16 @@ plt.clf()
 
 # %%
 # Per dataset plots
-use_normalized = True
+cell_lines = ["A549"]
+method_names = [
+    "mrvi_attention_iso_z_10_u_5",
+    "mrvi_attention_iso_z_30_u_5",
+    "mrvi_attention_iso_z_30_u_10",
+]
+use_normalized = False
 for method_name in method_names:
     for cl in cell_lines:
         dataset_name = f"sciplex_{cl}_simple_filtered_all_phases"
-        normalized_dists_path = (
-            f"{dataset_name}.{method_name}.normalized_distance_matrices.nc"
-        )
-        if not RUN_WITH_PARSER:
-            normalized_dists_path = os.path.join(
-                "../results/sciplex_pipeline/distance_matrices",
-                normalized_dists_path,
-            )
-        normalized_dists = xr.open_dataarray(normalized_dists_path)
         dists_path = f"{dataset_name}.{method_name}.distance_matrices.nc"
         if not RUN_WITH_PARSER:
             dists_path = os.path.join(
@@ -236,26 +235,7 @@ for method_name in method_names:
             .to_dict()
         )
         sample_to_color_df = (
-            normalized_dists.sample_x.to_series()
-            .map(sample_to_pathway)
-            .map(pathway_color_map)
-        )
-
-        if not RUN_WITH_PARSER:
-            n_deg_dict = pd.read_csv(
-                f"../notebooks/output/{cl}_flat_deg_dict.csv", index_col=0
-            ).to_dict()["0"]
-            sample_to_n_deg_df = normalized_dists.sample_x.to_series().map(n_deg_dict)
-            sample_to_n_deg_df = sample_to_n_deg_df.map(
-                lambda x: cm.get_cmap("viridis", 256)(x / np.max(sample_to_n_deg_df))
-            )
-
-        sample_to_sig_prod_dose = (
-            adata.obs[["product_dose", f"{cl}_deg_product_dose"]]
-            .drop_duplicates()
-            .set_index("product_dose")[f"{cl}_deg_product_dose"]
-            .fillna("False")
-            .map({"True": "red", "False": "blue"})
+            dists.sample_x.to_series().map(sample_to_pathway).map(pathway_color_map)
         )
 
         sample_to_dose = (
@@ -269,16 +249,11 @@ for method_name in method_names:
         color_cols = [
             sample_to_color_df,
             sample_to_dose,
-            # sample_to_sig_prod_dose,
         ]
         col_names = [
             "Pathway",
             "Dose",
-            # "Product-Dose passed DEG filter?",
         ]
-        # if not RUN_WITH_PARSER:
-        #     color_cols.append(sample_to_n_deg_df)
-        #     col_names.append("n_degs")
         full_col_colors_df = pd.concat(
             color_cols,
             axis=1,
@@ -289,127 +264,44 @@ for method_name in method_names:
         for cluster in dists[cluster_dim_name].values:
             # unnormalized version
             unnormalized_vmax = np.percentile(dists.values, 90)
-            # g_dists = sns.clustermap(
-            #     dists.loc[cluster]
-            #     .sel(
-            #         sample_x=normalized_dists.sample_x,
-            #         sample_y=normalized_dists.sample_y,
-            #     )
-            #     .to_pandas(),
-            #     yticklabels=True,
-            #     xticklabels=True,
-            #     col_colors=full_col_colors_df,
-            #     vmin=0,
-            #     vmax=unnormalized_vmax,
-            # )
-            # g_dists.ax_heatmap.set_xticklabels(
-            #     g_dists.ax_heatmap.get_xmajorticklabels(), fontsize=2
-            # )
-            # g_dists.ax_heatmap.set_yticklabels(
-            #     g_dists.ax_heatmap.get_ymajorticklabels(), fontsize=2
-            # )
+            g_dists = sns.clustermap(
+                dists.loc[cluster]
+                .sel(
+                    sample_x=dists.sample_x,
+                    sample_y=dists.sample_y,
+                )
+                .to_pandas(),
+                yticklabels=True,
+                xticklabels=True,
+                col_colors=full_col_colors_df,
+                vmin=0,
+                vmax=unnormalized_vmax,
+            )
+            g_dists.ax_heatmap.set_xticklabels(
+                g_dists.ax_heatmap.get_xmajorticklabels(), fontsize=2
+            )
+            g_dists.ax_heatmap.set_yticklabels(
+                g_dists.ax_heatmap.get_ymajorticklabels(), fontsize=2
+            )
 
-            # handles = [
-            #     Patch(facecolor=pathway_color_map[name]) for name in pathway_color_map
-            # ]
-            # product_legend = plt.legend(
-            #     handles,
-            #     pathway_color_map,
-            #     title="Product Name",
-            #     bbox_to_anchor=(1, 0.9),
-            #     bbox_transform=plt.gcf().transFigure,
-            #     loc="upper right",
-            # )
-            # plt.gca().add_artist(product_legend)
-            # save_figures(
-            #     f"{cluster}.{method_name}.distance_matrices_heatmap", dataset_name
-            # )
-            # plt.clf()
+            handles = [
+                Patch(facecolor=pathway_color_map[name]) for name in pathway_color_map
+            ]
+            product_legend = plt.legend(
+                handles,
+                pathway_color_map,
+                title="Product Name",
+                bbox_to_anchor=(1, 0.9),
+                bbox_transform=plt.gcf().transFigure,
+                loc="upper right",
+            )
+            plt.gca().add_artist(product_legend)
+            save_figures(
+                f"{cluster}.{method_name}.distance_matrices_heatmap", dataset_name
+            )
+            plt.clf()
 
-            # # normalized with same order
-            normalized_vmax = np.percentile(normalized_dists.values, 90)
-            # g = sns.clustermap(
-            #     normalized_dists.loc[cluster]
-            #     .sel(
-            #         sample_x=normalized_dists.sample_x,
-            #         sample_y=normalized_dists.sample_y,
-            #     )
-            #     .to_pandas(),
-            #     yticklabels=True,
-            #     xticklabels=True,
-            #     col_colors=full_col_colors_df,
-            #     vmin=0,
-            #     vmax=normalized_vmax,
-            # )
-            # g.ax_heatmap.set_xticklabels(
-            #     g.ax_heatmap.get_xmajorticklabels(), fontsize=2
-            # )
-            # g.ax_heatmap.set_yticklabels(
-            #     g.ax_heatmap.get_ymajorticklabels(), fontsize=2
-            # )
-
-            # handles = [
-            #     Patch(facecolor=pathway_color_map[name]) for name in pathway_color_map
-            # ]
-            # product_legend = plt.legend(
-            #     handles,
-            #     pathway_color_map,
-            #     title="Product Name",
-            #     bbox_to_anchor=(1, 0.9),
-            #     bbox_transform=plt.gcf().transFigure,
-            #     loc="upper right",
-            # )
-            # plt.gca().add_artist(product_legend)
-            # save_figures(
-            #     f"{cluster}.{method_name}.normalized_distance_matrices_heatmap",
-            #     dataset_name,
-            # )
-            # plt.clf()
-
-            dists = normalized_dists if use_normalized else dists
-            # sig_samples = adata.obs[
-            #     (adata.obs[f"{cl}_deg_product_dose"] == "True")
-            #     | (adata.obs["product_name"] == "Vehicle")
-            # ]["product_dose"].unique()
-            # g = sns.clustermap(
-            #     dists.loc[cluster]
-            #     .sel(
-            #         sample_x=sig_samples,
-            #         sample_y=sig_samples,
-            #     )
-            #     .to_pandas(),
-            #     yticklabels=True,
-            #     xticklabels=True,
-            #     col_colors=full_col_colors_df,
-            #     vmin=0,
-            #     vmax=normalized_vmax if use_normalized else unnormalized_vmax,
-            # )
-            # g.ax_heatmap.set_xticklabels(
-            #     g.ax_heatmap.get_xmajorticklabels(), fontsize=2
-            # )
-            # g.ax_heatmap.set_yticklabels(
-            #     g.ax_heatmap.get_ymajorticklabels(), fontsize=2
-            # )
-
-            # handles = [
-            #     Patch(facecolor=pathway_color_map[name]) for name in pathway_color_map
-            # ]
-            # product_legend = plt.legend(
-            #     handles,
-            #     pathway_color_map,
-            #     title="Product Name",
-            #     bbox_to_anchor=(1, 0.9),
-            #     bbox_transform=plt.gcf().transFigure,
-            #     loc="upper right",
-            # )
-            # plt.gca().add_artist(product_legend)
-            # save_figures(
-            #     f"{cluster}.{method_name}.sig_{'normalized_' if use_normalized else ''}distance_matrices_heatmap",
-            #     dataset_name,
-            # )
-            # plt.clf()
-
-            unlike_thresh = 2 if use_normalized else 0.6
+            unlike_thresh = np.percentile(dists.sel(sample_x="Vehicle_0").values, 75)
             vehicle_unlike_samples = dists.coords["sample_y"][
                 dists.loc[cluster].sel(sample_x="Vehicle_0") > unlike_thresh
             ].values.tolist() + ["Vehicle_0"]
@@ -424,7 +316,7 @@ for method_name in method_names:
                 xticklabels=True,
                 col_colors=full_col_colors_df,
                 vmin=0,
-                vmax=normalized_vmax if use_normalized else unnormalized_vmax,
+                vmax=unnormalized_vmax,
             )
             g.ax_heatmap.set_xticklabels(
                 g.ax_heatmap.get_xmajorticklabels(), fontsize=2
@@ -451,55 +343,13 @@ for method_name in method_names:
             )
             plt.clf()
 
-            # top_samples = adata.obs[
-            #     (adata.obs["dose"] == 10000.0)
-            #     | (adata.obs["product_name"] == "Vehicle")
-            # ]["product_dose"].unique()
-            # g = sns.clustermap(
-            #     dists.loc[cluster]
-            #     .sel(
-            #         sample_x=top_samples,
-            #         sample_y=top_samples,
-            #     )
-            #     .to_pandas(),
-            #     yticklabels=True,
-            #     xticklabels=True,
-            #     col_colors=full_col_colors_df,
-            #     vmin=0,
-            #     vmax=normalized_vmax if use_normalized else unnormalized_vmax,
-            # )
-            # g.ax_heatmap.set_xticklabels(
-            #     g.ax_heatmap.get_xmajorticklabels(), fontsize=2
-            # )
-            # g.ax_heatmap.set_yticklabels(
-            #     g.ax_heatmap.get_ymajorticklabels(), fontsize=2
-            # )
-
-            # handles = [
-            #     Patch(facecolor=pathway_color_map[name]) for name in pathway_color_map
-            # ]
-            # product_legend = plt.legend(
-            #     handles,
-            #     pathway_color_map,
-            #     title="Product Name",
-            #     bbox_to_anchor=(1, 0.9),
-            #     bbox_transform=plt.gcf().transFigure,
-            #     loc="upper right",
-            # )
-            # plt.gca().add_artist(product_legend)
-            # save_figures(
-            #     f"{cluster}.{method_name}.topdose_{'normalized_' if use_normalized else ''}distance_matrices_heatmap",
-            #     dataset_name,
-            # )
-            # plt.clf()
 
 # %%
 #######################################
 # Final distance matrix and DE analysis
 #######################################
 cl = "A549"
-# method_name = "mrvi_z30_u5"
-method_name = "mrvi_attention_iso"
+method_name = "mrvi_attention_iso_z_30_u_10"
 
 dataset_name = f"sciplex_{cl}_simple_filtered_all_phases"
 dists_path = f"{dataset_name}.{method_name}.distance_matrices.nc"
@@ -547,10 +397,14 @@ full_col_colors_df = pd.concat(
 )
 full_col_colors_df.columns = col_names
 
-sig_samples = adata.obs[
-    (adata.obs[f"{cl}_deg_product_dose"] == "True")
-    | (adata.obs["product_name"] == "Vehicle")
-]["product_dose"].unique()
+# sig_samples = adata.obs[
+#     (adata.obs[f"{cl}_deg_product_dose"] == "True")
+#     | (adata.obs["product_name"] == "Vehicle")
+# ]["product_dose"].unique()
+unlike_thresh = np.percentile(dists.sel(sample_x="Vehicle_0").values, 80)
+sig_samples = dists.coords["sample_y"][
+    dists.loc[1].sel(sample_x="Vehicle_0") > unlike_thresh
+].values.tolist() + ["Vehicle_0"]
 d1 = dists.loc[1].sel(
     sample_x=sig_samples,
     sample_y=sig_samples,
@@ -592,7 +446,51 @@ if not RUN_WITH_PARSER:
         "../results/sciplex_pipeline/data", train_adata_path
     )
 train_adata = sc.read(train_adata_path)
-train_adata_log = train_adata[train_adata.obs.product_dose.isin(sig_samples)].copy()
+# %%
+model_path = f"{dataset_name}.{method_name}"
+if not RUN_WITH_PARSER:
+    model_path = os.path.join("../results/sciplex_pipeline/models", model_path)
+# Register adata to get scvi sample assignment
+model = mrvi.MrVI.load(model_path, adata=train_adata, accelerator="cpu")
+
+# %%
+import pymde
+
+mde_kwargs = dict(
+    embedding_dim=2,
+    constraint=pymde.Standardized(),
+    repulsive_fraction=1.5,
+    device="cuda",
+    n_neighbors=15,
+)
+for latent_key in ["z", "u"]:
+    rep = f"X_{method_name}_{latent_key}_mde"
+    latent = adata.obsm[f"X_{method_name}_{latent_key}"]
+    latent_mde = pymde.preserve_neighbors(latent, **mde_kwargs).embed().cpu().numpy()
+    adata.obsm[rep] = latent_mde
+    rep_plots = mde_reps.query(f"representation_name == '{rep}'")
+    rep_plots.loc[(rep_plots["index"] == adata.obs_names), ["new_x", "new_y"]] = (
+        adata.obsm[rep]
+    )
+    rep_plots = rep_plots.sample(frac=1)
+    for color_by in ["phase", "pathway_level_1"]:
+        if color_by == "phase":
+            palette = None
+        elif color_by == "pathway_level_1":
+            palette = pathway_color_map
+        fig, ax = plt.subplots(figsize=(15 * INCH_TO_CM, 15 * INCH_TO_CM))
+        sns.scatterplot(
+            rep_plots, x="new_x", y="new_y", hue=color_by, palette=palette, ax=ax, s=3
+        )
+        ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
+        ax.set_xlabel("MDE1")
+        ax.set_ylabel("MDE2")
+        ax.set_title(rep)
+        save_figures(
+            f"{rep}_{color_by}.final",
+            dataset_name,
+        )
+        plt.clf()
 
 # %%
 # Metric plots
@@ -730,7 +628,7 @@ sns.barplot(
     data=plot_df,
     y="method_name",
     x=metric,
-    order=["mrVI", "CompositionPCA", "CompositionSCVI", "Random"],
+    order=["mrVI", "CompositionSCVI", "CompositionPCA", "Random"],
     palette=BARPLOT_CMAP,
     ax=ax,
 )
@@ -777,10 +675,76 @@ ax.set_xticks([0.3, 0.35, 0.4, 0.45, 0.5])
 save_figures(f"{metric}_final", dataset_name)
 
 # %%
+# Silhouette analysis
+from sklearn.metrics import silhouette_score
+from scipy.cluster.hierarchy import fcluster
+
+# Define the range of clusters to test
+n_clusters_range = range(2, 30)
+
+silhouette_scores = []
+
+for n_clusters in n_clusters_range:
+    # Generate clusters
+    clusters = fcluster(Z, t=n_clusters, criterion="maxclust")
+
+    # Calculate silhouette score
+    score = silhouette_score(d1.to_pandas(), clusters)
+    silhouette_scores.append(score)
+
+    print(f"Silhouette Score for {n_clusters} clusters: {score}")
+
+# Plotting the silhouette scores
+plt.figure(figsize=(10, 6))
+plt.plot(n_clusters_range, silhouette_scores, marker="o")
+plt.xticks(n_clusters_range)
+plt.xlabel("Number of Clusters")
+plt.ylabel("Silhouette Score")
+plt.title("Silhouette Score by Number of Clusters")
+plt.grid(True)
+save_figures("silhouette_score", dataset_name)
+# %%
+# Sum of Squared Differences within each cluster
+from scipy.cluster.hierarchy import fcluster
+from sklearn.metrics import pairwise_distances
+import numpy as np
+
+# Define the range of clusters to test
+n_clusters_range = range(2, 30)
+
+ssd_scores = []
+
+for n_clusters in n_clusters_range:
+    # Generate clusters
+    clusters = fcluster(Z, t=n_clusters, criterion="maxclust")
+
+    # Calculate sum of squared differences within each cluster
+    ssd = 0
+    for cluster_id in np.unique(clusters):
+        cluster_points = d1.to_pandas()[clusters == cluster_id]
+        pairwise_dist = pairwise_distances(cluster_points)
+        ssd += (
+            np.sum(np.square(pairwise_dist)) / 2
+        )  # Divide by 2 to correct for double counting
+    ssd_scores.append(ssd)
+
+    print(f"Sum of Squared Differences for {n_clusters} clusters: {ssd}")
+
+# Plotting the SSD scores
+plt.figure(figsize=(10, 6))
+plt.plot(n_clusters_range, ssd_scores, marker="o")
+plt.xticks(n_clusters_range)
+plt.xlabel("Number of Clusters")
+plt.ylabel("Sum of Squared Differences")
+plt.title("SSD by Number of Clusters")
+plt.grid(True)
+save_figures("ssd_comparison", dataset_name)
+
+# %%
 # DE analysis
 plt.rcParams["axes.grid"] = False
 
-n_clusters = 8
+n_clusters = 9
 
 clusters = fcluster(Z, t=n_clusters, criterion="maxclust")
 donor_info_ = pd.DataFrame({"cluster_id": clusters}, index=d1.sample_x.values)
@@ -806,14 +770,9 @@ g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_ymajorticklabels(), fontsize=5)
 save_figures(f"{method_name}.distances_fig.clustered", dataset_name)
 
 # %%
-adata_path = f"{dataset_name}.{method_name}.final.h5ad"
-if not RUN_WITH_PARSER:
-    adata_path = os.path.join("../results/sciplex_pipeline/data", adata_path)
-adata = sc.read(adata_path)
-
-# %%
 # MDE with low opacity vehicle cluster
-vehicle_sim_thresh = 0.4
+# vehicle_sim_thresh = 0.4
+vehicle_sim_thresh = unlike_thresh
 vehicle_dists = (
     dists.where(dists.values < vehicle_sim_thresh)
     .sel(sample_x="Vehicle_0", _dummy_name=1)
@@ -824,47 +783,12 @@ sns.histplot(dists.sel(sample_x="Vehicle_0").to_numpy().flatten(), bins=50)
 plt.axvline(vehicle_sim_thresh, color="red")
 
 # %%
-rep = f"X_{method_name}_z_mde"
-rep_plots = mde_reps.query(f"representation_name == '{rep}'").sample(frac=1)
-color_by = "pathway_level_1"
-palette = pathway_color_map
-marker_size = 3
-fig, ax = plt.subplots(figsize=(15 * INCH_TO_CM, 15 * INCH_TO_CM))
-full_opacity_rep_plots = rep_plots[~rep_plots["product_dose"].isin(vehicle_sim_samples)]
-partial_opacity_rep_plots = rep_plots[
-    rep_plots["product_dose"].isin(vehicle_sim_samples)
-]
-sns.scatterplot(
-    partial_opacity_rep_plots,
-    x="x",
-    y="y",
-    hue=color_by,
-    palette=palette,
-    ax=ax,
-    s=marker_size,
-    alpha=0.1,
-)
-sns.scatterplot(
-    full_opacity_rep_plots,
-    x="x",
-    y="y",
-    hue=color_by,
-    palette=palette,
-    ax=ax,
-    s=marker_size,
-    legend=False,
-)
-ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
-ax.set_xlabel("MDE1")
-ax.set_ylabel("MDE2")
-
-save_figures(
-    f"{rep}_{color_by}_opacity_thresh_{vehicle_sim_thresh}",
-    dataset_name,
-)
-# %%
 rep = f"X_{method_name}_u_mde"
-rep_plots = mde_reps.query(f"representation_name == '{rep}'").sample(frac=1)
+rep_plots = mde_reps.query(f"representation_name == '{rep}'")
+rep_plots.loc[(rep_plots["index"] == adata.obs_names), ["new_x", "new_y"]] = adata.obsm[
+    rep
+]
+rep_plots = rep_plots.sample(frac=1)
 color_by = "pathway_level_1"
 palette = pathway_color_map
 marker_size = 3
@@ -875,8 +799,8 @@ partial_opacity_rep_plots = rep_plots[
 ]
 sns.scatterplot(
     partial_opacity_rep_plots,
-    x="x",
-    y="y",
+    x="new_x",
+    y="new_y",
     hue=color_by,
     palette=palette,
     ax=ax,
@@ -885,8 +809,8 @@ sns.scatterplot(
 )
 sns.scatterplot(
     full_opacity_rep_plots,
-    x="x",
-    y="y",
+    x="new_x",
+    y="new_y",
     hue=color_by,
     palette=palette,
     ax=ax,
@@ -901,74 +825,57 @@ save_figures(
     f"{rep}_{color_by}_opacity_thresh_{vehicle_sim_thresh}",
     dataset_name,
 )
-
-# %%
-# z mdes colored by cluster membership
+rep = f"X_{method_name}_z_mde"
+rep_plots = mde_reps.query(f"representation_name == '{rep}'")
+rep_plots.loc[(rep_plots["index"] == adata.obs_names), ["new_x", "new_y"]] = adata.obsm[
+    rep
+]
+rep_plots = rep_plots.sample(frac=1)
+color_by = "pathway_level_1"
+palette = pathway_color_map
+marker_size = 3
 fig, ax = plt.subplots(figsize=(15 * INCH_TO_CM, 15 * INCH_TO_CM))
-plot_df = pd.DataFrame(adata.obsm[f"X_{method_name}_z_mde"], columns=["x", "y"])
-plot_df["product_cluster"] = (
-    adata.obs["product_dose"].map(donor_info_["cluster_id"]).values
-)
-plot_df = plot_df.loc[~plot_df["product_cluster"].isna()]
-plot_df["product_cluster"] = plot_df["product_cluster"].astype(int).astype(str)
-# shuffle
-plot_df = plot_df.sample(frac=1).reset_index(drop=True)
+full_opacity_rep_plots = rep_plots[~rep_plots["product_dose"].isin(vehicle_sim_samples)]
+partial_opacity_rep_plots = rep_plots[
+    rep_plots["product_dose"].isin(vehicle_sim_samples)
+]
 sns.scatterplot(
-    plot_df,
-    x="x",
-    y="y",
-    hue="product_cluster",
-    hue_order=[str(i) for i in range(1, n_clusters + 1)],
-    palette={str(k): v for k, v in cluster_color_map.items()},
+    partial_opacity_rep_plots,
+    x="new_x",
+    y="new_y",
+    hue=color_by,
+    palette=palette,
     ax=ax,
     s=marker_size,
+    alpha=0.1,
+)
+sns.scatterplot(
+    full_opacity_rep_plots,
+    x="new_x",
+    y="new_y",
+    hue=color_by,
+    palette=palette,
+    ax=ax,
+    s=marker_size,
+    legend=False,
 )
 ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
 ax.set_xlabel("MDE1")
 ax.set_ylabel("MDE2")
-ax.set_title(method_name)
+
 save_figures(
-    f"{method_name}.z_mdes_colored_by_cluster",
+    f"{rep}_{color_by}_opacity_thresh_{vehicle_sim_thresh}",
     dataset_name,
 )
-
-# %%
-# u mdes colored by cluster membership
-fig, ax = plt.subplots(figsize=(15 * INCH_TO_CM, 15 * INCH_TO_CM))
-plot_df = pd.DataFrame(adata.obsm[f"X_{method_name}_u_mde"], columns=["x", "y"])
-plot_df["product_cluster"] = (
-    adata.obs["product_dose"].map(donor_info_["cluster_id"]).values
-)
-plot_df = plot_df.loc[~plot_df["product_cluster"].isna()]
-plot_df["product_cluster"] = plot_df["product_cluster"].astype(int).astype(str)
-# shuffle
-plot_df = plot_df.sample(frac=1).reset_index(drop=True)
-sns.scatterplot(
-    plot_df,
-    x="x",
-    y="y",
-    hue="product_cluster",
-    hue_order=[str(i) for i in range(1, n_clusters + 1)],
-    palette={str(k): v for k, v in cluster_color_map.items()},
-    ax=ax,
-    s=marker_size,
-)
-ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
-ax.set_xlabel("MDE1")
-ax.set_ylabel("MDE2")
-ax.set_title(method_name)
-save_figures(f"{method_name}.u_mdes_colored_by_cluster", dataset_name)
 
 # %%
 # Multivariate analysis DE
 # (For this we create a column for each cluster since we require float values)
-import mrvi
-
 model_path = f"{dataset_name}.{method_name}"
 if not RUN_WITH_PARSER:
     model_path = os.path.join("../results/sciplex_pipeline/models", model_path)
 # Register adata to get scvi sample assignment
-model = mrvi.MrVI.load(model_path, adata=train_adata)
+model = mrvi.MrVI.load(model_path, adata=train_adata, accelerator="cuda")
 
 # %%
 train_adata.obs["donor_cluster"] = (
@@ -1039,11 +946,10 @@ plt_vmax = 2
 
 gene_sets = [gp.parser.download_library(gene_set_name, "human")]
 # import json
-# with open(
-#     "../data/MSigDB_GTRD.json", "r"
-# ) as f:
+
+# with open("../data/MSigDB_GTRD.json", "r") as f:
 #     out = json.load(f)
-#     gene_sets = {k: v["geneSymbols"] for k,v in out.items()}
+#     gene_sets = {k: v["geneSymbols"] for k, v in out.items()}
 # %%
 
 enr_result_dict = {}
