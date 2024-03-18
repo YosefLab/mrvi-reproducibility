@@ -1,6 +1,7 @@
 """
 Exploratory notebook computing the autocorrelation of distances to Vehicle in the sciplex dataset.
 """
+
 # %%
 import os
 
@@ -12,7 +13,7 @@ import jax
 import jax.numpy as jnp
 import faiss
 
-import scvi_v2
+import mrvi
 import scvi
 import scanpy as sc
 import seaborn as sns
@@ -20,11 +21,11 @@ import scipy
 import xarray as xr
 
 # %%
-method_name = "scviv2"
+method_name = "mrvi"
 cell_line = "A549"
 data_variant = "significant_subsampled"
 
-base_dir_path = "/home/justin/ghrepos/scvi-v2-reproducibility"
+base_dir_path = "/home/justin/ghrepos/mrvi-reproducibility"
 results_dir_path = os.path.join(base_dir_path, "results/sciplex_pipeline")
 adata_path = os.path.join(
     results_dir_path,
@@ -38,7 +39,7 @@ model_path = os.path.join(
 
 # %%
 adata = sc.read_h5ad(adata_path)
-model = scvi_v2.MrVI.load(model_path, adata=adata)
+model = mrvi.MrVI.load(model_path, adata=adata)
 
 # %%
 cell_dists = model.get_local_sample_distances(
@@ -58,6 +59,8 @@ del dists_from_vehicle
 # %%
 latent_u = model.get_latent_representation(adata, give_z=False)
 adata.obsm["U"] = latent_u
+
+
 # %%
 def faiss_hnsw_nn(X: np.ndarray, k: int):
     """Gpu HNSW nearest neighbor search using faiss."""
@@ -78,6 +81,8 @@ nn_indices, nn_dists = faiss_hnsw_nn(latent_u, k=51)
 # Remove self
 nn_indices = nn_indices[:, 1:]
 nn_dists = nn_dists[:, 1:]
+
+
 # %%
 def compute_rank_autocorrelation(
     features_df, nn_indices, nn_dists, variant="binary", return_local=False
@@ -317,9 +322,9 @@ for i, dose in enumerate(doses):
     # Filter out groups with < 10 cells
     for group in vehicle_adata.obs[f"{prod}_leiden"].cat.categories:
         if sum(vehicle_adata.obs[f"{prod}_leiden"] == group) < 10:
-            adata.obs.loc[
-                adata.obs[f"{prod}_leiden"] == group, f"{prod}_leiden"
-            ] = "not clustered"
+            adata.obs.loc[adata.obs[f"{prod}_leiden"] == group, f"{prod}_leiden"] = (
+                "not clustered"
+            )
     adata.obs[f"{prod}_leiden"] = adata.obs[
         f"{prod}_leiden"
     ].cat.remove_unused_categories()
@@ -332,9 +337,11 @@ for i, dose in enumerate(doses):
     sc.pl.rank_genes_groups_dotplot(
         vehicle_adata,
         n_genes=5,
-        groups=list(vehicle_adata.obs[f"{prod}_leiden"].cat.categories[1:])
-        if "not clustered" in adata.obs[f"{prod}_leiden"].cat.categories
-        else list(vehicle_adata.obs[f"{prod}_leiden"].cat.categories),
+        groups=(
+            list(vehicle_adata.obs[f"{prod}_leiden"].cat.categories[1:])
+            if "not clustered" in adata.obs[f"{prod}_leiden"].cat.categories
+            else list(vehicle_adata.obs[f"{prod}_leiden"].cat.categories)
+        ),
         values_to_plot="logfoldchanges",
         cmap="bwr",
         vmin=-4,
@@ -377,9 +384,9 @@ for i, dose in enumerate(doses):
     cluster_dim_name = baseline_vehicle_dists.dims[0]
     dist_to_vehicle = np.zeros(adata.shape[0])
     for cluster in baseline_vehicle_dists[cluster_dim_name].unique():
-        dist_to_vehicle[
-            adata.obs[adata.uns["cluster_key"]] == cluster
-        ] = baseline_vehicle_dists.loc[cluster].values
+        dist_to_vehicle[adata.obs[adata.uns["cluster_key"]] == cluster] = (
+            baseline_vehicle_dists.loc[cluster].values
+        )
     adata.obs[f"{prod}_{baseline_method_name}_dist_to_vehicle"] = dist_to_vehicle
     sc.pl.embedding(
         adata,

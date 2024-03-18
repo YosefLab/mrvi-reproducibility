@@ -1,13 +1,13 @@
 from pathlib import Path
 
 import scanpy as sc
-import scvi_v2
+import mrvi
 from anndata import AnnData
 from utils import load_config, make_parents, wrap_kwargs
 
 
 @wrap_kwargs
-def get_latent_scviv2(
+def get_latent_mrvi(
     *,
     adata_in: str,
     model_in: str,
@@ -39,7 +39,7 @@ def get_latent_scviv2(
     compute_local_representations = config.get("compute_local_representations", True)
     labels_key = config.get("labels_key", None)
     adata = sc.read_h5ad(adata_in)
-    model = scvi_v2.MrVI.load(model_in, adata=adata)
+    model = mrvi.MrVI.load(model_in, adata=adata)
 
     _adata = AnnData(obs=adata.obs, uns=adata.uns)
     model_name = model_in.split(".")[-1]
@@ -91,4 +91,4 @@ def get_latent_scviv2(
 
 
 if __name__ == "__main__":
-    get_latent_scviv2()
+    get_latent_mrvi()

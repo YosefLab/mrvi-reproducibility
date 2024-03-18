@@ -6,7 +6,7 @@
     "mrvi_train_kwargs": {
         "max_epochs": 200
     },
-    "scviv2_train_kwargs": {
+    "mrvi_train_kwargs": {
         "max_epochs": 400,
         "batch_size": 2048,
         "check_val_every_n_epoch": 1,

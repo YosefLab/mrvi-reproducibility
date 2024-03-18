@@ -82,18 +82,18 @@ fig
 # %%
 plot_df
 # %%
-model_name = "scviv2"
-# model_name = "scviv2_nonlinear"
+model_name = "mrvi"
+# model_name = "mrvi_nonlinear"
 # Distance matrix comparison
-scviv2_dists_path = os.path.join(
+mrvi_dists_path = os.path.join(
     results_path_root, f"symsim_new.{model_name}.distance_matrices.nc"
 )
-scviv2_normalized_dists_path = os.path.join(
+mrvi_normalized_dists_path = os.path.join(
     results_path_root,
     f"symsim_new.{model_name}.normalized_distance_matrices.nc",
 )
-dists = xr.open_dataset(scviv2_dists_path).celltype
-normalized_dists = xr.open_dataset(scviv2_normalized_dists_path).celltype
+dists = xr.open_dataset(mrvi_dists_path).celltype
+normalized_dists = xr.open_dataset(mrvi_normalized_dists_path).celltype
 # %%
 normalized_vmax = np.percentile(normalized_dists.data, 95)
 vmax = np.percentile(dists.data, 95)

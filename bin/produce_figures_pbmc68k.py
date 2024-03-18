@@ -67,7 +67,7 @@ sc.set_figure_params(dpi_save=500)
 plt.rcParams["axes.grid"] = False
 plt.rcParams["svg.fonttype"] = "none"
 
-FIGURE_DIR = "/data1/scvi-v2-reproducibility/experiments/pbmcs68k_V2"
+FIGURE_DIR = "/data1/mrvi-reproducibility/experiments/pbmcs68k_V2"
 os.makedirs(FIGURE_DIR, exist_ok=True)
 
 adata = sc.read_h5ad("../results/aws_pipeline/pbmcs68k.preprocessed.h5ad")
@@ -130,7 +130,7 @@ for adata_file in adata_files:
     print(adata_.shape)
     for obsm_key in adata_.obsm.keys():
         print(obsm_key)
-        if obsm_key.endswith("mde") & ("scviv2" in obsm_key):
+        if obsm_key.endswith("mde") & ("mrvi" in obsm_key):
             print(obsm_key)
             rdm_perm = np.random.permutation(adata.shape[0])
             sc.pl.embedding(
@@ -146,13 +146,13 @@ for adata_file in adata_files:
 keys_of_interest = [
     "X_SCVI_clusterkey_subleiden1",
     "X_PCA_clusterkey_subleiden1",
-    # "X_scviv2_u",
-    # "X_scviv2_mlp_u",
-    # "X_scviv2_mlp_smallu_u",
-    # "X_scviv2_attention_u",
-    # "X_scviv2_attention_smallu_u",
-    "X_scviv2_attention_noprior_u",
-    "X_scviv2_attention_no_prior_mog_u",
+    # "X_mrvi_u",
+    # "X_mrvi_mlp_u",
+    # "X_mrvi_mlp_smallu_u",
+    # "X_mrvi_attention_u",
+    # "X_mrvi_attention_smallu_u",
+    "X_mrvi_attention_noprior_u",
+    "X_mrvi_attention_no_prior_mog_u",
     # "X_PCA_leiden1_subleiden1",
     # "X_SCVI_leiden1_subleiden1",
 ]

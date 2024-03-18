@@ -9,7 +9,7 @@
     "mrvi_train_kwargs": {
         "max_epochs": 1
     },
-    "scviv2_train_kwargs": {
+    "mrvi_train_kwargs": {
         "max_epochs": 1
     },
     "composition_scvi_train_kwargs": {

@@ -21,6 +21,6 @@ dependencies:
     - numpy<=1.24
     - pip
     - pip:
-          - git+ssh://git@github.com/YosefLab/scvi-v2.git@lfc_batch
+          - git+ssh://git@github.com/YosefLab/mrvi.git@paper_reproducibility
           - numpy<=1.24
           - remote-pdb==2.1.0
