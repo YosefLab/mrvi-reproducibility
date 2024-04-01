@@ -141,13 +141,13 @@ sciplex_metrics_df = sciplex_metrics_df[
     sciplex_metrics_df["model_name"].isin(method_names)
 ]
 
-for dataset_name in sciplex_metrics_df["dataset_name"].unique():
-    dataset_dir = os.path.join(output_dir, dataset_name)
+for ds in sciplex_metrics_df["dataset_name"].unique():
+    dataset_dir = os.path.join(output_dir, ds)
     if not os.path.exists(dataset_dir):
         os.makedirs(dataset_dir, exist_ok=True)
 
     plot_df = sciplex_metrics_df[
-        (sciplex_metrics_df["dataset_name"] == dataset_name)
+        (sciplex_metrics_df["dataset_name"] == ds)
         # & (sciplex_metrics_df["leiden_1.0"].isna())
         & (
             sciplex_metrics_df["distance_type"] == "distance_matrices"
@@ -176,7 +176,7 @@ for dataset_name in sciplex_metrics_df["dataset_name"].unique():
         min_lim = plot_df[metric].min() - 0.05
         max_lim = plot_df[metric].max() + 0.05
         ax.set_xlim(min_lim, max_lim)
-        save_figures(metric, dataset_name)
+        save_figures(metric, ds)
         plt.clf()
 
 
@@ -187,6 +187,10 @@ fig, ax = plt.subplots(figsize=(4 * INCH_TO_CM, 6 * INCH_TO_CM))
 elbo_validation_df["Model"] = elbo_validation_df["model_name"].map(
     lambda x: "u={}, z={}".format(x.split("_")[-3], x.split("_")[-1])
 )
+elbo_validation_df = elbo_validation_df.drop_duplicates(
+    subset=["Model", "elbo_validation"], keep="first"
+)
+
 sns.barplot(
     data=elbo_validation_df,
     y="Model",
@@ -262,6 +266,17 @@ for method_name in method_names:
 
         # Pathway annotated clustermap filtered down to the same product doses
         for cluster in dists[cluster_dim_name].values:
+            unlike_thresh = np.percentile(dists.sel(sample_x="Vehicle_0").values, 80)
+            vehicle_unlike_samples = dists.coords["sample_y"][
+                dists.loc[cluster].sel(sample_x="Vehicle_0") > unlike_thresh
+            ].values.tolist() + ["Vehicle_0"]
+            full_col_colors_df["Retained for analysis"] = full_col_colors_df.index.isin(
+                vehicle_unlike_samples
+            )
+            full_col_colors_df["Retained for analysis"] = full_col_colors_df[
+                "Retained for analysis"
+            ].map({True: "red", False: "black"})
+
             # unnormalized version
             unnormalized_vmax = np.percentile(dists.values, 90)
             g_dists = sns.clustermap(
@@ -276,6 +291,7 @@ for method_name in method_names:
                 col_colors=full_col_colors_df,
                 vmin=0,
                 vmax=unnormalized_vmax,
+                figsize=(20, 20),
             )
             g_dists.ax_heatmap.set_xticklabels(
                 g_dists.ax_heatmap.get_xmajorticklabels(), fontsize=2
@@ -301,10 +317,6 @@ for method_name in method_names:
             )
             plt.clf()
 
-            unlike_thresh = np.percentile(dists.sel(sample_x="Vehicle_0").values, 75)
-            vehicle_unlike_samples = dists.coords["sample_y"][
-                dists.loc[cluster].sel(sample_x="Vehicle_0") > unlike_thresh
-            ].values.tolist() + ["Vehicle_0"]
             g = sns.clustermap(
                 dists.loc[cluster]
                 .sel(
@@ -465,7 +477,8 @@ mde_kwargs = dict(
 )
 for latent_key in ["z", "u"]:
     rep = f"X_{method_name}_{latent_key}_mde"
-    latent = adata.obsm[f"X_{method_name}_{latent_key}"]
+    latent_obsm_key = f"X_{method_name}_{latent_key}"
+    latent = adata.obsm[latent_obsm_key]
     latent_mde = pymde.preserve_neighbors(latent, **mde_kwargs).embed().cpu().numpy()
     adata.obsm[rep] = latent_mde
     rep_plots = mde_reps.query(f"representation_name == '{rep}'")
@@ -486,6 +499,38 @@ for latent_key in ["z", "u"]:
         ax.set_xlabel("MDE1")
         ax.set_ylabel("MDE2")
         ax.set_title(rep)
+        save_figures(
+            f"{rep}_{color_by}.final",
+            dataset_name,
+        )
+        plt.clf()
+
+    # Compute UMAPs
+    sc.pp.neighbors(adata, n_neighbors=20, use_rep=latent_obsm_key)
+    sc.tl.umap(adata)
+    rep = f"X_{method_name}_{latent_key}_umap"
+    umap_rep = "X_umap"
+    adata.obs[f"{rep}_1"] = adata.obsm[umap_rep][:, 0]
+    adata.obs[f"{rep}_2"] = adata.obsm[umap_rep][:, 1]
+    for color_by in ["phase", "pathway_level_1"]:
+        if color_by == "phase":
+            palette = None
+        elif color_by == "pathway_level_1":
+            palette = pathway_color_map
+        fig, ax = plt.subplots(figsize=(15 * INCH_TO_CM, 15 * INCH_TO_CM))
+        sns.scatterplot(
+            adata.obs,
+            x=f"{rep}_1",
+            y=f"{rep}_2",
+            hue=color_by,
+            palette=palette,
+            ax=ax,
+            s=3,
+        )
+        ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
+        ax.set_xlabel("UMAP1")
+        ax.set_ylabel("UMAP2")
+        ax.set_title(f"UMAP with {color_by}")
         save_figures(
             f"{rep}_{color_by}.final",
             dataset_name,
@@ -869,6 +914,50 @@ save_figures(
 )
 
 # %%
+# Compute UMAPs for umap representation
+for latent_key in ["u", "z"]:
+    rep = f"X_{method_name}_{latent_key}_umap"
+    color_by = "pathway_level_1"
+    palette = pathway_color_map
+    rep_plots = adata.obs[[f"{rep}_1", f"{rep}_2", "product_dose", color_by]]
+    rep_plots = rep_plots.sample(frac=1)
+    full_opacity_rep_plots = rep_plots[
+        ~rep_plots["product_dose"].isin(vehicle_sim_samples)
+    ]
+    partial_opacity_rep_plots = rep_plots[
+        rep_plots["product_dose"].isin(vehicle_sim_samples)
+    ]
+    fig, ax = plt.subplots(figsize=(15 * INCH_TO_CM, 15 * INCH_TO_CM))
+    sns.scatterplot(
+        partial_opacity_rep_plots,
+        x=f"{rep}_1",
+        y=f"{rep}_2",
+        hue=color_by,
+        palette=palette,
+        ax=ax,
+        s=marker_size,
+        alpha=0.1,
+    )
+    sns.scatterplot(
+        full_opacity_rep_plots,
+        x=f"{rep}_1",
+        y=f"{rep}_2",
+        hue=color_by,
+        palette=palette,
+        ax=ax,
+        s=marker_size,
+        legend=False,
+    )
+    ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0, markerscale=1.5)
+    ax.set_xlabel("UMAP1")
+    ax.set_ylabel("UMAP2")
+    save_figures(
+        f"{rep}_{color_by}",
+        dataset_name,
+    )
+
+
+# %%
 # Multivariate analysis DE
 # (For this we create a column for each cluster since we require float values)
 model_path = f"{dataset_name}.{method_name}"
@@ -917,11 +1006,8 @@ with open(
         output_dir, f"{dataset_name}.{method_name}.cluster_wise_multivar_res.pkl"
     ),
     "wb",
-):
-    pickle.dump(
-        cluster_wise_multivar_res,
-        open(f"{dataset_name}.{method_name}.cluster_wise_multivar_res.pkl", "wb"),
-    )
+) as f:
+    pickle.dump(cluster_wise_multivar_res, f)
 
 # %%
 import pickle
@@ -932,10 +1018,8 @@ with open(
         output_dir, f"{dataset_name}.{method_name}.cluster_wise_multivar_res.pkl"
     ),
     "rb",
-):
-    cluster_wise_multivar_res = pickle.load(
-        open(f"{dataset_name}.{method_name}.cluster_wise_multivar_res.pkl", "rb")
-    )
+) as f:
+    cluster_wise_multivar_res = pickle.load(f)
 
 # %%
 # GSEA for DE genes
@@ -976,21 +1060,55 @@ for cluster_i in cluster_wise_multivar_res:
     full_dfs[cluster_i] = lfc_df
 
     cond = lfc_df.absLFC > lfc_thresh
-    betas_de = betas_[:, cond]
     obs_de = lfc_df.loc[cond, :].reset_index(drop=True)
     obs_de.LFC.hist(bins=100)
     de_dfs[cluster_i] = obs_de
 
     de_genes = obs_de.gene.values
     de_genes = [gene for gene in de_genes if str(gene) != "nan"]
-    try:
-        enr_results, fig = perform_gsea(
-            de_genes, gene_sets=gene_sets, plot=True, use_server=False
-        )
-        enr_result_dict[cluster_i] = enr_results
-    except ValueError as e:
-        print(e)
-        continue
+    if len(de_genes) > 0:
+        try:
+            enr_results, fig = perform_gsea(
+                de_genes, gene_sets=gene_sets, plot=True, use_server=False
+            )
+            enr_result_dict[cluster_i] = enr_results
+        except ValueError as e:
+            print(e)
+
+    # directional gsea
+    up_cond = lfc_df.LFC > lfc_thresh
+    down_cond = lfc_df.LFC < -lfc_thresh
+    up_obs_de = lfc_df.loc[up_cond, :]
+    down_obs_de = lfc_df.loc[down_cond, :]
+
+    up_de_genes = up_obs_de.gene.values
+    up_de_genes = [gene for gene in up_de_genes if str(gene) != "nan"]
+    if len(up_de_genes) > 0:
+        try:
+            up_enr_results, up_fig = perform_gsea(
+                up_de_genes,
+                gene_sets=gene_sets,
+                plot=True,
+                use_server=False,
+            )
+            enr_result_dict[f"{cluster_i}_up"] = up_enr_results
+        except ValueError as e:
+            print(f"Up GSEA Error: {e}")
+
+    down_de_genes = down_obs_de.gene.values
+    down_de_genes = [gene for gene in down_de_genes if str(gene) != "nan"]
+    if len(down_de_genes) > 0:
+        try:
+            down_enr_results, down_fig = perform_gsea(
+                down_de_genes,
+                gene_sets=gene_sets,
+                plot=True,
+                use_server=False,
+            )
+            enr_result_dict[f"{cluster_i}_down"] = down_enr_results
+        except ValueError as e:
+            print(f"Down GSEA Error: {e}")
+
 
 # %%
 enr_pval_df_records = []
@@ -1028,6 +1146,175 @@ sns.clustermap(
 )
 save_figures(
     f"multivar_gsea_heatmap.{gene_set_name}",
+    dataset_name,
+)
+# %%
+# Up direction GSEA
+up_enr_pval_df_records = []
+for cluster_idx in range(1, n_clusters + 1):
+    up_cluster_idx = f"{cluster_idx}_up"
+    if up_cluster_idx not in enr_result_dict:
+        up_enr_pval_df_records.append({"cluster_idx": cluster_idx})
+    else:
+        up_enr_cluster_results = enr_result_dict[up_cluster_idx]
+        up_enr_pval_df_records.append(
+            {
+                "cluster_idx": cluster_idx,
+                **up_enr_cluster_results.pivot(
+                    index="Gene_set", columns="Term", values="Significance score"
+                )
+                .iloc[0]
+                .to_dict(),
+            }
+        )
+up_enr_pval_df = pd.DataFrame.from_records(up_enr_pval_df_records, index="cluster_idx")
+up_enr_pval_df.fillna(0, inplace=True)
+
+# %%
+# Plot up GSEA heatmap
+filtered_up_enr_pval_df = up_enr_pval_df.loc[
+    :, (up_enr_pval_df > -np.log10(0.05)).values.any(axis=0)
+]
+sns.clustermap(
+    filtered_up_enr_pval_df.T,
+    col_cluster=False,
+    yticklabels=True,
+    xticklabels=True,
+    vmin=0,
+    vmax=plt_vmax,
+    cmap="Reds",
+)
+save_figures(
+    f"multivar_gsea_heatmap.{gene_set_name}.up",
+    dataset_name,
+)
+
+# %%
+# Down direction GSEA
+down_enr_pval_df_records = []
+for cluster_idx in range(1, n_clusters + 1):
+    down_cluster_idx = f"{cluster_idx}_down"
+    if down_cluster_idx not in enr_result_dict:
+        down_enr_pval_df_records.append({"cluster_idx": cluster_idx})
+    else:
+        down_enr_cluster_results = enr_result_dict[down_cluster_idx]
+        down_enr_pval_df_records.append(
+            {
+                "cluster_idx": cluster_idx,
+                **down_enr_cluster_results.pivot(
+                    index="Gene_set", columns="Term", values="Significance score"
+                )
+                .iloc[0]
+                .to_dict(),
+            }
+        )
+down_enr_pval_df = pd.DataFrame.from_records(
+    down_enr_pval_df_records, index="cluster_idx"
+)
+down_enr_pval_df.fillna(0, inplace=True)
+
+# %%
+# Plot down GSEA heatmap
+filtered_down_enr_pval_df = down_enr_pval_df.loc[
+    :, (down_enr_pval_df > -np.log10(0.05)).values.any(axis=0)
+]
+sns.clustermap(
+    filtered_down_enr_pval_df.T,
+    col_cluster=False,
+    yticklabels=True,
+    xticklabels=True,
+    vmin=0,
+    vmax=plt_vmax,
+    cmap="Reds",
+)
+save_figures(
+    f"multivar_gsea_heatmap.{gene_set_name}.down",
+    dataset_name,
+)
+
+# %%
+# Plot up and down together
+from matplotlib.tri import Triangulation
+
+# Ensure the columns of up_enr_pval_df and down_enr_pval_df are consistent
+all_columns = set(up_enr_pval_df.columns).union(set(down_enr_pval_df.columns))
+for col in all_columns:
+    if col not in up_enr_pval_df:
+        up_enr_pval_df[col] = 0
+    if col not in down_enr_pval_df:
+        down_enr_pval_df[col] = 0
+
+# Reorder the columns to make sure they are consistent between the two dataframes
+up_enr_pval_df = up_enr_pval_df.reindex(columns=sorted(all_columns))
+down_enr_pval_df = down_enr_pval_df.reindex(columns=sorted(all_columns))
+
+significant_columns = set(
+    up_enr_pval_df.columns[(up_enr_pval_df > -np.log10(0.05)).any()]
+).union(down_enr_pval_df.columns[(down_enr_pval_df > -np.log10(0.05)).any()])
+
+up_enr_pval_df = up_enr_pval_df[significant_columns]
+down_enr_pval_df = down_enr_pval_df[significant_columns]
+
+# Perform hierarchical clustering on columns and reorder dataframes based on the clustering result
+from scipy.cluster.hierarchy import linkage, leaves_list
+
+# Combine both up and down dataframes for clustering
+combined_df = up_enr_pval_df + down_enr_pval_df
+
+# Perform hierarchical clustering on columns
+linked_cols = linkage(combined_df.T, method="average", metric="euclidean")
+col_order = leaves_list(linked_cols)
+
+# Reorder columns based on hierarchical clustering
+up_enr_pval_df = up_enr_pval_df.iloc[:, col_order]
+down_enr_pval_df = down_enr_pval_df.iloc[:, col_order]
+
+
+M = up_enr_pval_df.shape[0]
+N = up_enr_pval_df.shape[1]
+x = np.arange(M + 1)
+y = np.arange(N + 1)
+xs, ys = np.meshgrid(x, y)
+
+triangles1 = [
+    (i + j * (M + 1), i + 1 + j * (M + 1), i + (j + 1) * (M + 1))
+    for j in range(N)
+    for i in range(M)
+]
+triangles2 = [
+    (i + 1 + j * (M + 1), i + 1 + (j + 1) * (M + 1), i + (j + 1) * (M + 1))
+    for j in range(N)
+    for i in range(M)
+]
+triang1 = Triangulation(xs.ravel() - 0.5, ys.ravel() - 0.5, triangles1)
+triang2 = Triangulation(xs.ravel() - 0.5, ys.ravel() - 0.5, triangles2)
+img1 = plt.tripcolor(
+    triang1,
+    down_enr_pval_df.T.values.flatten(),
+    cmap="Blues",
+    vmax=plt_vmax,
+    vmin=0,
+)
+img2 = plt.tripcolor(
+    triang2,
+    up_enr_pval_df.T.values.flatten(),
+    cmap="Reds",
+    vmax=plt_vmax,
+    vmin=0,
+)
+
+plt.colorbar(img2, ticks=range(10), pad=-0.05)
+plt.colorbar(img1, ticks=range(10))
+plt.xlim(x[0] - 0.5, x[-1] - 0.5)
+plt.ylim(y[0] - 0.5, y[-1] - 0.5)
+plt.xticks(
+    ticks=np.arange(up_enr_pval_df.shape[0]),
+    labels=up_enr_pval_df.index.values,
+    rotation=0,
+)
+plt.yticks(ticks=np.arange(len(up_enr_pval_df.columns)), labels=up_enr_pval_df.columns)
+save_figures(
+    f"multivar_gsea_heatmap.{gene_set_name}.up_down",
     dataset_name,
 )
 
