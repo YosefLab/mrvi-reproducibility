@@ -160,7 +160,7 @@ for ds in sciplex_metrics_df["dataset_name"].unique():
             continue
         fig, ax = plt.subplots(figsize=(4 * INCH_TO_CM, 6 * INCH_TO_CM))
         plot_df["Model"] = plot_df["model_name"].map(
-            lambda x: "u={}, z={}".format(x.split("_")[-3], x.split("_")[-1])
+            lambda x: "u={}, z={}".format(x.split("_")[-1], x.split("_")[-3])
         )
         sns.barplot(
             data=plot_df,
@@ -182,7 +182,7 @@ for ds in sciplex_metrics_df["dataset_name"].unique():
 elbo_validation_df = rep_results["elbo_validations"]
 fig, ax = plt.subplots(figsize=(4 * INCH_TO_CM, 6 * INCH_TO_CM))
 elbo_validation_df["Model"] = elbo_validation_df["model_name"].map(
-    lambda x: "u={}, z={}".format(x.split("_")[-3], x.split("_")[-1])
+    lambda x: "u={}, z={}".format(x.split("_")[-1], x.split("_")[-3])
 )
 elbo_validation_df = elbo_validation_df.drop_duplicates(
     subset=["Model", "elbo_validation"], keep="first"
