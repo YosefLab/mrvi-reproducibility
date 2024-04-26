@@ -141,10 +141,30 @@ sciplex_metrics_df = sciplex_metrics_df[
     sciplex_metrics_df["model_name"].isin(method_names)
 ]
 
+# %%
 for ds in sciplex_metrics_df["dataset_name"].unique():
     dataset_dir = os.path.join(output_dir, ds)
     if not os.path.exists(dataset_dir):
         os.makedirs(dataset_dir, exist_ok=True)
+
+    baselines_df = all_results["sciplex_metrics"][
+        (all_results["sciplex_metrics"]["dataset_name"] == ds)
+        & (all_results["sciplex_metrics"]["leiden_1.0"].isna())
+        & (
+            all_results["sciplex_metrics"]["distance_type"] == "distance_matrices"
+        )  # Exclude normalized matrices
+    ]
+    model_to_method_name_mapping = {
+        "composition_SCVI_clusterkey_subleiden1": "CompositionSCVI",
+        "composition_PCA_clusterkey_subleiden1": "CompositionPCA",
+    }
+    # select rows then color w cmap + baseline
+    baselines_df = baselines_df[
+        baselines_df["model_name"].isin(model_to_method_name_mapping.keys())
+    ]
+    baselines_df["method_name"] = baselines_df["model_name"].map(
+        model_to_method_name_mapping
+    )
 
     plot_df = sciplex_metrics_df[
         (sciplex_metrics_df["dataset_name"] == ds)
@@ -163,7 +183,7 @@ for ds in sciplex_metrics_df["dataset_name"].unique():
             continue
         fig, ax = plt.subplots(figsize=(4 * INCH_TO_CM, 6 * INCH_TO_CM))
         plot_df["Model"] = plot_df["model_name"].map(
-            lambda x: "u={}, z={}".format(x.split("_")[-1], x.split("_")[-3])
+            lambda x: "z={}, u={}".format(x.split("_")[-3], x.split("_")[-1])
         )
         sns.barplot(
             data=plot_df,
@@ -173,6 +193,12 @@ for ds in sciplex_metrics_df["dataset_name"].unique():
             color="blue",
             ax=ax,
         )
+
+        max_baseline_value = baselines_df[metric].max()
+        ax.axvline(
+            x=max_baseline_value, color="red", linestyle="--", label="Max Baseline"
+        )
+
         min_lim = plot_df[metric].min() - 0.05
         max_lim = plot_df[metric].max() + 0.05
         ax.set_xlim(min_lim, max_lim)
@@ -185,7 +211,7 @@ for ds in sciplex_metrics_df["dataset_name"].unique():
 elbo_validation_df = rep_results["elbo_validations"]
 fig, ax = plt.subplots(figsize=(4 * INCH_TO_CM, 6 * INCH_TO_CM))
 elbo_validation_df["Model"] = elbo_validation_df["model_name"].map(
-    lambda x: "u={}, z={}".format(x.split("_")[-1], x.split("_")[-3])
+    lambda x: "z={}, u={}".format(x.split("_")[-3], x.split("_")[-1])
 )
 elbo_validation_df = elbo_validation_df.drop_duplicates(
     subset=["Model", "elbo_validation"], keep="first"

@@ -108,11 +108,14 @@ if use_simple_deg_filter:
         )
 
         n_deg_list = []
+        max_n_deg_list = []
         for prod in n_deg_dict:
             for dose in n_deg_dict[prod]:
                 n_deg_list.append(n_deg_dict[prod][dose])
+                if dose == "10000":
+                    max_n_deg_list.append(n_deg_dict[prod][dose])
 
-        plt.hist(n_deg_list, bins=100, alpha=0.3, label=cl)
+        plt.hist(max_n_deg_list, bins=100, alpha=0.3, label=cl)
         plt.xlim(0, 10000)
 
         # Keep products with at least one dose past the cutoff
