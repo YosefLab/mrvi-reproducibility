@@ -54,7 +54,8 @@ def compute_2dreps(
             latent_mde_keys.append(latent_mde_key)
         adata.uns["latent_pca_keys"] = latent_pca_keys
         adata.uns["latent_mde_keys"] = latent_mde_keys
-    except:
+    except Exception as e:
+        print(e)
         warnings.warn("Could not compute 2d representations")
 
     adata.write_h5ad(adata_out)

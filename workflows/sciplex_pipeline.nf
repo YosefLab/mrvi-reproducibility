@@ -9,13 +9,11 @@ workflow run_main {
     main:
     input = Channel.fromPath(params.inputs)
     gt_clusters = Channel.fromPath(params.gt_clusters).collect()
+    gt_deg_sim_in = Channel.fromPath(params.gt_deg_sim).collect()
 
     outs = preprocess_data(input) | run_models
 
-    sciplex_metrics = compute_sciplex_metrics(outs.distance_matrices, gt_clusters)
-    metrics = compute_metrics(outs.adatas, outs.distance_matrices)
-
-    metrics = sciplex_metrics.concat(metrics)
+    metrics = compute_sciplex_metrics(outs.distance_matrices, gt_clusters, gt_deg_sim_in)
 
     results = outs.adatas.concat(
         outs.rfs,

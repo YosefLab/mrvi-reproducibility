@@ -1,3 +1,4 @@
+import time
 import gc
 import json
 import os
@@ -114,7 +115,7 @@ def load_results(results_paths):
                 obs_.loc[:, "representation_name"] = latent_key
                 obs_.loc[:, "representation_type"] = representation_name
                 obs_.loc[:, "dataset_name"] = dataset_name
-                obs = obs.append(obs_)
+                obs = pd.concat([obs, obs_], axis=0, ignore_index=True)
             return obs
         return None
 
@@ -126,6 +127,7 @@ def load_results(results_paths):
         "umaps_metrics": [],
         "distances_metrics": [],
         "representations": [],
+        "elbo_validations": [],
         "sciplex_metrics": [],
     }
     for file in results_paths:
@@ -162,6 +164,19 @@ def load_results(results_paths):
                     all_results["representations"].append(
                         append_representations(adata, uns_key, rep_type, dataset_name)
                     )
+            print(adata.uns)
+            if "elbo_validation" in adata.uns:
+                all_results["elbo_validations"].append(
+                    pd.DataFrame.from_records(
+                        [
+                            {
+                                "dataset_name": dataset_name,
+                                "model_name": model_name,
+                                "elbo_validation": adata.uns["elbo_validation"],
+                            }
+                        ]
+                    )
+                )
             del adata
             gc.collect()  # Adata uns creates weak reference that must be manually gc.
     for key in all_results.keys():
@@ -250,7 +265,8 @@ def perform_gsea(
             "GSEApy is not installed. Please install it via pip or conda."
         )
 
-    if gene_sets is None:
+    provided_gene_sets = gene_sets is not None
+    if not provided_gene_sets:
         gene_sets = [
             "MSigDB_Hallmark_2020",
             "WikiPathway_2021_Human",
@@ -301,7 +317,7 @@ def perform_gsea(
     enr_results.loc[:, "Significance score"] = -np.log10(
         enr_results.loc[:, "Adjusted P-value"]
     )
-    if not use_server:
+    if not use_server and not provided_gene_sets:
         gene_set_mapping = {
             f"gs_ind_{i}": gene_set_name
             for i, gene_set_name in enumerate(gene_set_names)

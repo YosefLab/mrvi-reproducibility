@@ -19,6 +19,7 @@ def compute_sciplex_metrics(
     *,
     distance_matrices_in,
     gt_clusters_in,
+    gt_deg_sim_in,
     config_in,
     table_out,
 ):
@@ -30,6 +31,8 @@ def compute_sciplex_metrics(
         path to inferred distance matrices
     gt_clusters_in:
         paths to approximate ground truth clusters retrieved from bulk data
+    gt_deg_sim_in:
+        paths to ground truth differential expression similarity scores retrieved from bulk data
     config_in :
         path to config file
     table_out :
@@ -77,10 +80,33 @@ def compute_sciplex_metrics(
             ]
             break
 
+    gt_deg_sim_df = None
+    gt_deg_sim_in = gt_deg_sim_in.split(",")
+    for gt_deg_sim_in_path in gt_deg_sim_in:
+        gt_cell_line = os.path.basename(gt_deg_sim_in_path).split("_")[0]
+        if gt_cell_line == cell_line:
+            if determine_if_file_empty(gt_deg_sim_in_path):
+                break
+
+            gt_deg_sim_df = pd.read_csv(gt_deg_sim_in_path, index_col=0)
+            # Assign them all at 10000 nM dose
+            new_sample_idx = [prod + "_10000" for prod in list(gt_deg_sim_df.index)]
+            gt_deg_sim_df.index = new_sample_idx
+            # Filter on samples in the distance matrix
+            gt_deg_sim_df = gt_deg_sim_df.loc[
+                np.intersect1d(
+                    inferred_mats.coords["sample_x"].data,
+                    gt_deg_sim_df.index.array,
+                )
+            ]
+            break
+
     if gt_cluster_labels_df is None:
         Path(table_out).touch()
     else:
         gt_silhouette_scores = []
+        gt_correlation_scores = []
+        gt_correlation_pvals = []
 
         for cluster in clusters:
             dist_inferred = (
@@ -98,7 +124,25 @@ def compute_sciplex_metrics(
             asw = (asw + 1) / 2
             gt_silhouette_scores.append(asw)
 
+            dist_inferred_deg_sim = (
+                inferred_mats.loc[cluster]
+                .sel(
+                    sample_x=gt_deg_sim_df.index,
+                    sample_y=gt_deg_sim_df.index,
+                )
+                .values
+            )
+            off_diag_idx = np.invert(np.eye(dist_inferred_deg_sim.shape[0], dtype=bool))
+            res = scipy.stats.spearmanr(
+                dist_inferred_deg_sim[off_diag_idx],
+                gt_deg_sim_df.values[off_diag_idx],
+                alternative="greater",
+            )
+            gt_correlation_scores.append(res.statistic)
+            gt_correlation_pvals.append(res.pvalue)
+
         metrics_dict["gt_silhouette_score"] = gt_silhouette_scores
+        metrics_dict["gt_correlation_score"] = gt_correlation_scores
 
     # Compute product dose metrics
     all_products = set()
@@ -154,12 +198,12 @@ def compute_sciplex_metrics(
         )
         in_product_all_dist_avg_percentile.append(in_prod_all_dist_avg_percentile)
         in_product_top_2_dist_avg_percentile.append(in_prod_top_two_dist_avg_percentile)
-    metrics_dict[
-        "in_product_all_dist_avg_percentile"
-    ] = in_product_all_dist_avg_percentile
-    metrics_dict[
-        "in_product_top_2_dist_avg_percentile"
-    ] = in_product_top_2_dist_avg_percentile
+    metrics_dict["in_product_all_dist_avg_percentile"] = (
+        in_product_all_dist_avg_percentile
+    )
+    metrics_dict["in_product_top_2_dist_avg_percentile"] = (
+        in_product_top_2_dist_avg_percentile
+    )
 
     metrics = pd.DataFrame(
         {"distance_type": distance_type, dim_name: clusters, **metrics_dict}

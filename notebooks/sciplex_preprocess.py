@@ -4,6 +4,7 @@ from collections import defaultdict
 
 import pandas as pd
 import scanpy as sc
+import anndata
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -72,7 +73,7 @@ if use_simple_deg_filter:
     warnings.filterwarnings("ignore")
     adata.layers["log1p"] = sc.pp.log1p(adata, copy=True).X
     adata.uns["log1p"] = {"base": None}
-    n_deg_cutoff = 2000
+    n_deg_cutoff = 3000
     per_cl_deg_products = defaultdict(list)
     per_cl_deg_product_doses = defaultdict(list)
     for cl in cell_lines:
@@ -107,14 +108,15 @@ if use_simple_deg_filter:
         )
 
         n_deg_list = []
+        max_n_deg_list = []
         for prod in n_deg_dict:
             for dose in n_deg_dict[prod]:
                 n_deg_list.append(n_deg_dict[prod][dose])
+                if dose == "10000":
+                    max_n_deg_list.append(n_deg_dict[prod][dose])
 
-        plt.hist(n_deg_list, bins=100)
+        plt.hist(max_n_deg_list, bins=100, alpha=0.3, label=cl)
         plt.xlim(0, 10000)
-        plt.axvline(x=2800, color="r", linestyle="--")
-        plt.show()
 
         # Keep products with at least one dose past the cutoff
         for prod in n_deg_dict:
@@ -122,6 +124,13 @@ if use_simple_deg_filter:
                 if n_deg_dict[prod][dose] >= n_deg_cutoff:
                     per_cl_deg_products[cl].append(prod)
                     per_cl_deg_product_doses[cl].append(f"{prod}_{dose}")
+
+    # plot overlaid histograms
+    plt.legend()
+    plt.axvline(x=n_deg_cutoff, color="r", linestyle="--")
+    plt.xlabel("Num. DEGs")
+    plt.ylabel("Count")
+    plt.savefig("figures/n_deg_cutoff.png", dpi=300)
 
     for cl in per_cl_deg_products:
         print(cl, len(set(per_cl_deg_products[cl])))
@@ -184,17 +193,24 @@ filtered_adata = filtered_adata.concatenate(
 )
 
 # %%
-# Top 10k HVGs
+# Add dummy variable for unwanted covariates
+filtered_adata.obs["_dummy"] = 1
+filtered_adata.obs["_dummy"] = filtered_adata.obs["_dummy"].astype("category")
+
+
+# %%
+# Top HVGs
 hvgs = sc.pp.highly_variable_genes(
     filtered_adata,
     flavor="seurat_v3",
     batch_key="cell_type",
-    n_top_genes=10000,
+    n_top_genes=5000,
     subset=True,
 )
 
 # %%
 # For keeping all phases
+sub_adatas = []
 for cl in cell_lines:
     sub_adata = filtered_adata[filtered_adata.obs["cell_type"] == cl].copy()
 
@@ -221,6 +237,12 @@ for cl in cell_lines:
         sub_adata.write(f"../data/sciplex_{cl}_simple_filtered_all_phases.h5ad")
     else:
         sub_adata.write(f"../data/sciplex_{cl}_significant_all_phases.h5ad")
-    del sub_adata
+    sub_adatas.append(sub_adata)
+
+# %%
+# Save full adata too
+if use_simple_deg_filter:
+    full_adata = anndata.concat(sub_adatas)
+    full_adata.write(f"../data/sciplex_simple_filtered.h5ad")
 
 # %%

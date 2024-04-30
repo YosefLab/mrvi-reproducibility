@@ -49,6 +49,11 @@ def get_latent_mrvi(
     _adata.obsm[u_latent_key] = model.get_latent_representation(adata, give_z=False)
     _adata.obsm[z_latent_key] = model.get_latent_representation(adata, give_z=True)
     _adata.uns["latent_keys"] = [u_latent_key, z_latent_key]
+
+    _adata.uns["elbo_validation"] = model.history_["elbo_validation"].iloc[-1][
+        "elbo_validation"
+    ]
+
     make_parents(adata_out)
     _adata.write(filename=adata_out)
     del _adata

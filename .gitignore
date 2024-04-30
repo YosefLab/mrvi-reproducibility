@@ -34,3 +34,4 @@ condaenv*
 notebooks/figures
 notebooks/*figures
 notebooks/output
+notebooks/models

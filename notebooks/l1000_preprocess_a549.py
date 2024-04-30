@@ -40,7 +40,7 @@ full_a549_df_w_meta = full_a549_df.merge(
 )
 # %%
 # Read the full a549 sciplex data
-a549_adata = sc.read("../data/sciplex_A549_significant_all_phases.h5ad")
+a549_adata = sc.read("../data/sciplex_A549_simple_filtered_all_phases.h5ad")
 # %%
 sciplex_product_names = set(a549_adata.obs["product_name"].cat.categories)
 
@@ -49,11 +49,10 @@ sciplex_product_names = set(a549_adata.obs["product_name"].cat.categories)
 sig_product_names = set(a549_sig_meta_df["Perturbagen"])
 
 # %%
-sciplex_product_names.intersection(sig_product_names)
-
-# %%
-# remove incorrect one
+# remove incorrect ones
 sig_product_names.remove("Estradiol")
+sig_product_names.remove("sirolimus")
+sig_product_names.remove("YC1")
 
 valid_mapping = {}
 for pn in sciplex_product_names:
@@ -185,9 +184,7 @@ prod_order = list(np.array(prod_order)[has_deg_idxs])
 # Viz matrix
 deg_sim_df = pd.DataFrame(deg_sim_mtx, index=prod_order, columns=prod_order)
 
-fig, ax = plt.subplots(figsize=(15, 15))
-sns.heatmap(deg_sim_df, cmap="YlGnBu", ax=ax)
-plt.show()
+sns.clustermap(deg_sim_df, cmap="YlGnBu")
 
 # %%
 # Save matrix
@@ -222,7 +219,7 @@ clipped_deg_sim = deg_sim_df.values.copy()
 clipped_deg_sim[clipped_deg_sim < 0.1] = 0
 
 g_adj = ig.Graph.Weighted_Adjacency(clipped_deg_sim, mode="undirected")
-partition = la.RBConfigurationVertexPartition(g_adj, resolution_parameter=1)
+partition = la.RBConfigurationVertexPartition(g_adj, resolution_parameter=0.9)
 optimizer = la.Optimiser()
 optimizer.optimise_partition(partition)
 
@@ -233,25 +230,33 @@ print(cluster_labels)
 
 # %%
 color_list = [
-    'red',
-    'blue',
-    'green',
-    'cyan',
-    'pink',
-    'orange',
-    'grey',
-    'yellow',
-    'white',
-    'black',
-    'purple'
+    "red",
+    "blue",
+    "green",
+    "cyan",
+    "pink",
+    "orange",
+    "grey",
+    "yellow",
+    "white",
+    "black",
+    "purple",
 ]
-ig.plot(g_adj, vertex_color=[color_list[k] for k in cluster_labels], vertex_label=deg_sim_df.index)
+ig.plot(
+    g_adj,
+    vertex_color=[color_list[k] for k in cluster_labels],
+    vertex_label=deg_sim_df.index,
+)
 
 # %%
 # Filter out clusters with only one element
 filtered_cluster_labels = []
 cluster_label_index = []
-keep_clusters = [cluster_label for cluster_label, ct in zip(*np.unique(cluster_labels, return_counts=True)) if ct > 1]
+keep_clusters = [
+    cluster_label
+    for cluster_label, ct in zip(*np.unique(cluster_labels, return_counts=True))
+    if ct > 1
+]
 for i, cluster_label in enumerate(cluster_labels):
     if cluster_label in keep_clusters:
         filtered_cluster_labels.append(cluster_label)
@@ -260,6 +265,7 @@ for i, cluster_label in enumerate(cluster_labels):
 # %%
 # Save the cluster labels
 cluster_labels_df = pd.DataFrame(filtered_cluster_labels, index=cluster_label_index)
+print(cluster_labels_df)
 cluster_labels_df.to_csv(f"../data/l1000_signatures/A549_cluster_labels.csv", sep=",")
 
 # %%

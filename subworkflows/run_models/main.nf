@@ -4,7 +4,9 @@ include {
     fit_mrvi as fit_mrvi_mlp_uz;
     fit_mrvi as fit_mrvi_samedim_uz;
     fit_mrvi as fit_mrvi_regularnorm;
-    fit_mrvi as fit_mrvi_isoprior;
+    fit_mrvi as fit_mrvi_isoprior_10_5;
+    fit_mrvi as fit_mrvi_isoprior_30_5;
+    fit_mrvi as fit_mrvi_isoprior_30_10;
 } from params.modules.fit_mrvi
 include {
     get_latent_mrvi as get_latent_mrvi_attention_mog;
@@ -12,14 +14,15 @@ include {
     get_latent_mrvi as get_latent_mrvi_mlp_uz;
     get_latent_mrvi as get_latent_mrvi_samedim_uz;
     get_latent_mrvi as get_latent_mrvi_regularnorm;
-    get_latent_mrvi as get_latent_mrvi_isoprior;
-
+    get_latent_mrvi as get_latent_mrvi_isoprior_10_5;
+    get_latent_mrvi as get_latent_mrvi_isoprior_30_5;
+    get_latent_mrvi as get_latent_mrvi_isoprior_30_10;
 } from params.modules.get_latent_mrvi
 include {
-    fit_and_get_latent_composition_baseline as fit_and_get_latent_composition_scvi_clusterkey;
     fit_and_get_latent_composition_baseline as fit_and_get_latent_composition_pca_clusterkey;
-    fit_and_get_latent_composition_baseline as fit_and_get_latent_composition_scvi_leiden;
+    fit_and_get_latent_composition_baseline as fit_and_get_latent_composition_scvi_clusterkey;
     fit_and_get_latent_composition_baseline as fit_and_get_latent_composition_pca_leiden;
+    fit_and_get_latent_composition_baseline as fit_and_get_latent_composition_scvi_leiden;
 } from params.modules.fit_and_get_latent_composition_baseline
 include { run_milo } from params.modules.run_milo
 include { run_milode } from params.modules.run_milode
@@ -36,19 +39,27 @@ workflow run_models {
 
     // Step 1: Run models
     // Run base model
-    mrvi_attention_mog_outs = fit_mrvi_attention_mog(adatas_in, true, false, false, false, false, false) | get_latent_mrvi_attention_mog
-    mrvi_attention_mog_adata = mrvi_attention_mog_outs.adata
+    mrvi_isoprior_10_5_outs = fit_mrvi_isoprior_10_5(adatas_in, false, false, false, false, false, true, 10, 5) | get_latent_mrvi_isoprior_10_5
+    mrvi_isoprior_10_5_adata = mrvi_isoprior_10_5_outs.adata
 
-    mrvi_isoprior_outs = fit_mrvi_isoprior(adatas_in, false, false, false, false, false, true) | get_latent_mrvi_isoprior
-    mrvi_isoprior_adata = mrvi_isoprior_outs.adata
+    mrvi_isoprior_30_5_outs = fit_mrvi_isoprior_30_5(adatas_in, false, false, false, false, false, true, 30, 5) | get_latent_mrvi_isoprior_30_5
+    mrvi_isoprior_30_5_adata = mrvi_isoprior_30_5_outs.adata
 
-    distance_matrices = mrvi_attention_mog_outs.distance_matrices.concat(
-        mrvi_attention_mog_outs.normalized_distance_matrices,
-        mrvi_isoprior_outs.distance_matrices,
-        mrvi_isoprior_outs.normalized_distance_matrices,
+    mrvi_isoprior_30_10_outs = fit_mrvi_isoprior_30_10(adatas_in, false, false, false, false, false, true, 30, 10) | get_latent_mrvi_isoprior_30_10
+    mrvi_isoprior_30_10_adata = mrvi_isoprior_30_10_outs.adata
+
+    distance_matrices = mrvi_isoprior_10_5_outs.distance_matrices.concat(
+        // mrvi_isoprior_10_5_outs.normalized_distance_matrices,
+        mrvi_isoprior_30_5_outs.distance_matrices,
+        // mrvi_isoprior_30_5_outs.normalized_distance_matrices,
+        mrvi_isoprior_30_10_outs.distance_matrices,
+        // mrvi_isoprior_30_10_outs.normalized_distance_matrices,
     )
-    adatas = mrvi_attention_mog_adata.concat(
-        mrvi_isoprior_adata,
+
+    adatas = mrvi_isoprior_10_5_adata.concat(
+        mrvi_isoprior_10_5_adata,
+        mrvi_isoprior_30_5_adata,
+        mrvi_isoprior_30_10_adata,
     )
 
     if ( params.runMILO ) {
@@ -99,13 +110,9 @@ workflow run_models {
 
         distance_matrices = distance_matrices.concat(
             c_pca_clusterkey_outs.distance_matrices,
-            c_pca_clusterkey_outs.normalized_distance_matrices,
             c_scvi_clusterkey_outs.distance_matrices,
-            c_scvi_clusterkey_outs.normalized_distance_matrices,
             c_pca_leiden_outs.distance_matrices,
-            c_pca_leiden_outs.normalized_distance_matrices,
             c_scvi_leiden_outs.distance_matrices,
-            c_scvi_leiden_outs.normalized_distance_matrices,
         )
         adatas = adatas.concat(
             c_pca_clusterkey_outs.adata,
