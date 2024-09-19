@@ -13,6 +13,7 @@ import click
 import numpy as np
 import pandas as pd
 import scanpy as sc
+from tqdm import tqdm
 from remote_pdb import RemotePdb
 
 
@@ -270,7 +271,7 @@ def perform_gsea(
 
     if use_server:
         is_done = False
-        for _ in range(n_trials_max):
+        for _ in tqdm(range(n_trials_max)):
             if is_done:
                 break
 
@@ -284,7 +285,8 @@ def perform_gsea(
                 )
                 is_done = True
             except:
-                time.sleep(3)
+                print("GSEA failed; retrying...")
+                time.sleep(1)
                 continue
         if not is_done:
             raise ValueError(

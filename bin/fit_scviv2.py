@@ -19,6 +19,7 @@ def fit_scviv2(
     use_attention_no_prior_mog: str = "false",
     use_attention_mog: str = "false",
     use_attention_no_prior_mog_large: str = "false",
+    use_ibd_config: str = "false",
 ) -> scvi_v2.MrVI:
     """
     Train a MrVI model.
@@ -38,7 +39,10 @@ def fit_scviv2(
     use_attention_smallu = use_attention_smallu.lower() == "true"
     use_attention_noprior = use_attention_noprior.lower() == "true"
     use_attention_no_prior_mog = use_attention_no_prior_mog.lower() == "true"
-    use_attention_no_prior_mog_large = use_attention_no_prior_mog_large.lower() == "true"
+    use_attention_no_prior_mog_large = (
+        use_attention_no_prior_mog_large.lower() == "true"
+    )
+    use_ibd_config = use_ibd_config.lower() == "true"
 
     config = load_config(config_in)
     batch_key = config.get("batch_key", None)
@@ -121,19 +125,19 @@ def fit_scviv2(
                     "use_map": True,
                     "stop_gradients": False,
                     "stop_gradients_mlp": True,
-                    "dropout_rate": 0.03
+                    "dropout_rate": 0.03,
                 },
                 "px_kwargs": {
                     "stop_gradients": False,
                     "stop_gradients_mlp": True,
                     "h_activation": nn.softmax,
                     "dropout_rate": 0.03,
-                    "low_dim_batch": True
+                    "low_dim_batch": True,
                 },
                 "learn_z_u_prior_scale": False,
                 "z_u_prior": True,
                 "u_prior_mixture": False,
-        }
+            }
         )
     if use_attention_no_prior_mog:
         model_kwargs.update(
@@ -209,6 +213,31 @@ def fit_scviv2(
                 "u_prior_mixture_k": 20,
             }
         )
+    if use_ibd_config:
+        model_kwargs = {
+            "n_latent": 200,
+            "n_latent_u": 10,
+            "qz_nn_flavor": "attention",
+            "px_nn_flavor": "attention",
+            "qz_kwargs": {
+                "use_map": False,
+                "stop_gradients": False,
+                "stop_gradients_mlp": True,
+                "dropout_rate": 0.03,
+            },
+            "px_kwargs": {
+                "stop_gradients": False,
+                "stop_gradients_mlp": True,
+                "h_activation": nn.softmax,
+                "dropout_rate": 0.03,
+                "low_dim_batch": True,
+            },
+            "learn_z_u_prior_scale": False,
+            "z_u_prior": False,
+            "u_prior_mixture": True,
+            "u_prior_mixture_k": 100,
+        }
+
     model = scvi_v2.MrVI(adata, **model_kwargs)
     model.train(**train_kwargs)
 

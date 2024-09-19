@@ -9,6 +9,7 @@ process fit_scviv2 {
     val use_attention_no_prior_mog
     val use_attention_mog
     val use_attention_no_prior_mog_large
+    val use_ibd_config
 
     script:
     adata_name = adata_in.getSimpleName()
@@ -38,6 +39,9 @@ process fit_scviv2 {
     else if (use_attention_no_prior_mog_large) {
         method_name = "scviv2_attention_no_prior_mog_large"
     }
+    else if (use_ibd_config) {
+        method_name = "scviv2_ibd"
+    }
     else {
         method_name = "scviv2"
     }
@@ -55,6 +59,7 @@ process fit_scviv2 {
         --use_attention_noprior ${use_attention_noprior} \\
         --use_attention_no_prior_mog ${use_attention_no_prior_mog} \\
         --use_attention_mog ${use_attention_mog} \\
+        --use_ibd_config ${use_ibd_config} \\
         --use_attention_no_prior_mog_large ${use_attention_no_prior_mog_large}
     """
 

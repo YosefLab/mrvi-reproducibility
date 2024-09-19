@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import scipy.sparse as sp
 from scipy.stats import pearsonr
+from scipy.stats import ttest_ind
+from statsmodels.stats.weightstats import ttest_ind as sm_ttest_ind
 from pydeseq2.dds import DeseqDataSet
 from tqdm import tqdm
 from ete3 import Tree
@@ -53,6 +55,13 @@ FIGURE_DIR = "../results/milo/experiments/pbmcs68k_for_subsample"
 os.makedirs(FIGURE_DIR, exist_ok=True)
 
 adata = sc.read_h5ad("../results/milo/data/pbmcs68k_for_subsample.preprocessed.h5ad")
+
+
+# %%
+(
+    adata.obs.loc[lambda x: x.leiden == "0"].groupby(["sample_group", "sample_assignment"]).size()
+    .loc[lambda x: x > 1]
+)
 
 # %%
 import scipy.cluster.hierarchy as sch
@@ -218,6 +227,22 @@ sample_to_group = (
 # %%
 sample_order = adata.obs["sample_assignment"].cat.categories
 
+dmat_files = [
+     '../results/milo/distance_matrices/pbmcs68k_for_subsample.distance_matrices_gt.nc',
+#  '../results/milo/distance_matrices/pbmcs68k_for_subsample.scviv2_attention_no_prior_mog_large.normalized_distance_matrices.nc',
+#  '../results/milo/distance_matrices/pbmcs68k_for_subsample.scviv2_attention_mog.distance_matrices.nc',
+#  '../results/milo/distance_matrices/pbmcs68k_for_subsample.scviv2_attention_mog.normalized_distance_matrices.nc',
+#  '../results/milo/distance_matrices/pbmcs68k_for_subsample.scviv2_attention_noprior.normalized_distance_matrices.nc',
+ '../results/milo/distance_matrices/pbmcs68k_for_subsample.scviv2_attention_no_prior_mog.distance_matrices.nc',
+ '../results/milo/distance_matrices/pbmcs68k_for_subsample.composition_SCVI_clusterkey_subleiden1.distance_matrices.nc',
+ '../results/milo/distance_matrices/pbmcs68k_for_subsample.composition_PCA_clusterkey_subleiden1.distance_matrices.nc',
+#  '../results/milo/distance_matrices/pbmcs68k_for_subsample.scviv2_attention_no_prior_mog_large.distance_matrices.nc',
+#  '../results/milo/distance_matrices/pbmcs68k_for_subsample.composition_SCVI_leiden1_subleiden1.distance_matrices.nc',
+#  '../results/milo/distance_matrices/pbmcs68k_for_subsample.scviv2_attention_noprior.distance_matrices.nc',
+#  '../results/milo/distance_matrices/pbmcs68k_for_subsample.scviv2_attention_no_prior_mog.distance_matrices.nc',
+#  '../results/milo/distance_matrices/pbmcs68k_for_subsample.composition_PCA_leiden1_subleiden1.distance_matrices.nc'
+]
+
 all_res = []
 for dmat_file in dmat_files:
     print(dmat_file)
@@ -317,7 +342,7 @@ fig = (
     + SHARED_THEME
     + p9.labs(x="", y="Intra-cluster distance ratio")
 )
-fig.save(os.path.join(FIGURE_DIR, "intra_distance_ratios.svg"))
+# fig.save(os.path.join(FIGURE_DIR, "intra_distance_ratios.svg"))
 fig
 
 # %%
@@ -353,9 +378,22 @@ fig = (
     + p9.ylim(0, 1.2)
     + p9.coord_flip()
     + p9.labs(y="Inter cluster distance ratio", x="")
+    + p9.geom_point()
 )
 fig.save(os.path.join(FIGURE_DIR, "inter_distance_ratios.svg"))
 fig
+
+# %%
+from scipy.stats import mannwhitneyu
+
+for model in relative_d.Model.unique():
+    if model.startswith("MrVI"):
+        continue
+    print("MrVI", model, mannwhitneyu(
+        relative_d.query("Model == 'MrVI (MoG)'").relative_d,
+        relative_d.query(f"Model == '{model}'").relative_d,
+    ))
+
 
 # %%
 # Plot variance of dist to sample 8 per rank
@@ -501,7 +539,8 @@ plt.clf()
 
 # %%
 # DEG Analysis
-import scvi_v2
+import mrvi
+# import scvi_v2
 
 modelname = "scviv2_attention_mog"
 
@@ -510,8 +549,8 @@ adata_path = os.path.join(
 )
 model_path = os.path.join(f"../results/milo/models/pbmcs68k_for_subsample.{modelname}")
 adata = sc.read(adata_path)
-model = scvi_v2.MrVI.load(model_path, adata=adata)
-model
+# model = mrvi.MrVI.load(model_path, adata=adata)
+# model
 
 # %%
 model_out_adata_path = os.path.join(
@@ -658,6 +697,9 @@ gt_de_analysis = pd.DataFrame(
     }
 )
 
+
+# %%
+
 # %%
 
 mrvi_res = gt_de_analysis.merge(
@@ -679,12 +721,34 @@ r_milode = pearsonr(
     milode_res.LFC.values,
     milode_res.lfc_gt.values,
 )
-de_comp = pd.concat(
-    [
-        mrvi_res.assign(method=f"MrVI; Pearson r: {r_mrvi[0]:.2f}"),
-        milode_res.assign(method=f"MILODE; Pearson r: {r_milode[0]:.2f}"),
-    ]
+de_comp = (
+    pd.concat(
+        [
+            mrvi_res.assign(method=f"MrVI; Pearson r: {r_mrvi[0]:.2f}"),
+            milode_res.assign(method=f"MILODE; Pearson r: {r_milode[0]:.2f}"),
+        ]
+    )
+    .merge(
+        adata.var.loc[:, ["is_gene_for_subclustering"]],
+        left_on="gene",
+        right_index=True,
+        how="left",
+    )
 )
+
+# %%
+fig = (
+    p9.ggplot(
+        de_comp,
+        p9.aes(x="LFC", fill="method"),
+    )
+    # + p9.geom_histogram(bins=100, alpha=0.5)
+    + p9.theme_classic()
+    + p9.geom_density()
+    + p9.facet_wrap("~method+is_gene_for_subclustering")
+    + p9.xlim(-0.5, 0.5)
+)
+fig.save(os.path.join(FIGURE_DIR, "deg_comparison.svg"))
 
 # %%
 de_comp_ = de_comp.sample(frac=0.3)
@@ -899,15 +963,116 @@ plt.savefig(
     bbox_inches="tight",
 )
 
+# Comparison to MILO
+milo_analysis = pd.read_csv(
+    "../results/milo/models/pbmcs68k_for_subsample.MILO.da_analysis.tsv", sep="\t"
+)
+milo_neighborhoods = pd.read_csv(
+    "../results/milo/models/pbmcs68k_for_subsample.MILO.assignments.mtx",
+    sep="\s",
+    skiprows=2,
+    header=None,
+)
+cell_idx = milo_neighborhoods.iloc[:, 0].to_numpy() - 1
+neigh_idx = milo_neighborhoods.iloc[:, 1].to_numpy() - 1
+data_idx = np.ones_like(cell_idx)
+mtx = sp.csr_matrix((data_idx, (cell_idx, neigh_idx)))
+
+print(mtx.shape, milo_analysis.shape)
+milo_cell_res = []
+for row in tqdm(mtx):
+    row_ = row.toarray().flatten()
+    row_ = row_ > 0
+    res_ = milo_analysis.iloc[row_]
+    lfc = res_["logFC"].mean(0)
+    pval = res_["PValue"].min(0)
+    pval_conservative = res_["PValue"].max(0)
+    abs_lfc = np.abs(lfc)
+    milo_cell_res.append(dict(lfc=lfc, pval=pval, pval_conservative=pval_conservative, abs_lfc=abs_lfc))
+milo_cell_res = pd.DataFrame(milo_cell_res)
+
+# %%
+from mrvi import MrVI
+import flax.linen as nn
+
+
+MrVI.setup_anndata(
+    adata, batch_key="Site", sample_key="sample_assignment"
+)
+model = MrVI(
+    adata,
+    **{
+        "n_latent": 30,
+        "n_latent_u": 5,
+        "qz_nn_flavor": "attention",
+        "px_nn_flavor": "attention",
+        "qz_kwargs": {
+            "use_map": True,
+            "stop_gradients": False,
+            "stop_gradients_mlp": True,
+            # "dropout_rate": 0.03,
+        },
+        "px_kwargs": {
+            "stop_gradients": False,
+            "stop_gradients_mlp": True,
+            "h_activation": nn.softmax,
+            "low_dim_batch": True,
+            # "dropout_rate": 0.03,
+        },
+        "learn_z_u_prior_scale": False,
+        "z_u_prior": True,
+        "u_prior_mixture": True,
+        "u_prior_mixture_k": 5,
+    }
+)
+
+import jax
+
+model.train(
+    # accelerator="cuda",
+    devices=jax.devices(),
+    **{
+        "max_epochs": 400,
+        "batch_size": 1024,
+        "check_val_every_n_epoch": 1,
+        "early_stopping": True,
+        "early_stopping_patience": 100,
+        "early_stopping_monitor": "elbo_validation",
+        "plan_kwargs": {
+            "n_epochs_kl_warmup": 50,
+            "lr": 1e-2
+        }
+    }
+)
+# model = MRVI(
+#     adata,
+#     model_name="pbmcs68k_for_subsample",
+#     model_dir="results/mrvi/models",
+#     use_cuda=False,
+#     device=0,
+#     n_epochs=1000,
+#     lr=0.001,
+#     weight_decay=0.01,
+#     alpha=1.0,
+#     beta=1.0,
+#     gamma=1.0,
+#     n_neighbors=30,
+#     n_layers=1,
+#     n_hidden=256,
+#     dropout=0.1,
+#     batch_size=1000,
+#     seed=0,
+# )
+
+# %%
+model.history["elbo_train"].plot()
+model.history["elbo_validation"].plot()
+
 # %%
 # Admissibility for rank 1 subsampled (can subsample further to see effect)
-model_out_adata[model_out_adata.obs["sample_assignment"] == "1"]
 ball_res = model.get_outlier_cell_sample_pairs(
     flavor="ball", quantile_threshold=0.05, minibatch_size=1000
 )
-ball_res
-
-# %%
 model_out_adata.obs["sample_1_admissibility"] = ball_res.is_admissible.sel(
     sample="1"
 ).astype(str)
@@ -951,30 +1116,10 @@ plt.savefig(
 
 
 # %%
-# Differential abundance rank 1 vs rank 4
-ap_res = model.get_outlier_cell_sample_pairs(flavor="ap", minibatch_size=1000)
-ap_res
+
 
 # %%
-model_out_adata.obs["sample_1_4_da"] = ap_res.log_probs.sel(
-    sample="1"
-) - ap_res.log_probs.sel(sample="4")
-fig = sc.pl.embedding(
-    model_out_adata,
-    basis="X_scviv2_attention_mog_u_mde",
-    color=["sample_1_4_da", "leiden"],
-    vmax="p95",
-    vmin="p5",
-    vcenter=0,
-    cmap="RdBu",
-    show=False,
-    return_fig=True,
-)
-plt.savefig(
-    os.path.join(FIGURE_DIR, f"pres_{modelname}_rank_1_4_da.svg"),
-    bbox_inches="tight",
-)
-# %%
+ap_res = model.get_outlier_cell_sample_pairs(flavor="ap", minibatch_size=1000)
 sample_to_metadata = (
     adata.obs.loc[:, ["sample_assignment", "sample_metadata2"]]
     .drop_duplicates()
@@ -1013,59 +1158,80 @@ plt.savefig(
     bbox_inches="tight",
 )
 
-# %%
-# Comparison to MILO
-milo_analysis = pd.read_csv(
-    "../results/milo/models/pbmcs68k_for_subsample.MILO.da_analysis.tsv", sep="\t"
-)
-milo_neighborhoods = pd.read_csv(
-    "../results/milo/models/pbmcs68k_for_subsample.MILO.assignments.mtx",
-    sep="\s",
-    skiprows=2,
-    header=None,
-)
-cell_idx = milo_neighborhoods.iloc[:, 0].to_numpy() - 1
-neigh_idx = milo_neighborhoods.iloc[:, 1].to_numpy() - 1
-data_idx = np.ones_like(cell_idx)
-mtx = sp.csr_matrix((data_idx, (cell_idx, neigh_idx)))
-
-print(mtx.shape, milo_analysis.shape)
-# %%
-milo_cell_res = []
-for row in tqdm(mtx):
-    row_ = row.toarray().flatten()
-    row_ = row_ > 0
-    res_ = milo_analysis.iloc[row_]
-    lfc = res_["logFC"].mean(0)
-    pval = res_["PValue"].min(0)
-    pval_conservative = res_["PValue"].max(0)
-    abs_lfc = np.abs(lfc)
-    milo_cell_res.append(dict(lfc=lfc, pval=pval, pval_conservative=pval_conservative, abs_lfc=abs_lfc))
-milo_cell_res = pd.DataFrame(milo_cell_res)
-
 
 # %%
-model_out_adata.obs.loc[:, "milo_lfc"] = milo_cell_res["lfc"].values
+# def get_smooth_logratios(adata, log_ratio_key):
+#     adata.obsp["normalized_connectivities"] = adata.obsp["connectivities"] / adata.obsp[
+#         "connectivities"
+#     ].sum(1)
+#     adata.obs[log_ratio_key + "_smoothed"] = np.asarray(
+#         adata.obsp["normalized_connectivities"]
+#         * np.expand_dims(adata.obs[log_ratio_key], 1)
+#     ).squeeze()
+
+# sc.pp.neighbors(model_out_adata, n_neighbors=30, use_rep="X_scviv2_attention_mog_u")
 model_out_adata.obs.loc[:, "mrvi_lfc"] = log_ratios
-fig = sc.pl.embedding(
-    model_out_adata,
-    basis="X_scviv2_attention_mog_u_mde",
-    color=["milo_lfc", "mrvi_lfc", "leiden"],
-    vmax=qval,
-    vmin=-qval,
-    vcenter=0,
-    cmap="RdBu",
-    show=False,
-    return_fig=True,
+# get_smooth_logratios(model_out_adata, "mrvi_lfc")
+
+
+# %%
+# model_out_adata.obs.loc[:, "milo_lfc"] = milo_cell_res["lfc"].values
+# qval = 2.5
+# fig = sc.pl.embedding(
+#     model_out_adata,
+#     basis="X_scviv2_attention_mog_u_mde",
+#     # color=["milo_lfc", "mrvi_lfc", "mrvi_lfc_smoothed", "leiden"],
+#     color=["mrvi_lfc", "leiden"],
+#     vmax=qval,
+#     vmin=-qval,
+#     vcenter=0,
+#     cmap="RdBu",
+#     show=False,
+#     return_fig=True,
+# )
+# fig.savefig(
+#     os.path.join(
+#         FIGURE_DIR, f"DA_comparison_lfcs.svg"
+#     )
+
+# %%
+model_out_adata.obs.loc[:,"cluster_clean"] = model_out_adata.obs["leiden"].map(
+    {
+        "0": "subset A",
+        "1": "subset B",
+        "2": "Other",
+        "3": "subset C",
+        "4": "Other",
+        "5": "Other",
+    }
 )
-fig.savefig(
-    os.path.join(
-        FIGURE_DIR, f"DA_comparison_lfcs.svg"
-    )
+model_out_adata.obs["cluster_clean"] = pd.Categorical(
+    model_out_adata.obs["cluster_clean"],
+    categories=["subset A", "subset B", "subset C", "Other"],
+)
+
+sns.violinplot(
+    model_out_adata.obs, x="cluster_clean", y="mrvi_lfc"
+)
+plt.axhline(0, color="black", linestyle="--")
+plt.xticks(rotation=-45)
+plt.ylim(-1.5, 1.5)
+plt.savefig(
+    os.path.join(FIGURE_DIR, f"DA_comparison_lfcs_violin.svg")
 )
 
 # %%
-from sklearn.metrics import precision_recall_curve
+for key in model_out_adata.obs["cluster_clean"].unique():
+    pop1 = model_out_adata[model_out_adata.obs["cluster_clean"] == key].obs["mrvi_lfc"]
+    pop2 = model_out_adata[model_out_adata.obs["cluster_clean"] != key].obs["mrvi_lfc"]
+    stat_res = ttest_ind(pop1, pop2)
+    stat_res1 = sm_ttest_ind(pop1, pop2, alternative="larger", value=0.1)
+    stat_res2 = sm_ttest_ind(pop1, pop2, alternative="smaller", value=-0.1)
+    pval = np.minimum(stat_res1[1], stat_res2[1])
+    print(key, pval)
+
+# %%
+from sklearn.metrics import precision_recall_curve, auc
 
 
 def plot_pr(y_pred, label=None):
@@ -1074,15 +1240,16 @@ def plot_pr(y_pred, label=None):
     y_pred_ = y_pred.copy()
     y_pred_[np.isnan(y_pred_)] = 0.0
     pre, rec, _ = precision_recall_curve(y_true, -y_pred_)
+    prauc = auc(rec, pre)
     # plt.plot(rec, pre, label=label)
-    return pd.DataFrame(dict(precision=pre, recall=rec))
+    return pd.DataFrame(dict(precision=pre, recall=rec)), prauc
 
 
 
 # %%
-df1 = plot_pr(-np.abs(log_ratios))
+df1, auc_mrvi = plot_pr(-np.abs(log_ratios))
 # df2 = plot_pr(milo_cell_res["pval"].values)
-df2 = plot_pr(-np.abs(milo_cell_res["lfc"].values))
+df2, auc_milo = plot_pr(-np.abs(milo_cell_res["lfc"].values))
 df = pd.concat([df1.assign(model="MrVI"), df2.assign(model="MILO")])
 fig = (
     p9.ggplot(df, p9.aes(x="recall", y="precision", color="model"))
@@ -1102,6 +1269,33 @@ fig.save(
 )
 fig
 
+
+# %%
+
+plot_df = pd.DataFrame(
+    {
+        "model": ["MrVI", "MILO"],
+        "auc": [auc_mrvi, auc_milo],
+    }
+)
+fig = (
+    p9.ggplot(plot_df, p9.aes(x="model", y="auc"))
+    + p9.geom_bar(stat="identity", width=0.5)
+    + p9.theme_classic()
+    + SHARED_THEME
+    + p9.labs(
+        x="",
+        y="PRAUC",
+    )
+    + p9.scale_y_continuous(expand=(0.0, 0.0))
+    + p9.theme(
+        figure_size=(4 * INCH_TO_CM, 4 * INCH_TO_CM),
+    )
+)
+fig.save(
+    os.path.join(FIGURE_DIR, f"semisynth_auc.svg"),
+)
+plot_df
 
 # %%
 # df1 = plot_pr(log_ratios, label="MrVI")

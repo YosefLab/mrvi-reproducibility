@@ -7,13 +7,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotnine as p9
+import plotly.graph_objects as go
+from scipy.spatial.distance import squareform
 import scanpy as sc
 import seaborn as sns
 import xarray as xr
 from biothings_client import get_client
 from matplotlib.colors import hex2color, rgb2hex
 from scib_metrics.benchmark import Benchmarker
-from scipy.cluster.hierarchy import fcluster
+from scipy.cluster.hierarchy import fcluster, leaves_list
 from scipy.special import logsumexp
 from sklearn.cluster import KMeans
 import scipy.stats as st
@@ -23,11 +25,12 @@ from sklearn.metrics import pairwise_distances
 from tree_utils import hierarchical_clustering
 from utils import perform_gsea
 from matplotlib.patches import Patch
-from scvi_v2 import MrVI
+from mrvi import MrVI
 import pynndescent
+from scipy.cluster.hierarchy import linkage, fcluster, optimal_leaf_ordering
 import jax.numpy as jnp
 from scvi import REGISTRY_KEYS
-from scvi_v2._constants import MRVI_REGISTRY_KEYS
+from mrvi._constants import MRVI_REGISTRY_KEYS
 from scvi.distributions import JaxNegativeBinomialMeanDisp as NegativeBinomial
 from tqdm import tqdm
 
@@ -191,7 +194,8 @@ def compute_distance_matrices(model, adata=None, dists=None, leiden_resolutions=
     adata.obs.loc[:, "_indices"] = np.arange(adata.shape[0])
 
     if leiden_resolutions is None:
-        leiden_resolutions = [0.005, 0.01, 0.05, 0.1, 0.5, 1.0]
+        # leiden_resolutions = [0.005, 0.01, 0.05, 0.1, 0.5, 1.0]
+        leiden_resolutions = [0.001, 0.005, 0.01, 0.05]
     elif isinstance(leiden_resolutions, float):
         leiden_resolutions = [leiden_resolutions]
 
@@ -283,11 +287,9 @@ adata.var.loc[:, "ensembl_gene"] = ensembl_gene.reindex(adata.var_names)[
 
 # %%
 ### Load base model
-
 model = MrVI.load(
     "/data1/scvi-v2-reproducibility/results/aws_pipeline/models/haniffa2.scviv2_attention_mog",
     adata=adata,
-    #     "/data1/scvi-v2-reproducibility/results/aws_pipeline/models/haniffa.scviv2_attention_no_prior_mog", adata=adata
 )
 model.history["elbo_validation"].iloc[50:].plot()
 ax = model.history["reconstruction_loss_validation"].plot()
@@ -483,9 +485,16 @@ adata_embs = sc.read_h5ad(adata_file)
 adata_mat = model.adata.copy()
 adata_mat, dmats = compute_distance_matrices(model, adata_mat)
 adata_mat.obsm = adata_embs.obsm
+adata_mat.obs.loc[:, "initial_clustering_simplified"] = adata_mat.obs.initial_clustering.map(
+    replacer
+)
+adata_mat.obs.loc[:, "initial_clustering_simplified"] = pd.Categorical(
+    adata_mat.obs.initial_clustering_simplified, categories=cat_order
+)
 
 # %%
-DMAT_CLUSTERING_KEY = "leiden_dmats_0.005"
+DMAT_CLUSTERING_KEY = "leiden_dmats_0.001"
+# DMAT_CLUSTERING_KEY = "leiden_dmats_0.005"
 fig = sc.pl.embedding(
     adata_mat,
     basis="X_scviv2_attention_mog_u_mde",
@@ -502,6 +511,65 @@ fig.savefig(
         "dmat_clusterings.svg",
     )
 )
+# %%
+props_per_cluster = (
+    adata_mat.obs.groupby(DMAT_CLUSTERING_KEY)["initial_clustering_simplified"]
+    .value_counts(normalize=True)
+    .to_frame("prop")
+    .reset_index()
+)
+props_per_cluster
+
+
+cmap_clustering = pd.Series(
+    adata_.uns["initial_clustering_simplified_colors"],
+    index=adata_.obs["initial_clustering_simplified"].cat.categories.values,
+)
+
+props_per_cluster_ = props_per_cluster.loc[lambda x: x.prop > 0.01]
+all_cats = list(props_per_cluster_["initial_clustering_simplified"].astype('category').cat.categories) + list(props_per_cluster_[DMAT_CLUSTERING_KEY].astype('category').cat.categories)
+source = pd.Categorical(props_per_cluster_["initial_clustering_simplified"], categories=all_cats).codes
+target = pd.Categorical(props_per_cluster_[DMAT_CLUSTERING_KEY], categories=all_cats).codes
+values = props_per_cluster_["prop"].values
+
+colors_for_sankey = cmap_clustering.reindex(all_cats).fillna("#000000")
+colors_source = colors_for_sankey.loc[props_per_cluster_["initial_clustering_simplified"].values]
+fig = go.Figure(
+    data=[
+        go.Sankey(
+            node=dict(
+            pad=15,
+            thickness=20,
+            line=dict(
+                color="black", width=0.5),
+                label=all_cats,
+                color=colors_for_sankey.values,
+            ),
+            link=dict(
+                source=source,
+                target=target,
+                value=values,
+                color=colors_source.values,
+            )
+        )
+    ]
+)
+fig.update_layout(
+    width=400,  # Width in pixels
+    height=500,  # Height in pixels
+    font_size=10
+)
+fig.write_image(
+    os.path.join(
+        FIGURE_DIR,
+        "sankey_haniffa.svg",
+    ),
+    format='svg'
+)
+fig.show()
+
+# %%
+### For each cluster, plot average distance matrix
 
 ## Plot composition of clusters
 props_per_cluster = (
@@ -519,8 +587,6 @@ props_per_cluster = (
     + p9.geom_col(position="fill")
 )
 
-# %%
-### For each cluster, plot average distance matrix
 
 VMIN = 0
 VMAX = 1
@@ -546,6 +612,7 @@ for cluster in adata_mat.obs[DMAT_CLUSTERING_KEY].unique():
         # red, blue, white
     ).values
     donor_cluster_key = f"donor_clusters_{cluster}"
+    print(donor_cluster_key)
     adata_mat.obs.loc[:, donor_cluster_key] = adata_mat.obs.patient_id.map(
         donor_info_.loc[:, "donor_group"]
     ).values
@@ -560,8 +627,9 @@ for cluster in adata_mat.obs[DMAT_CLUSTERING_KEY].unique():
         row_colors=colors_,
         vmin=VMIN,
         vmax=VMAX,
+        # cmap="rocket_r",
         yticklabels=True,
-        figsize=(20, 20),
+        # figsize=(20, 20),
     )
     sns_plot.savefig(
         os.path.join(
@@ -571,12 +639,58 @@ for cluster in adata_mat.obs[DMAT_CLUSTERING_KEY].unique():
     )
 
 # %%
+donors_to_clusters = adata_mat.obs.loc[:, ["patient_id", "donor_clusters_1"]].drop_duplicates().reset_index(drop=True)
+donor_info_.loc[:, "donor_group"] = donors_to_clusters.set_index("patient_id").loc[donor_info_.index, "donor_clusters_1"].values
+# %%
+group1 = donor_info_.loc[lambda x: x.donor_group == "cluster 1"]
+group2 = donor_info_.loc[lambda x: x.donor_group == "cluster 2"]
+print(group1.shape, group2.shape)
+print(
+    group1.Status.value_counts(normalize=True),
+    group2.Status.value_counts(normalize=True),
+)
+plot_df_donor_groups = pd.concat([group1, group2])
+
+# %%
+from scipy.stats import mannwhitneyu
+
+mannwhitneyu(
+    group1.DFO.dropna(), group2.DFO.dropna(), alternative="less"
+)
+
+
+# %%
+fig = (
+    p9.ggplot(plot_df_donor_groups, p9.aes(x="donor_group", y="DFO"))
+    + p9.geom_boxplot(width=0.2, outlier_alpha=0.0)
+    + p9.geom_jitter(width=0.2, size=0.5)
+    + p9.theme_classic()
+    + p9.theme(
+        strip_background=p9.element_blank(),
+        axis_text_x=p9.element_text(rotation=0, hjust=1),
+        axis_text=p9.element_text(family="sans-serif", size=5),
+        axis_title=p9.element_text(family="sans-serif", size=6),
+        figure_size=(2, 2),
+    )
+    + p9.labs(
+        x="Donor group",
+        y="Days from onset",
+    )
+)
+fig.save(
+    os.path.join(
+        FIGURE_DIR,
+        "DFO_diffs.svg",
+    )
+)
+
+# %%
 ### Select one cluster and perform DE/DA
 
 cluster = 1
 CLUSTER_NAME = f"donor_clusters_{cluster}"
 de_n_clusters = 500
-# %%
+
 donor_keys = [
     "Sex",
     "Status",
@@ -630,7 +744,6 @@ multivariate_analysis_kwargs = {
 # plt.hist(betas_.mean(0), bins=100)
 # plt.xlabel("LFC")
 # plt.show()
-# %%
 ## Perform DE analysis
 
 donor_subset = obs_df.loc[
@@ -645,17 +758,41 @@ multivariate_analysis_kwargs = {
     "eps_lfc": 1e-4,
 }
 
-res = model.perform_multivariate_analysis(
-    donor_keys=donor_keys_,
-    adata=_adata,
-    donor_subset=donor_subset,
-    **multivariate_analysis_kwargs,
+# res = model.perform_multivariate_analysis(
+#     donor_keys=donor_keys_,
+#     adata=_adata,
+#     donor_subset=donor_subset,
+#     **multivariate_analysis_kwargs,
+# )
+
+__adata = _adata.copy()
+# sc.pp.subsample(__adata, n_obs=2000)
+# %%
+# res = model.perform_multivariate_analysis(
+#     donor_keys=donor_keys_,
+#     adata=__adata,
+#     donor_subset=donor_subset,
+#     **multivariate_analysis_kwargs,
+# )
+# res.to_netcdf(
+#     os.path.join(
+#         FIGURE_DIR,
+#         f"multivariate_analysis.nc",
+#     )
+# )
+res = xr.open_dataset(
+    os.path.join(
+        FIGURE_DIR,
+        f"multivariate_analysis.nc",
+    )
 )
+__adata = adata_mat[res.cell_name.values]
 # %%
 betas_ = res.lfc.values.squeeze(0)
 plt.hist(betas_.mean(0), bins=100)
 plt.xlabel("LFC")
 plt.show()
+
 # %%
 lfc_df = pd.DataFrame(
     {
@@ -669,36 +806,66 @@ lfc_df = pd.DataFrame(
 ).assign(
     absLFC=lambda x: np.abs(x.LFC),
     gene_score=lambda x: np.maximum(x.LFC_q0_95, -x.LFC_q0_05),
-    # gene_score=lambda x: x.LFC_std / x.absLFC,
 )
 # %%
-bins = np.linspace(0, 1, 100)
-lfc_df.gene_score.plot.hist(bins=bins)
-v500 = lfc_df.gene_score.sort_values().iloc[-1000]
-plt.vlines(v500, 0, 1000)
+adata_t_all = sc.AnnData(
+    X=betas_.T,
+    obs=lfc_df,
+)
 
-# Cluster and visualize DE genes
-cond = lfc_df.sort_values("gene_score", ascending=False).iloc[:500].gene_index.values
-betas_de = betas_[:, cond]
-obs_de = lfc_df.loc[cond, :].reset_index(drop=True)
-obs_de.index = obs_de.gene
-obs_de.plot.scatter("LFC", "LFC_std")
+
+lfc_pca = KernelPCA(n_components=5, kernel="cosine")
+lfc_pcs = lfc_pca.fit_transform(adata_t_all.X)
+adata_t_all.obsm["lfc_mds"] = TSNE(
+    n_components=2, metric="precomputed", init="random"
+).fit_transform(pairwise_distances(lfc_pcs))
+
+# %%
+dists = pairwise_distances(lfc_pcs)
+dists = squareform(dists)
+# Z = hierarchical_clustering(dists, method="ward", return_ete=False)
+Z = linkage(dists, method="ward")
+
+# %%
+order = optimal_leaf_ordering(Z, dists)
+
+# %%
+# vmax = np.quantile(lfc_df.absLFC.values, 0.95)
+# sc.pl.embedding(
+#     adata_t_all,
+#     basis="lfc_mds",
+#     color=["LFC"],
+#     vmin=-vmax,
+#     vmax=vmax,
+#     cmap="coolwarm",
+# )
+
+# # %%
+# bins = np.linspace(0, 1, 100)
+# lfc_df.gene_score.plot.hist(bins=bins)
+# v500 = lfc_df.gene_score.sort_values().iloc[-1000]
+# plt.vlines(v500, 0, 1000)
+
+# # Cluster and visualize DE genes
+# cond = lfc_df.sort_values("gene_score", ascending=False).iloc[:500].gene_index.values
+# betas_de = betas_[:, cond]
+# obs_de = lfc_df.loc[cond, :].reset_index(drop=True)
+# obs_de.index = obs_de.gene
+# obs_de.plot.scatter("LFC", "LFC_std")
 
 # %%
 ## Cluster and visualize LFCs
 adata_t = sc.AnnData(
     X=betas_de.T,
-    # X=np.abs(betas_de.T),
     obs=obs_de,
 )
-lfc_pca = PCA(n_components=4)
-# lfc_pca = KernelPCA(n_components=5, kernel="cosine")
+# lfc_pca = PCA(n_components=4)
+lfc_pca = KernelPCA(n_components=5, kernel="cosine")
 lfc_pcs = lfc_pca.fit_transform(adata_t.X)
 adata_t.obsm["lfc_pca"] = lfc_pcs
 adata_t.obsm["lfc_mds"] = TSNE(
     n_components=2, metric="precomputed", init="random"
 ).fit_transform(pairwise_distances(lfc_pcs))
-
 sc.pp.neighbors(adata_t, use_rep="lfc_pca", n_neighbors=10, random_state=0)
 
 # %%
@@ -706,10 +873,9 @@ sc.pp.neighbors(adata_t, use_rep="lfc_pca", n_neighbors=10, random_state=0)
 RESOLUTION = 0.15
 sc.tl.leiden(adata_t, key_added="lfc_leiden", resolution=RESOLUTION, random_state=0)
 adata_t.obs["lfc_clusters"] = KMeans(n_clusters=4, n_init=1000).fit_predict(lfc_pcs)
-adata_t.obs["lfc_clusters"] = adata_t.obs["lfc_clusters"].astype(str)
-# adata_t.obs["lfc_clusters"] = adata_t.obs["lfc_leiden"].astype(str)
+adata_t.obs["lfc_clusters"] = adata_t.obs["lfc_leiden"].astype(str)
+print("N clusters:", adata_t.obs["lfc_clusters"].nunique())
 
-# %%
 vmax = np.quantile(obs_de.absLFC.values, 0.95)
 sc.pl.embedding(
     adata_t,
@@ -720,6 +886,7 @@ sc.pl.embedding(
     cmap="coolwarm",
 )
 plt.tight_layout()
+plt.show()
 
 sc.pl.embedding(
     adata_t,
@@ -727,6 +894,7 @@ sc.pl.embedding(
     color=["lfc_clusters", "gene_score", "LFC_std"],
 )
 plt.tight_layout()
+plt.show()
 
 # %%
 ## Enrichment analysis per cluster
@@ -742,8 +910,8 @@ gene_sets = [
     # 'COVID-19_Related_Gene_Sets_2021',
 ]
 
-# LFC_CLUSTERING_KEY = "lfc_leiden"
-LFC_CLUSTERING_KEY = "lfc_clusters"
+LFC_CLUSTERING_KEY = "lfc_leiden"
+# LFC_CLUSTERING_KEY = "lfc_clusters"
 
 gene_info_ = adata_t.obs
 beta_module_keys = []
@@ -767,12 +935,12 @@ for cluster in np.arange(gene_info_[LFC_CLUSTERING_KEY].nunique()):
     gene_info_modules.append(gene_info_module)
 
     beta_module = adata_t[gene_info_module.loc[:, "gene"].values].X.toarray().mean(0)
-    _adata.obs.loc[:, beta_module_name] = beta_module
+    __adata.obs.loc[:, beta_module_name] = beta_module
     beta_module_keys.append(beta_module_name)
-
-    enr = perform_gsea(genes, gene_sets=gene_sets).assign(cluster=cluster)
-    all_enrichr_results.append(enr)
-all_enrichr_results = pd.concat(all_enrichr_results).astype({"Gene_set": "category"})
+    
+    # enr = perform_gsea(genes, gene_sets=gene_sets, n_trials_max=3, use_server=False).assign(cluster=cluster)
+    # all_enrichr_results.append(enr)
+# all_enrichr_results = pd.concat(all_enrichr_results).astype({"Gene_set": "category"})
 gene_info_modules = pd.concat(gene_info_modules).astype({"gene": "category"})
 gene_info_modules.to_csv(
     os.path.join(
@@ -781,57 +949,67 @@ gene_info_modules.to_csv(
     )
 )
 
-# %%
-# sc.pp.neighbors(_adata, use_rep="X_scviv2_attention_mog_u")
-# sc.tl.umap(_adata, min_dist=0.5)
-
-# %%
-
-## Plot cell subpopulations
-fig = sc.pl.embedding(
-    _adata,
-    basis="X_scviv2_attention_mog_u_mde",
-    color=["initial_clustering"],
-    return_fig=True,
-)
-
-# fig = sc.pl.umap(
-#     _adata,
-#     # basis="X_scviv2_attention_mog_u_mde",
-#     color=["initial_clustering"],
-#     return_fig=True,
-# )
-
-fig.savefig(
-    os.path.join(
-        FIGURE_DIR,
-        f"initial_clustering_{cluster}.svg",
-    )
-)
 
 # %%
 genes_of_interest = [
+    "IL1B",
+    # "LGALS1",
+    "LGALS2",
+    "CSF3R",
+    "HLA-DRA",
+    "HLA-DRB1",
     "IFITM3",
     "IFI6",
     "IFI27",
     "GBP1",
     "IRF7",
-    "ССL13",
-    "IL1B",
-    "LGALS1",
-    "LGALS2",
-    "CSF3R",
-    "HLA-DRA",
-    "HLA-DRB1",
-    "HLA-DPB1",
+    # "ССL13",
+    "NFKBIZ",
+    "SLC25A5",
+    "TNF",
+    "RHOB",
+    "TKT",
 ]
 for gene in genes_of_interest:
     if gene in gene_info_modules.index:
         print(
-            f"{gene} found, belongs, to cluster {gene_info_modules.loc[gene, LFC_CLUSTERING_KEY]}"
+            f"{gene} found, belongs, to cluster {gene_info_modules.loc[gene, LFC_CLUSTERING_KEY]}",
+            gene_info_modules.loc[gene, "LFC"]
         )
     else:
         print(f"{gene} not found")
+        
+        
+# %%
+adata_t2 = sc.AnnData(
+    X=betas_de,
+    obs=__adata.obs,
+    var=obs_de,
+)
+adata_t2 = adata_t2[adata_t2.obs["initial_clustering"].isin(["CD14", "CD16", "DCs"])].copy()
+vmax = 1.0
+sc.pl.heatmap(
+    adata_t2, 
+    genes_of_interest, 
+    # gene_info_modules.index,
+    groupby='initial_clustering',
+    cmap='coolwarm',
+    vmin=-vmax,
+    vmax=vmax,
+    swap_axes=True,
+    save=f"haniffa_DEGs_heatmap.svg",
+    # return_fig=True,
+)
+# fig.savefig(
+#     os.path.join(
+#         FIGURE_DIR,
+#         f"haniffa_DEGs_heatmap.svg",
+#     )
+# )
+# %% 
+# _adata2 = __adata.copy()
+# sc.pp.neighbors(_adata2, use_rep="X_scviv2_attention_mog_u_mde", n_neighbors=10)
+# sc.tl.umap(_adata2, min_dist=0.3, maxiter=1000, init_pos="X_scviv2_attention_mog_u_mde")
 
 # %%
 ## Plot beta modules activity scores & GSEA
@@ -850,12 +1028,12 @@ for beta_module_key in beta_module_keys:
         sep="\t",
     )
 
-    vmin, vmax = np.quantile(_adata.obs[beta_module_key], [0.10, 0.90])
+    vmin, vmax = np.quantile(__adata.obs[beta_module_key], [0.10, 0.90])
     # Option when sorted by abs
     # cmap = "viridis"
 
     # Option when sorted by sign
-    if _adata.obs[beta_module_key].mean() > 0:
+    if __adata.obs[beta_module_key].mean() > 0:
         cmap = "Reds"
         vmin = 0
     else:
@@ -863,7 +1041,7 @@ for beta_module_key in beta_module_keys:
         vmax = 0
 
     fig = sc.pl.embedding(
-        _adata,
+        __adata,
         basis="X_scviv2_attention_mog_u_mde",
         color=beta_module_key,
         vmin=vmin,
@@ -885,57 +1063,136 @@ for beta_module_key in beta_module_keys:
             f"{beta_module_key}_{cluster}.svg",
         )
     )
-    plt.tight_layout()
+    # fig = sc.pl.umap(
+    #     _adata2,
+    #     # basis="X_scviv2_attention_mog_u_mde",
+    #     color=beta_module_key,
+    #     vmin=vmin,
+    #     vmax=vmax,
+    #     cmap=cmap,
+    #     return_fig=True,
+    # )
+    # fig.savefig(
+    #     os.path.join(
+    #         FIGURE_DIR,
+    #         f"{beta_module_key}_{cluster}2.svg",
+    #     )
+    # )
+    # plt.tight_layout()
 
-    plot_df = (
-        all_enrichr_results.loc[lambda x: x.cluster == cluster, :]
-        .loc[lambda x: ~x.Term.isin(["Inflammatory Response"])]
-        .loc[lambda x: x["Adjusted P-value"] < 0.1, :]
-        .sort_values("Significance score", ascending=False)
-        .head(5)
-        # .sort_values("Gene_set")
-        .assign(
-            Term=lambda x: x.Term.str.split(r" \(GO", expand=True).loc[:, 0],
-        )
-    )
-    scaler = len(plot_df)
-    fig = (
-        p9.ggplot(
-            plot_df,
-            p9.aes(
-                x="Term",
-                y="Significance score",
-                # fill='Gene_set',
-            ),
-        )
-        + p9.geom_col(color="grey")
-        # + p9.geom_col()
-        + p9.labs(
-            x="",
-        )
-        + p9.theme_classic()
-        + p9.scale_y_continuous(expand=(0, 0))
-        + p9.scale_x_discrete(limits=plot_df.Term.tolist())
-        + p9.theme(
-            strip_background=p9.element_blank(),
-            axis_text_x=p9.element_text(rotation=0, hjust=1),
-            axis_text=p9.element_text(family="sans-serif", size=5),
-            axis_title=p9.element_text(family="sans-serif", size=6),
-        )
-        + p9.coord_flip()
-        # + p9.scale_x_discrete(limits=plot_df.Term.tolist())
-    )
-    fig.save(
-        os.path.join(
-            FIGURE_DIR,
-            f"haniffa.{cluster}.beta_modules_cts.{beta_module_key}.gsea.svg",
-        )
-    )
-    plt.tight_layout()
-    fig.draw(show=True)
+    # plot_df = (
+    #     all_enrichr_results.loc[lambda x: x.cluster == cluster, :]
+    #     .loc[lambda x: ~x.Term.isin(["Inflammatory Response"])]
+    #     .loc[lambda x: x["Adjusted P-value"] < 0.1, :]
+    #     .sort_values("Significance score", ascending=False)
+    #     .head(5)
+    #     # .sort_values("Gene_set")
+    #     .assign(
+    #         Term=lambda x: x.Term.str.split(r" \(GO", expand=True).loc[:, 0],
+    #     )
+    # )
+    # scaler = len(plot_df)
+    # fig = (
+    #     p9.ggplot(
+    #         plot_df,
+    #         p9.aes(
+    #             x="Term",
+    #             y="Significance score",
+    #             # fill='Gene_set',
+    #         ),
+    #     )
+    #     + p9.geom_col(color="grey")
+    #     # + p9.geom_col()
+    #     + p9.labs(
+    #         x="",
+    #     )
+    #     + p9.theme_classic()
+    #     + p9.scale_y_continuous(expand=(0, 0))
+    #     + p9.scale_x_discrete(limits=plot_df.Term.tolist())
+    #     + p9.theme(
+    #         strip_background=p9.element_blank(),
+    #         axis_text_x=p9.element_text(rotation=0, hjust=1),
+    #         axis_text=p9.element_text(family="sans-serif", size=5),
+    #         axis_title=p9.element_text(family="sans-serif", size=6),
+    #     )
+    #     + p9.coord_flip()
+    #     # + p9.scale_x_discrete(limits=plot_df.Term.tolist())
+    # )
+    # fig.save(
+    #     os.path.join(
+    #         FIGURE_DIR,
+    #         f"haniffa.{cluster}.beta_modules_cts.{beta_module_key}.gsea.svg",
+    #     )
+    # )
+    # plt.tight_layout()
+    # fig.draw(show=True)
+    # print(beta_module_key)
+    # for term in plot_df.Term.tolist():
+    #     print(term)
+    # print()
 
-    for term in plot_df.Term.tolist():
-        print(term)
+# %%
+plot_df_de = (
+    __adata.obs.loc[lambda x: x["initial_clustering"].isin(["CD14", "CD16", "DCs"])]
+    .assign(
+        initial_clustering=lambda x: x["initial_clustering"].astype(str)
+    )
+)
+plot_df_de
+# %%
+sns.violinplot(
+    plot_df_de, x="initial_clustering", y="beta_module_0",
+)
+plt.xlabel("")
+plt.ylabel("Log-LR")
+plt.savefig(
+    os.path.join(
+        FIGURE_DIR,
+        f"DE_violinplot_beta_module_0.svg",
+    )
+)
+plt.show()
+
+
+sns.violinplot(
+    plot_df_de, x="initial_clustering", y="beta_module_1",
+)
+plt.xlabel("")
+plt.ylabel("Log-LR")
+plt.savefig(
+    os.path.join(
+        FIGURE_DIR,
+        f"DE_violinplot_beta_module_1.svg",
+    )
+)
+plt.show()
+
+
+sns.violinplot(
+    plot_df_de, x="initial_clustering", y="beta_module_2",
+)
+plt.xlabel("")
+plt.ylabel("Log-LR")
+plt.savefig(
+    os.path.join(
+        FIGURE_DIR,
+        f"DE_violinplot_beta_module_2.svg",
+    )
+)
+plt.show()
+
+sns.violinplot(
+    plot_df_de, x="initial_clustering", y="beta_module_3",
+)
+plt.xlabel("")
+plt.ylabel("Log-LR")
+plt.savefig(
+    os.path.join(
+        FIGURE_DIR,
+        f"DE_violinplot_beta_module_3.svg",
+    )
+)
+plt.show()
 
 # %%
 da_res = model.get_outlier_cell_sample_pairs(
@@ -952,11 +1209,15 @@ log_ratios_casecontrol = log_p1 - log_p2
 
 gp1 = model.donor_info.query("is_covid2 == 1").patient_id.values
 gp2 = model.donor_info.query("is_covid1 == 1").patient_id.values
+# Late vs early
 log_p1 = da_res.log_probs.loc[{"sample": gp1}]
 log_p1 = logsumexp(log_p1, axis=1) - np.log(log_p1.shape[1])
 log_p2 = da_res.log_probs.loc[{"sample": gp2}]
 log_p2 = logsumexp(log_p2, axis=1) - np.log(log_p2.shape[1])
 log_ratios_earlylate = log_p1 - log_p2
+
+# %%
+
 
 # %%
 _adata.obs.loc[:, "log_ratios_casecontrol"] = log_ratios_casecontrol
@@ -980,38 +1241,159 @@ _adata.obs.loc[:, "log_ratios_earlylate"] = log_ratios_earlylate
 #         f"initial_clustering_{cluster}_all.svg",
 #     )
 # )
+# sc.pl.embedding(
+#     _adata,
+#     basis="X_scviv2_attention_mog_u_mde",
+#     color="initial_clustering",
+#     legend_loc="right",
+# )
 
-for key in ["initial_clustering", "log_ratios_casecontrol", "log_ratios_earlylate"]:
+plot_df = (
+    _adata.obs
+    .assign(
+        mde1=_adata.obsm["X_scviv2_attention_mog_u_mde"][:, 0], 
+        mde2=_adata.obsm["X_scviv2_attention_mog_u_mde"][:, 1]
+    )
+    .loc[_adata.obs.initial_clustering.isin(['CD14', 'CD16', 'DCs'])]
+    .assign(
+        initial_clustering=lambda x: x.initial_clustering.astype(str)
+    )
+)
+
+(
+    p9.ggplot(plot_df, p9.aes(x="mde1", y="mde2", color="initial_clustering"))
+    + p9.geom_point()
+)
+
+# %%
+sc.pp.neighbors(_adata, use_rep="X_scviv2_attention_mog_u_mde", n_neighbors=30)
+# fibroblast.obsp['normalized_connectivities'] = fibroblast.obsp['connectivities']/fibroblast.obsp['connectivities'].sum(1)
+
+# %%
+# fig = plt.figure(figsize=(2.5, 2.5))
+sns.violinplot(
+    plot_df, x="initial_clustering", y="log_ratios_casecontrol",
+)
+plt.xlabel("")
+plt.ylabel("Log-LR")
+plt.axhline(0, color='red', linestyle='--', linewidth=2)
+plt.ylim(-5.0, 5.0)
+plt.savefig(
+    os.path.join(
+        FIGURE_DIR,
+        f"DA_violinplot_{cluster}_all_casecontrol.svg",
+    )
+)
+
+# %%
+sns.violinplot(
+    plot_df, x="initial_clustering", y="log_ratios_earlylate",
+)
+plt.axhline(0, color='red', linestyle='--', linewidth=2)
+plt.xlabel("")
+plt.ylabel("Log-LR")
+plt.ylim(-2.0, 2.0)
+plt.savefig(
+    os.path.join(
+        FIGURE_DIR,
+        f"DA_violinplot_{cluster}_all_earlylate.svg",
+    )
+)
+
+# %%
+def get_smooth_logratios(adata, log_ratio_key):
+    adata.obsp["normalized_connectivities"] = adata.obsp["connectivities"] / adata.obsp[
+        "connectivities"
+    ].sum(1)
+    adata.obs[log_ratio_key + "_smoothed"] = np.asarray(
+        adata.obsp["normalized_connectivities"]
+        * np.expand_dims(adata.obs[log_ratio_key], 1)
+    ).squeeze()
+
+
+
+for key in ["log_ratios_casecontrol", "log_ratios_earlylate"]:
+    get_smooth_logratios(_adata, key)
+
     fig = sc.pl.embedding(
         _adata,
         basis="X_scviv2_attention_mog_u_mde",
-        color=key,
-        vmin=-0.6,
-        vmax=0.6,
+        color=[key, key+"_smoothed"],
+        # vmin=-0.6,
+        # vmax=0.6,
+        vmin=-2.5,
+        vmax=2.5,
         cmap="coolwarm",
         return_fig=True,
     )
     fig.savefig(
         os.path.join(
             FIGURE_DIR,
-            f"initial_clustering_{cluster}_all_{key}.svg",
+            f"DA_embs_{key}.svg",
         )
     )
 
+# %%
+from scipy.stats import ttest_ind
+from statsmodels.stats.weightstats import ttest_ind as sm_ttest
+
+
+for ct in ["CD14", "CD16", "DCs"]:
+    pop1 = _adata.obs.loc[lambda x: x.initial_clustering == ct]
+    pop2 = _adata.obs.loc[lambda x: x.initial_clustering != ct]
+
+    test1 = sm_ttest(
+        pop1.log_ratios_casecontrol,
+        pop2.log_ratios_casecontrol,
+        alternative="smaller",
+        value=-0.1
+    )
+    test2 = sm_ttest(
+        pop1.log_ratios_casecontrol,
+        pop2.log_ratios_casecontrol,
+        alternative="larger",
+        value=0.1
+    )
+    pval = np.minimum(test1[1], test2[1])
+    print(f"Cluster {ct}: {pval}")
 
 # %%
-plot_df = _adata.obs.loc[
-    lambda x: x.initial_clustering.isin(["CD14", "CD16", "DCs"])
-].melt(
-    id_vars=["initial_clustering"],
-    value_vars=["log_ratios_casecontrol", "log_ratios_earlylate"],
-)
+from scipy.stats import ttest_ind
+from statsmodels.stats.weightstats import ttest_ind as sm_ttest
 
-(
-    p9.ggplot(plot_df, p9.aes(x="initial_clustering", y="value", fill="variable"))
-    + p9.geom_boxplot()
-    + p9.ylim(-0.6, 0.6)
-)
+
+for ct in ["CD14", "CD16", "DCs"]:
+    pop1 = _adata.obs.loc[lambda x: x.initial_clustering == ct]
+    pop2 = _adata.obs.loc[lambda x: x.initial_clustering != ct]
+
+    test1 = sm_ttest(
+        pop1.log_ratios_earlylate,
+        pop2.log_ratios_earlylate,
+        alternative="smaller",
+        value=-0.1
+    )
+    test2 = sm_ttest(
+        pop1.log_ratios_earlylate,
+        pop2.log_ratios_earlylate,
+        alternative="larger",
+        value=0.1
+    )
+    pval = np.minimum(test1[1], test2[1])
+    print(f"Cluster {ct}: {pval}")
+
+# %%
+# plot_df = _adata.obs.loc[
+#     lambda x: x.initial_clustering.isin(["CD14", "CD16", "DCs"])
+# ].melt(
+#     id_vars=["initial_clustering"],
+#     value_vars=["log_ratios_casecontrol", "log_ratios_earlylate"],
+# )
+
+# (
+#     p9.ggplot(plot_df, p9.aes(x="initial_clustering", y="value", fill="variable"))
+#     + p9.geom_boxplot()
+#     + p9.ylim(-0.6, 0.6)
+# )
 
 
 # %%
