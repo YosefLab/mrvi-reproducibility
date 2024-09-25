@@ -321,21 +321,18 @@ plt.title(
     f"Admissibility Scores vs Reconstruction Log Probs for Heldout {holdout_sample} Cells"
 )
 
-# Add a trend line
-sns.regplot(
-    data=plot_data,
-    x="Admissibility Scores",
-    y="Reconstruction Scores",
-    scatter=False,
-    color="red",
-    line_kws={"linestyle": "--"},
-)
+# # Add a trend line
+# sns.regplot(
+#     data=plot_data,
+#     x="Admissibility Scores",
+#     y="Reconstruction Scores",
+#     scatter=False,
+#     color="red",
+#     line_kws={"linestyle": "--"},
+# )
 
 plt.xlabel("Admissibility Scores")
 plt.ylabel("Heldout Reconstruction Log Probability")
-
-plt.yscale("symlog")
-plt.xscale("symlog")
 
 plt.tight_layout()
 
