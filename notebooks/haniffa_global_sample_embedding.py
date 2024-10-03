@@ -84,7 +84,7 @@ cluster_b_sample_dist_matrices = cluster_b_sample_dist_matrices[patient_subset.i
 # %%
 # plot dist matrices together
 # Create a figure with 4 subplots
-fig, axs = plt.subplots(2, 2, figsize=(10, 10))
+fig, axs = plt.subplots(2, 2, figsize=(15, 15))
 
 # Flatten the axs array for easier indexing
 axs = axs.flatten()
@@ -111,13 +111,15 @@ for i, (matrix, title) in enumerate(zip(matrices, titles)):
     axs[i].set_title(title)
     axs[i].set_xlabel("Samples")
     axs[i].set_ylabel("Samples")
+    axs[i].set_xticklabels(patient_subset.values, rotation=90)
+    axs[i].set_yticklabels(patient_subset.values, rotation=0)
 
 # Adjust layout and display
 plt.tight_layout()
+plt.savefig("./figures/sample_embedding_experiment.png")
 plt.show()
 
-# Save the figure
-plt.savefig("./figures/sample_emedding_experiment.png")
 plt.close()
+# Save the figure
 
 # %%
